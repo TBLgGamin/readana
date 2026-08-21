@@ -48,8 +48,8 @@ enum class PageTurnMode {
 }
 
 /**
- * Columns per page. [Auto] gives a two-page spread whenever the window is wide enough, which on a
- * 3:2 tablet means landscape; the other values force one or two columns.
+ * Columns per page. [Auto] adapts reflowable text to the window but keeps fixed-layout books, such
+ * as comics, at one full-size page. The other values force one or two columns/pages.
  */
 enum class ReaderColumns {
     Auto,

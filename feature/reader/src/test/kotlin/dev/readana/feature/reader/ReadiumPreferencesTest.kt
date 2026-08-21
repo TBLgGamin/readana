@@ -15,6 +15,7 @@ import org.readium.r2.navigator.preferences.Axis
 import org.readium.r2.navigator.preferences.ColumnCount
 import org.readium.r2.navigator.preferences.Fit
 import org.readium.r2.navigator.preferences.FontFamily
+import org.readium.r2.navigator.preferences.Spread
 import org.readium.r2.navigator.preferences.Theme
 
 @RunWith(AndroidJUnit4::class)
@@ -109,6 +110,14 @@ class ReadiumPreferencesTest {
         assertEquals(ColumnCount.AUTO, preferences(columns = ReaderColumns.Auto).columnCount)
         assertEquals(ColumnCount.ONE, preferences(columns = ReaderColumns.One).columnCount)
         assertEquals(ColumnCount.TWO, preferences(columns = ReaderColumns.Two).columnCount)
+    }
+
+    @Test
+    fun `fixed-layout books default to one readable page and honor an explicit spread`() {
+        // Fixed-layout EPUBs ignore columnCount, so the matching spread preference must be set too.
+        assertEquals(Spread.NEVER, preferences(columns = ReaderColumns.Auto).spread)
+        assertEquals(Spread.NEVER, preferences(columns = ReaderColumns.One).spread)
+        assertEquals(Spread.ALWAYS, preferences(columns = ReaderColumns.Two).spread)
     }
 
     @Test

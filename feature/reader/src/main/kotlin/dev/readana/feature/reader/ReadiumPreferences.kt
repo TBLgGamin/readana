@@ -12,6 +12,7 @@ import org.readium.r2.navigator.preferences.Color
 import org.readium.r2.navigator.preferences.ColumnCount
 import org.readium.r2.navigator.preferences.Fit
 import org.readium.r2.navigator.preferences.FontFamily
+import org.readium.r2.navigator.preferences.Spread
 import org.readium.r2.navigator.preferences.Theme
 
 /** Readium has no pitch-black theme, so black is dark with the colours overridden. */
@@ -39,6 +40,9 @@ internal fun ReaderSettings.toEpubPreferences(systemInDarkTheme: Boolean): EpubP
         fontSize = fontScale.toDouble(),
         lineHeight = lineHeight.toDouble().coerceAtMost(MAX_LINE_HEIGHT),
         pageMargins = MARGIN_BASE + pageMargins * MARGIN_STEP,
+        // Fixed-layout EPUBs (comics and image-based books) ignore columnCount and use spread.
+        // Keep Auto to one full-size page; two tiny comic pages are usually unreadable on a tablet.
+        spread = columns.toSpread(),
         // A gap between paragraphs replaces the publisher's indent; one or the other, never both,
         // or the text ends up looking doubly broken up.
         paragraphSpacing = paragraphSpacing.toDouble(),
@@ -63,6 +67,11 @@ private fun ReaderColumns.toColumnCount(): ColumnCount = when (this) {
     ReaderColumns.Auto -> ColumnCount.AUTO
     ReaderColumns.One -> ColumnCount.ONE
     ReaderColumns.Two -> ColumnCount.TWO
+}
+
+private fun ReaderColumns.toSpread(): Spread = when (this) {
+    ReaderColumns.Auto, ReaderColumns.One -> Spread.NEVER
+    ReaderColumns.Two -> Spread.ALWAYS
 }
 
 private fun ReaderFont.toReadiumFontFamily(): FontFamily? = when (this) {
