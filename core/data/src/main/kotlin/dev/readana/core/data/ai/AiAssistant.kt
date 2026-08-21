@@ -128,12 +128,16 @@ class DefaultAiAssistant @Inject constructor(
 
             val request = requestFor(thread, history, userText, images, settings.illustrateFromWeb)
             val answer = StringBuilder()
-            val failure = collectAnswer(client, request, answer)
+            val stop = StringBuilder()
+            val failure = collectAnswer(client, request, answer, stop)
 
             finish(thread, answer.toString(), failure)
+            // An answer with nothing in it is a failure whatever the provider calls it: a model
+            // with adaptive thinking can spend the entire output budget before writing a word.
+            val outcome = failure ?: emptyAnswerError(answer, stop.toString())
             emit(
-                if (failure != null && answer.isEmpty()) {
-                    AssistantEvent.Failed(failure)
+                if (outcome != null) {
+                    AssistantEvent.Failed(outcome, answer.toString())
                 } else {
                     AssistantEvent.Done(answer.toString())
                 }
@@ -167,7 +171,8 @@ class DefaultAiAssistant @Inject constructor(
     private suspend fun FlowCollector<AssistantEvent>.collectAnswer(
         client: LlmClient,
         request: LlmRequest,
-        answer: StringBuilder
+        answer: StringBuilder,
+        stop: StringBuilder
     ): AppError? = try {
         client.stream(request).collect { event ->
             when (event) {
@@ -176,12 +181,16 @@ class DefaultAiAssistant @Inject constructor(
                     emit(AssistantEvent.Delta(answer.toString()))
                 }
 
-                is LlmEvent.Done -> Timber.d(
-                    "AI answer: %d in (%d cached), %d out",
-                    event.inputTokens ?: 0,
-                    event.cachedInputTokens ?: 0,
-                    event.outputTokens ?: 0
-                )
+                is LlmEvent.Done -> {
+                    event.stopReason?.let { stop.append(it) }
+                    Timber.d(
+                        "AI answer: %d in (%d cached), %d out, stop=%s",
+                        event.inputTokens ?: 0,
+                        event.cachedInputTokens ?: 0,
+                        event.outputTokens ?: 0,
+                        event.stopReason ?: "?"
+                    )
+                }
             }
         }
         null
@@ -189,6 +198,16 @@ class DefaultAiAssistant @Inject constructor(
         llm.error
     } catch (io: IOException) {
         AppError.Network(io.message ?: "The connection dropped.", io)
+    }
+
+    private fun emptyAnswerError(answer: StringBuilder, stopReason: String): AppError? {
+        if (answer.isNotBlank()) return null
+        Timber.w("The provider answered with nothing; stop reason %s", stopReason.ifEmpty { "?" })
+        return if (stopReason in BUDGET_STOPS) {
+            AppError.Unexpected(OUT_OF_BUDGET)
+        } else {
+            AppError.Unexpected(NOTHING_WRITTEN)
+        }
     }
 
     override suspend fun reusableRecap(book: Book, coveredFraction: Float?): AiThread? {
@@ -241,9 +260,17 @@ class DefaultAiAssistant @Inject constructor(
 
     private companion object {
         const val NO_PROVIDER = "No AI provider is set up yet. Add one in Settings."
+        const val OUT_OF_BUDGET =
+            "The model used up its whole answer budget before writing anything. Ask again, " +
+                "or put the question more plainly."
+        const val NOTHING_WRITTEN = "The provider sent an empty answer."
+        val BUDGET_STOPS = setOf("max_tokens", "length")
         const val RECAP_TITLE = "Where was I?"
         const val TITLE_CHARS = 80
-        const val ANSWER_MAX_TOKENS = 700
-        const val RECAP_MAX_TOKENS = 600
+
+        // Generous, because models with adaptive thinking spend this budget on thinking too: at
+        // 700 an answer that thought hard arrived empty.
+        const val ANSWER_MAX_TOKENS = 3_000
+        const val RECAP_MAX_TOKENS = 2_500
     }
 }

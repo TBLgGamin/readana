@@ -92,6 +92,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A question that gets no answer at all now says so. Models that think before answering spend the
+  same budget on thinking, and a long deliberation could use the lot before a single word was
+  written; the empty result was drawn as an empty message, so the spinner simply vanished and left
+  nothing behind. The budget is several times larger, an empty answer is reported with the reason
+  the provider gave, and an answer consisting only of a picture that could not be found says that
+  instead of rendering blank.
+
 - An answer that fails part-way through says so, keeping what was written, instead of stopping
   mid-sentence with no explanation. A provider that is overloaded ends the stream with an error
   after a sentence or two, and that error was being swallowed whenever any text had arrived.

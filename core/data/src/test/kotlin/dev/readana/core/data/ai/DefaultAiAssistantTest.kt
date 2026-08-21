@@ -110,6 +110,32 @@ class DefaultAiAssistantTest {
     }
 
     @Test
+    fun `an answer with nothing in it is reported rather than shown as silence`() = runTest {
+        client = FakeLlmClient(chunks = emptyList(), stopReason = "max_tokens")
+        val thread = startThread()
+
+        val events = assistant().reply(thread, question = "Why?").toList()
+
+        val failure = assertIs<AssistantEvent.Failed>(events.last())
+        assertTrue(failure.error.message.contains("budget"), failure.error.message)
+        assertTrue(threads.messagesOf(thread.id).none { it.role == AiRole.Assistant })
+    }
+
+    @Test
+    fun `a stream that breaks off keeps what was written and says what went wrong`() = runTest {
+        client = HalfwayFailingLlmClient(AppError.Http(529, "overloaded"))
+        val thread = startThread()
+
+        val events = assistant().reply(thread, question = "Why?").toList()
+
+        val failure = assertIs<AssistantEvent.Failed>(events.last())
+        assertEquals("Ishmael ", failure.partialText)
+        assertIs<AppError.Http>(failure.error)
+        // The half answer is kept, so a follow-up still has the thread's history.
+        assertEquals("Ishmael ", threads.messagesOf(thread.id).last().text)
+    }
+
+    @Test
     fun `a failed request reports the provider's error`() = runTest {
         client = FailingLlmClient(AppError.Unauthorized("bad key"))
         val thread = startThread()
@@ -195,9 +221,12 @@ private class FixedClientFactory(private val client: LlmClient) : LlmClientFacto
     override fun create(config: AiProviderConfig): LlmClient? = client.takeIf { config.isUsable }
 }
 
-private class FakeLlmClient(private val chunks: List<String>) : LlmClient {
-    override fun stream(request: LlmRequest): Flow<LlmEvent> =
-        flowOf(*chunks.map { LlmEvent.Delta(it) }.toTypedArray(), LlmEvent.Done())
+private class FakeLlmClient(private val chunks: List<String>, private val stopReason: String? = "end_turn") :
+    LlmClient {
+    override fun stream(request: LlmRequest): Flow<LlmEvent> = flowOf(
+        *chunks.map { LlmEvent.Delta(it) }.toTypedArray(),
+        LlmEvent.Done(stopReason = stopReason)
+    )
 
     override suspend fun listModels(): AppResult<List<LlmModel>> = emptyList<LlmModel>().asSuccess()
 
@@ -210,6 +239,18 @@ private class RecordingLlmClient : LlmClient {
     override fun stream(request: LlmRequest): Flow<LlmEvent> {
         requests += request
         return flowOf(LlmEvent.Delta("ok"), LlmEvent.Done())
+    }
+
+    override suspend fun listModels(): AppResult<List<LlmModel>> = emptyList<LlmModel>().asSuccess()
+
+    override suspend fun ping(): AppResult<Long> = 1L.asSuccess()
+}
+
+/** Writes a little, then breaks off — an overloaded provider's usual shape. */
+private class HalfwayFailingLlmClient(private val error: AppError) : LlmClient {
+    override fun stream(request: LlmRequest): Flow<LlmEvent> = flow {
+        emit(LlmEvent.Delta("Ishmael "))
+        throw LlmException(error)
     }
 
     override suspend fun listModels(): AppResult<List<LlmModel>> = emptyList<LlmModel>().asSuccess()

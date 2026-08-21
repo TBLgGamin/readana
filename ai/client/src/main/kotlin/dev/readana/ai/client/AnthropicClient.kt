@@ -95,8 +95,11 @@ internal class AnthropicClient(private val httpClient: HttpClient, private val e
             EVENT_MESSAGE_START ->
                 usage.read(LlmJson.decodeFromString<MessageStart>(event.data).message?.usage)
 
-            EVENT_MESSAGE_DELTA ->
-                usage.read(LlmJson.decodeFromString<MessageDelta>(event.data).usage)
+            EVENT_MESSAGE_DELTA -> {
+                val message = LlmJson.decodeFromString<MessageDelta>(event.data)
+                usage.read(message.usage)
+                usage.stopReason = message.delta?.stopReason
+            }
 
             EVENT_ERROR -> {
                 val message = LlmJson.decodeFromString<StreamError>(event.data).error?.message
@@ -112,6 +115,7 @@ internal class AnthropicClient(private val httpClient: HttpClient, private val e
         private var input: Int? = null
         private var output: Int? = null
         private var cached: Int? = null
+        var stopReason: String? = null
 
         fun read(usage: Usage?) {
             usage ?: return
@@ -120,7 +124,7 @@ internal class AnthropicClient(private val httpClient: HttpClient, private val e
             usage.cacheReadInputTokens?.let { cached = it }
         }
 
-        fun toDone() = LlmEvent.Done(input, output, cached)
+        fun toDone() = LlmEvent.Done(input, output, cached, stopReason)
     }
 
     private companion object {
@@ -176,7 +180,10 @@ private data class MessageStart(val message: StartedMessage? = null)
 private data class StartedMessage(val usage: Usage? = null)
 
 @Serializable
-private data class MessageDelta(val usage: Usage? = null)
+private data class MessageDelta(val usage: Usage? = null, val delta: StopInfo? = null)
+
+@Serializable
+private data class StopInfo(@SerialName("stop_reason") val stopReason: String? = null)
 
 @Serializable
 private data class Usage(

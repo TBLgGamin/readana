@@ -32,7 +32,7 @@ class AnthropicClientTest {
             listOf("Ishmael ", "is the narrator."),
             events.filterIsInstance<LlmEvent.Delta>().map { it.text }
         )
-        assertEquals(LlmEvent.Done(1200, 42, 1024), events.last())
+        assertEquals(LlmEvent.Done(1200, 42, 1024, stopReason = "end_turn"), events.last())
     }
 
     @Test

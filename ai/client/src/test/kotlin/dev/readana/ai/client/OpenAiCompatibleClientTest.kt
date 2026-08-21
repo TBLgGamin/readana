@@ -31,7 +31,7 @@ class OpenAiCompatibleClientTest {
             listOf("Ishmael ", "is the narrator."),
             events.filterIsInstance<LlmEvent.Delta>().map { it.text }
         )
-        assertEquals(LlmEvent.Done(1200, 42, 1024), events.last())
+        assertEquals(LlmEvent.Done(1200, 42, 1024, stopReason = "stop"), events.last())
         assertEquals(1, events.count { it is LlmEvent.Done })
     }
 

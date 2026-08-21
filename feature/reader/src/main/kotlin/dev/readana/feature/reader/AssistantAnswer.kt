@@ -30,6 +30,11 @@ import coil3.compose.AsyncImage
 @Composable
 internal fun AssistantAnswer(text: String, pictures: Map<String, AssistantPicture>, modifier: Modifier = Modifier) {
     val parts = remember(text) { text.splitOnMarkers() }
+    // An answer that is nothing but a marker whose picture could not be found must not render as
+    // blank space; the reader is owed either the picture or a word about why there isn't one.
+    val hasVisibleContent = parts.any { part ->
+        part is AnswerPart.Prose || pictures.containsKey((part as AnswerPart.Marker).key)
+    }
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         parts.forEach { part ->
             when (part) {
@@ -37,11 +42,27 @@ internal fun AssistantAnswer(text: String, pictures: Map<String, AssistantPictur
                     Text(text = part.text, style = MaterialTheme.typography.bodyLarge)
                 }
 
-                is AnswerPart.Marker -> pictures[part.key]?.let { PictureBlock(it) }
+                is AnswerPart.Marker -> when (val picture = pictures[part.key]) {
+                    null -> if (!hasVisibleContent) MissingPicture(part.key)
+                    else -> PictureBlock(picture)
+                }
             }
         }
     }
 }
+
+@Composable
+private fun MissingPicture(key: String, modifier: Modifier = Modifier) {
+    Text(
+        text = stringResource(R.string.feature_reader_ai_picture_missing, key.subjectLabel()),
+        modifier = modifier,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+/** "image:hms victory" reads back as "hms victory"; a figure marker keeps its own name. */
+private fun String.subjectLabel(): String = substringAfter(':').trim()
 
 @Composable
 private fun PictureBlock(picture: AssistantPicture, modifier: Modifier = Modifier) {

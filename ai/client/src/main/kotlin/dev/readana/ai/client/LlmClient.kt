@@ -82,7 +82,9 @@ sealed interface LlmEvent {
         val inputTokens: Int? = null,
         val outputTokens: Int? = null,
         /** Input tokens served from the provider's prompt cache, when it reports them. */
-        val cachedInputTokens: Int? = null
+        val cachedInputTokens: Int? = null,
+        /** Why the model stopped: "end_turn", "max_tokens", "stop", "length", … */
+        val stopReason: String? = null
     ) : LlmEvent
 }
 

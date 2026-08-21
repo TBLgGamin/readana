@@ -98,6 +98,7 @@ internal class OpenAiCompatibleClient(private val httpClient: HttpClient, privat
         val text = chunk.choices.firstOrNull()?.delta?.content
         if (!text.isNullOrEmpty()) emit(LlmEvent.Delta(text))
         usage.read(chunk.usage)
+        chunk.choices.firstOrNull()?.finishReason?.let { usage.stopReason = it }
     }
 
     /** Only the last chunk carries usage, and only when the provider supports `stream_options`. */
@@ -105,6 +106,7 @@ internal class OpenAiCompatibleClient(private val httpClient: HttpClient, privat
         private var input: Int? = null
         private var output: Int? = null
         private var cached: Int? = null
+        var stopReason: String? = null
 
         fun read(usage: OpenAiUsage?) {
             usage ?: return
@@ -113,7 +115,7 @@ internal class OpenAiCompatibleClient(private val httpClient: HttpClient, privat
             usage.promptTokensDetails?.cachedTokens?.let { cached = it }
         }
 
-        fun toDone() = LlmEvent.Done(input, output, cached)
+        fun toDone() = LlmEvent.Done(input, output, cached, stopReason)
     }
 
     private fun OpenAiModelEntry.toModel(): LlmModel = LlmModel(
