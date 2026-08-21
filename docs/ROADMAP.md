@@ -50,6 +50,5 @@ Milestones are sized so each one ships something usable on the tablet.
 
 ## M6 — Polish
 
-- [ ] Text-to-speech (Readium TTS navigator), reading statistics, sync/backup of library metadata
 - [ ] Roborazzi screenshot tests, baseline profiles, release signing + GitHub Releases
 - [ ] Stylus: highlight with pen, palm rejection in reader

@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Book import pipeline: copies EPUB/PDF files into app storage or the chosen SAF library folder,
+  extracts title, authors, language and cover through Readium, skips files already in the library
+  and deletes files together with their entry.
 - Material 3 Expressive theming app-wide: `ReadanaTheme` builds on `MaterialExpressiveTheme` with
   the expressive motion scheme, and loading states use the expressive `LoadingIndicator`.
 - Project scaffold (M0): Gradle 9.7 / AGP 9.3 / Kotlin 2.4 multi-module build with convention

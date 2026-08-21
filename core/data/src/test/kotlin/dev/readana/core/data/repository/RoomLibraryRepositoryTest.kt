@@ -83,6 +83,15 @@ class RoomLibraryRepositoryTest {
         }
     }
 
+    @Test
+    fun `finds duplicates by title and size only`() = runTest {
+        repository.upsert(book("1"))
+
+        assertNotNull(repository.findDuplicate("Title 1", 1234))
+        assertNull(repository.findDuplicate("Title 1", 9999))
+        assertNull(repository.findDuplicate("Another title", 1234))
+    }
+
     private fun book(id: String, addedAt: Long = 1_000, lastOpenedAt: Long? = null) = Book(
         id = id,
         title = "Title $id",

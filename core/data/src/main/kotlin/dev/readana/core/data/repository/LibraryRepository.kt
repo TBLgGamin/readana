@@ -23,6 +23,9 @@ interface LibraryRepository {
 
     suspend fun getBook(id: String): Book?
 
+    /** An already-imported book with the same title and byte size, used to skip re-imports. */
+    suspend fun findDuplicate(title: String, sizeBytes: Long): Book?
+
     suspend fun upsert(book: Book)
 
     suspend fun remove(id: String)
@@ -45,6 +48,10 @@ class RoomLibraryRepository @Inject constructor(
 
     override suspend fun getBook(id: String): Book? = withContext(ioDispatcher) {
         bookDao.getById(id)?.toModel()
+    }
+
+    override suspend fun findDuplicate(title: String, sizeBytes: Long): Book? = withContext(ioDispatcher) {
+        bookDao.findByTitleAndSize(title, sizeBytes)?.toModel()
     }
 
     override suspend fun upsert(book: Book) = withContext(ioDispatcher) {
