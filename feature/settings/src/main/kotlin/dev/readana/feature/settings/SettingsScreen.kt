@@ -40,6 +40,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.readana.core.designsystem.component.LoadingState
 import dev.readana.core.model.PageTurnMode
+import dev.readana.core.model.ReaderColumns
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.ReaderTheme
 import dev.readana.core.model.SourceSettings
@@ -55,6 +56,7 @@ internal fun SettingsRoute(modifier: Modifier = Modifier, viewModel: SettingsVie
         onFontScaleChange = viewModel::setFontScale,
         onThemeChange = viewModel::setTheme,
         onPageTurnModeChange = viewModel::setPageTurnMode,
+        onColumnsChange = viewModel::setColumns,
         onKeepScreenOnChange = viewModel::setKeepScreenOn,
         onVolumeKeysChange = viewModel::setVolumeKeysTurnPages,
         onLibraryFolderChange = viewModel::setLibraryFolder,
@@ -72,6 +74,7 @@ internal fun SettingsScreen(
     onFontScaleChange: (Float) -> Unit,
     onThemeChange: (ReaderTheme) -> Unit,
     onPageTurnModeChange: (PageTurnMode) -> Unit,
+    onColumnsChange: (ReaderColumns) -> Unit,
     onKeepScreenOnChange: (Boolean) -> Unit,
     onVolumeKeysChange: (Boolean) -> Unit,
     onLibraryFolderChange: (String?) -> Unit,
@@ -100,6 +103,7 @@ internal fun SettingsScreen(
                     onFontScaleChange = onFontScaleChange,
                     onThemeChange = onThemeChange,
                     onPageTurnModeChange = onPageTurnModeChange,
+                    onColumnsChange = onColumnsChange,
                     onKeepScreenOnChange = onKeepScreenOnChange,
                     onVolumeKeysChange = onVolumeKeysChange
                 )
@@ -127,6 +131,7 @@ private fun ReaderSection(
     onFontScaleChange: (Float) -> Unit,
     onThemeChange: (ReaderTheme) -> Unit,
     onPageTurnModeChange: (PageTurnMode) -> Unit,
+    onColumnsChange: (ReaderColumns) -> Unit,
     onKeepScreenOnChange: (Boolean) -> Unit,
     onVolumeKeysChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
@@ -155,6 +160,14 @@ private fun ReaderSection(
             selected = settings.pageTurnMode,
             label = { it.name },
             onSelect = onPageTurnModeChange
+        )
+
+        Text(stringResource(R.string.feature_settings_columns))
+        ChipRow(
+            options = ReaderColumns.entries,
+            selected = settings.columns,
+            label = { it.name },
+            onSelect = onColumnsChange
         )
 
         SwitchRow(

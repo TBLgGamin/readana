@@ -3,4 +3,19 @@
     <string name="feature_reader_back">Back</string>
     <string name="feature_reader_not_found">This book is no longer in your library.</string>
     <string name="feature_reader_open_failed">Could not open this book: %1$s</string>
+    <string name="feature_reader_contents">Contents</string>
+    <string name="feature_reader_contents_empty">This book has no table of contents.</string>
+    <string name="feature_reader_settings">Reading settings</string>
+    <string name="feature_reader_position">Position %1$d of %2$d</string>
+    <string name="feature_reader_progress">%1$d%%</string>
+    <string name="feature_reader_font">Typeface</string>
+    <string name="feature_reader_font_size">Font size</string>
+    <string name="feature_reader_line_height">Line spacing</string>
+    <string name="feature_reader_margins">Margins</string>
+    <string name="feature_reader_theme">Theme</string>
+    <string name="feature_reader_page_turn">Page turning</string>
+    <string name="feature_reader_columns">Columns</string>
+    <string name="feature_reader_tap_to_turn">Tap edges to turn pages</string>
+    <string name="feature_reader_volume_keys">Volume keys turn pages</string>
+    <string name="feature_reader_keep_screen_on">Keep screen on</string>
 </resources>

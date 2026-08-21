@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.readana.core.data.repository.BookSourceRegistry
 import dev.readana.core.data.repository.SettingsRepository
 import dev.readana.core.model.PageTurnMode
+import dev.readana.core.model.ReaderColumns
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.ReaderTheme
 import dev.readana.core.model.SourceSettings
@@ -55,6 +56,8 @@ class SettingsViewModel @Inject constructor(
     fun setTheme(theme: ReaderTheme) = updateReader { it.copy(theme = theme) }
 
     fun setPageTurnMode(mode: PageTurnMode) = updateReader { it.copy(pageTurnMode = mode) }
+
+    fun setColumns(columns: ReaderColumns) = updateReader { it.copy(columns = columns) }
 
     fun setKeepScreenOn(enabled: Boolean) = updateReader { it.copy(keepScreenOn = enabled) }
 

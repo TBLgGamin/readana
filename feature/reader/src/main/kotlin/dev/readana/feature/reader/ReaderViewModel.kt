@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.readana.core.common.coroutines.ApplicationScope
+import dev.readana.core.common.input.VolumeKeyRelay
 import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
 import dev.readana.core.data.repository.LibraryRepository
@@ -62,6 +63,8 @@ internal class ReaderViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val sessionFactory: ReaderSessionFactory,
     private val sessionStore: ReaderSessionStore,
+    /** Exposed so the reading surface can claim the volume keys while it is on screen. */
+    val volumeKeyRelay: VolumeKeyRelay,
     @ApplicationScope private val applicationScope: CoroutineScope
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<ReaderUiState>(ReaderUiState.Loading)

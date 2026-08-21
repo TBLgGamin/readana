@@ -2,6 +2,7 @@ package dev.readana.feature.reader
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.readana.core.model.PageTurnMode
+import dev.readana.core.model.ReaderColumns
 import dev.readana.core.model.ReaderFont
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.ReaderTheme
@@ -11,6 +12,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import org.junit.runner.RunWith
 import org.readium.r2.navigator.preferences.Axis
+import org.readium.r2.navigator.preferences.ColumnCount
 import org.readium.r2.navigator.preferences.Fit
 import org.readium.r2.navigator.preferences.FontFamily
 import org.readium.r2.navigator.preferences.Theme
@@ -88,6 +90,13 @@ class ReadiumPreferencesTest {
     }
 
     @Test
+    fun `maps the column choice`() {
+        assertEquals(ColumnCount.AUTO, preferences(columns = ReaderColumns.Auto).columnCount)
+        assertEquals(ColumnCount.ONE, preferences(columns = ReaderColumns.One).columnCount)
+        assertEquals(ColumnCount.TWO, preferences(columns = ReaderColumns.Two).columnCount)
+    }
+
+    @Test
     fun `PDFs get a reading axis and a page fit`() {
         val paginated = settings(pageTurn = PageTurnMode.Paginated).toPdfiumPreferences()
         val scrolled = settings(pageTurn = PageTurnMode.Scrolled).toPdfiumPreferences()
@@ -109,8 +118,9 @@ class ReadiumPreferencesTest {
         lineHeight: Float = ReaderSettings().lineHeight,
         pageMargins: Float = 1f,
         pageTurn: PageTurnMode = PageTurnMode.Paginated,
+        columns: ReaderColumns = ReaderColumns.Auto,
         systemInDarkTheme: Boolean = false
-    ) = settings(theme, font, fontScale, lineHeight, pageMargins, pageTurn)
+    ) = settings(theme, font, fontScale, lineHeight, pageMargins, pageTurn, columns)
         .toEpubPreferences(systemInDarkTheme)
 
     private fun settings(
@@ -119,13 +129,15 @@ class ReadiumPreferencesTest {
         fontScale: Float = 1f,
         lineHeight: Float = ReaderSettings().lineHeight,
         pageMargins: Float = 1f,
-        pageTurn: PageTurnMode = PageTurnMode.Paginated
+        pageTurn: PageTurnMode = PageTurnMode.Paginated,
+        columns: ReaderColumns = ReaderColumns.Auto
     ) = ReaderSettings(
         fontScale = fontScale,
         fontFamily = font,
         theme = theme,
         lineHeight = lineHeight,
         pageMargins = pageMargins,
-        pageTurnMode = pageTurn
+        pageTurnMode = pageTurn,
+        columns = columns
     )
 }

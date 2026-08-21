@@ -1,6 +1,7 @@
 package dev.readana.feature.reader
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.readana.core.common.input.VolumeKeyRelay
 import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
 import dev.readana.core.common.result.asFailure
@@ -50,6 +51,7 @@ class ReaderViewModelTest {
         settingsRepository = settings,
         sessionFactory = sessionFactory,
         sessionStore = sessionStore,
+        volumeKeyRelay = VolumeKeyRelay(),
         applicationScope = applicationScope
     )
 

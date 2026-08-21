@@ -1,6 +1,7 @@
 package dev.readana.feature.reader
 
 import dev.readana.core.model.PageTurnMode
+import dev.readana.core.model.ReaderColumns
 import dev.readana.core.model.ReaderFont
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.ReaderTheme
@@ -33,7 +34,7 @@ internal fun ReaderSettings.toEpubPreferences(systemInDarkTheme: Boolean): EpubP
     val resolvedTheme = theme.resolve(systemInDarkTheme)
     return EpubPreferences(
         backgroundColor = if (theme == ReaderTheme.Black) Color(BLACK_BACKGROUND.toInt()) else null,
-        columnCount = ColumnCount.AUTO,
+        columnCount = columns.toColumnCount(),
         fontFamily = family,
         fontSize = fontScale.toDouble(),
         lineHeight = lineHeight.toDouble().coerceAtMost(MAX_LINE_HEIGHT),
@@ -51,6 +52,12 @@ internal fun ReaderSettings.toPdfiumPreferences(): PdfiumPreferences = PdfiumPre
     fit = Fit.CONTAIN,
     scrollAxis = if (pageTurnMode == PageTurnMode.Scrolled) Axis.VERTICAL else Axis.HORIZONTAL
 )
+
+private fun ReaderColumns.toColumnCount(): ColumnCount = when (this) {
+    ReaderColumns.Auto -> ColumnCount.AUTO
+    ReaderColumns.One -> ColumnCount.ONE
+    ReaderColumns.Two -> ColumnCount.TWO
+}
 
 private fun ReaderFont.toReadiumFontFamily(): FontFamily? = when (this) {
     ReaderFont.Publisher -> null

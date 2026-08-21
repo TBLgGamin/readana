@@ -14,18 +14,30 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.readana.core.common.input.VolumeKey
+import dev.readana.core.common.input.VolumeKeyRelay
 import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.EmptyState
 import dev.readana.core.designsystem.component.LoadingState
+import dev.readana.core.model.ReaderSettings
+import org.readium.r2.navigator.Navigator
+import org.readium.r2.navigator.OverflowableNavigator
 import org.readium.r2.shared.publication.Locator
+
+/** Reader chrome floats over the page, so it is only mostly opaque. */
+internal const val CHROME_ALPHA = 0.95f
 
 @Composable
 internal fun ReaderRoute(
@@ -37,12 +49,30 @@ internal fun ReaderRoute(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val systemInDarkTheme = isSystemInDarkTheme()
     LaunchedEffect(bookId) { viewModel.open(bookId, systemInDarkTheme) }
+    var navigator by remember { mutableStateOf<Navigator?>(null) }
+    val ready = uiState as? ReaderUiState.Ready
+
     ReaderScreen(
         uiState = uiState,
         onBack = onBack,
         onToggleChrome = viewModel::toggleChrome,
         onLocatorChange = viewModel::onLocatorChanged,
+        onNavigator = { navigator = it },
+        onSeek = { fraction -> viewModel.positionAt(fraction)?.let { navigator?.go(it) } },
+        onShowSheet = viewModel::showSheet,
+        onDismissSheet = viewModel::dismissSheet,
+        onSelectChapter = { item ->
+            viewModel.tocLink(item.index)?.let { navigator?.go(it) }
+            viewModel.dismissSheet()
+        },
+        onSettingsChange = viewModel::updateSettings,
         modifier = modifier
+    )
+
+    VolumeKeyPaging(
+        relay = viewModel.volumeKeyRelay,
+        navigator = navigator as? OverflowableNavigator,
+        enabled = ready?.settings?.volumeKeysTurnPages == true
     )
 }
 
@@ -52,6 +82,12 @@ internal fun ReaderScreen(
     onBack: () -> Unit,
     onToggleChrome: () -> Unit,
     onLocatorChange: (Locator) -> Unit,
+    onNavigator: (Navigator?) -> Unit,
+    onSeek: (Float) -> Unit,
+    onShowSheet: (ReaderSheet) -> Unit,
+    onDismissSheet: () -> Unit,
+    onSelectChapter: (TocItem) -> Unit,
+    onSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -65,17 +101,20 @@ internal fun ReaderScreen(
 
             is ReaderUiState.Failed -> EmptyState(
                 icon = ReadanaIcons.Library,
-                title = stringResource(
-                    R.string.feature_reader_open_failed,
-                    uiState.error.message
-                )
+                title = stringResource(R.string.feature_reader_open_failed, uiState.error.message)
             )
 
             is ReaderUiState.Ready -> ReadingSurface(
                 state = uiState,
                 onBack = onBack,
                 onToggleChrome = onToggleChrome,
-                onLocatorChange = onLocatorChange
+                onLocatorChange = onLocatorChange,
+                onNavigator = onNavigator,
+                onSeek = onSeek,
+                onShowSheet = onShowSheet,
+                onDismissSheet = onDismissSheet,
+                onSelectChapter = onSelectChapter,
+                onSettingsChange = onSettingsChange
             )
         }
     }
@@ -87,6 +126,12 @@ private fun ReadingSurface(
     onBack: () -> Unit,
     onToggleChrome: () -> Unit,
     onLocatorChange: (Locator) -> Unit,
+    onNavigator: (Navigator?) -> Unit,
+    onSeek: (Float) -> Unit,
+    onShowSheet: (ReaderSheet) -> Unit,
+    onDismissSheet: () -> Unit,
+    onSelectChapter: (TocItem) -> Unit,
+    onSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
     modifier: Modifier = Modifier
 ) {
     KeepScreenOnEffect(state.settings.keepScreenOn)
@@ -98,15 +143,55 @@ private fun ReadingSurface(
             settings = state.settings,
             onLocatorChange = onLocatorChange,
             onCenterTap = onToggleChrome,
-            onNavigator = {},
+            onNavigator = onNavigator,
             modifier = Modifier.fillMaxSize()
         )
+        BrightnessGestureZone(modifier = Modifier.align(Alignment.CenterStart))
         ReaderTopBar(
             title = state.title,
             visible = state.chromeVisible,
             onBack = onBack,
             modifier = Modifier.align(Alignment.TopCenter)
         )
+        ReaderBottomBar(
+            state = state,
+            onSeek = onSeek,
+            onShowContents = { onShowSheet(ReaderSheet.Contents) },
+            onShowSettings = { onShowSheet(ReaderSheet.Settings) },
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+    }
+
+    when (state.sheet) {
+        ReaderSheet.None -> Unit
+
+        ReaderSheet.Contents -> ReaderContentsSheet(
+            toc = state.toc,
+            onSelect = onSelectChapter,
+            onDismiss = onDismissSheet
+        )
+
+        ReaderSheet.Settings -> ReaderSettingsSheet(
+            settings = state.settings,
+            onChange = onSettingsChange,
+            onDismiss = onDismissSheet
+        )
+    }
+}
+
+/** Claims the volume keys for page turns while the reader is open and the setting is on. */
+@Composable
+private fun VolumeKeyPaging(relay: VolumeKeyRelay, navigator: OverflowableNavigator?, enabled: Boolean) {
+    DisposableEffect(relay, navigator, enabled) {
+        if (enabled && navigator != null) {
+            relay.setHandler { key ->
+                when (key) {
+                    VolumeKey.Up -> navigator.goBackward(animated = true)
+                    VolumeKey.Down -> navigator.goForward(animated = true)
+                }
+            }
+        }
+        onDispose { relay.setHandler(null) }
     }
 }
 
@@ -137,6 +222,3 @@ private fun ReaderTopBar(title: String, visible: Boolean, onBack: () -> Unit, mo
         )
     }
 }
-
-/** Reader chrome floats over the page, so it is only mostly opaque. */
-private const val CHROME_ALPHA = 0.95f

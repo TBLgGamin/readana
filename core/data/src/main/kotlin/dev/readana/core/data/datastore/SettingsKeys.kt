@@ -15,6 +15,7 @@ internal object SettingsKeys {
     val LINE_HEIGHT = floatPreferencesKey("reader_line_height")
     val PAGE_MARGINS = floatPreferencesKey("reader_page_margins")
     val PAGE_TURN_MODE = stringPreferencesKey("reader_page_turn_mode")
+    val COLUMNS = stringPreferencesKey("reader_columns")
     val TAP_TO_TURN = booleanPreferencesKey("reader_tap_to_turn")
     val VOLUME_KEYS = booleanPreferencesKey("reader_volume_keys")
     val KEEP_SCREEN_ON = booleanPreferencesKey("reader_keep_screen_on")
@@ -39,6 +40,7 @@ internal fun Preferences.toReaderSettings(): ReaderSettings {
         lineHeight = this[SettingsKeys.LINE_HEIGHT] ?: defaults.lineHeight,
         pageMargins = this[SettingsKeys.PAGE_MARGINS] ?: defaults.pageMargins,
         pageTurnMode = enumOrDefault(this[SettingsKeys.PAGE_TURN_MODE], defaults.pageTurnMode),
+        columns = enumOrDefault(this[SettingsKeys.COLUMNS], defaults.columns),
         tapToTurnPages = this[SettingsKeys.TAP_TO_TURN] ?: defaults.tapToTurnPages,
         volumeKeysTurnPages = this[SettingsKeys.VOLUME_KEYS] ?: defaults.volumeKeysTurnPages,
         keepScreenOn = this[SettingsKeys.KEEP_SCREEN_ON] ?: defaults.keepScreenOn
@@ -52,6 +54,7 @@ internal fun MutablePreferences.write(settings: ReaderSettings) {
     this[SettingsKeys.LINE_HEIGHT] = settings.lineHeight
     this[SettingsKeys.PAGE_MARGINS] = settings.pageMargins
     this[SettingsKeys.PAGE_TURN_MODE] = settings.pageTurnMode.name
+    this[SettingsKeys.COLUMNS] = settings.columns.name
     this[SettingsKeys.TAP_TO_TURN] = settings.tapToTurnPages
     this[SettingsKeys.VOLUME_KEYS] = settings.volumeKeysTurnPages
     this[SettingsKeys.KEEP_SCREEN_ON] = settings.keepScreenOn

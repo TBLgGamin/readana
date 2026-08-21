@@ -8,6 +8,7 @@ data class ReaderSettings(
     val lineHeight: Float = 1.4f,
     val pageMargins: Float = 1.0f,
     val pageTurnMode: PageTurnMode = PageTurnMode.Paginated,
+    val columns: ReaderColumns = ReaderColumns.Auto,
     val tapToTurnPages: Boolean = true,
     val volumeKeysTurnPages: Boolean = false,
     val keepScreenOn: Boolean = true
@@ -37,4 +38,14 @@ enum class ReaderTheme {
 enum class PageTurnMode {
     Paginated,
     Scrolled
+}
+
+/**
+ * Columns per page. [Auto] gives a two-page spread whenever the window is wide enough, which on a
+ * 3:2 tablet means landscape; the other values force one or two columns.
+ */
+enum class ReaderColumns {
+    Auto,
+    One,
+    Two
 }
