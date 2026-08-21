@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Network requests now speak with the same identity as the in-app browser: they share the system
+  WebView's cookie store and its user agent. Shadow-library front-ends only honour the cookie that
+  clears their bot check for the exact client that earned it, so search and download requests could
+  never benefit from a check the browser had already passed. Cover art and file transfers use the
+  same client, so nothing sends a different agent any more.
+
 - Anna's Archive searches find results again. The site ships part of its result list inside HTML
   comments and un-comments it in the browser, so a plain parser saw only half a page — and its card
   layout is restyled often. Searches now ask for the tabular layout, whose columns are fixed, read

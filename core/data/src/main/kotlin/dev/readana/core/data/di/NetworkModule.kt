@@ -4,6 +4,9 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dev.readana.core.data.browser.BrowserIdentity
+import dev.readana.core.data.browser.UserAgentInterceptor
+import dev.readana.core.data.browser.WebViewCookieJar
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
@@ -18,9 +21,14 @@ object NetworkModule {
     private const val CONNECT_TIMEOUT_MS = 15_000L
     private const val REQUEST_TIMEOUT_MS = 60_000L
 
+    /**
+     * One client for search, downloads and cover art. It carries the system WebView's cookies and
+     * user agent, so a bot check the user (or the hidden verifier) has cleared in a WebView also
+     * counts for the plain requests that follow — see [WebViewCookieJar].
+     */
     @Provides
     @Singleton
-    fun providesHttpClient(): HttpClient = HttpClient(OkHttp) {
+    fun providesHttpClient(cookieJar: WebViewCookieJar, identity: BrowserIdentity): HttpClient = HttpClient(OkHttp) {
         expectSuccess = false
         followRedirects = true
         install(ContentNegotiation) {
@@ -29,6 +37,12 @@ object NetworkModule {
         install(HttpTimeout) {
             connectTimeoutMillis = CONNECT_TIMEOUT_MS
             requestTimeoutMillis = REQUEST_TIMEOUT_MS
+        }
+        engine {
+            // Ktor follows redirects itself, one engine call per hop, so both of these apply
+            // to every hop of a redirect chain.
+            addInterceptor(UserAgentInterceptor(identity))
+            config { cookieJar(cookieJar) }
         }
     }
 }

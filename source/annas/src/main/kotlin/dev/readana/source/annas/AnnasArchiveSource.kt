@@ -16,11 +16,9 @@ import dev.readana.source.api.SearchResult
 import dev.readana.source.api.SourceId
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
-import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
 import kotlinx.serialization.SerializationException
@@ -54,7 +52,6 @@ class AnnasArchiveSource(
         val settings = config()
         return mirrors.withMirror(settings.normalizedMirrors) { base ->
             val response = client.get("$base/search") {
-                header(HttpHeaders.UserAgent, USER_AGENT)
                 parameter("q", query.text)
                 // The table layout puts every field in a fixed column, which survives the site's
                 // frequent restyling of the card layout.
@@ -105,7 +102,6 @@ class AnnasArchiveSource(
                 return@withMirror browserFallback(base, md5, format, fileName, key = null).asSuccess()
             }
             val response = client.get("$base/dyn/api/fast_download.json") {
-                header(HttpHeaders.UserAgent, USER_AGENT)
                 parameter("md5", md5)
                 parameter("key", key)
             }
@@ -214,9 +210,5 @@ class AnnasArchiveSource(
 
     companion object {
         val ID = SourceId("annas-archive")
-
-        /** A browser-like UA; the site serves challenge pages to obviously scripted clients. */
-        const val USER_AGENT =
-            "Mozilla/5.0 (Linux; Android 16; Xiaomi Pad 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128 Safari/537.36"
     }
 }
