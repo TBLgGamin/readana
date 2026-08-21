@@ -8,6 +8,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Anna's Archive searches find results again. The site ships part of its result list inside HTML
+  comments and un-comments it in the browser, so a plain parser saw only half a page — and its card
+  layout is restyled often. Searches now ask for the tabular layout, whose columns are fixed, read
+  the commented-out records too, and fall back to the card layout if a mirror ignores the request.
+- A search now asks Anna's Archive for every format the app can open, instead of silently asking for
+  none. Results in formats Readana cannot read (`.azw3`, `.djvu`, …) are dropped rather than
+  downloaded under an `.epub` name and failing at import.
+
 - Reading on into the next chapter in scrolling mode now starts at its first line. Readium carried
   the scroll offset across the boundary, so finishing a chapter dropped you the same distance down
   the next one. Jumps from the contents list, bookmarks and search hits still land where they were

@@ -56,7 +56,11 @@ class AnnasArchiveSource(
             val response = client.get("$base/search") {
                 header(HttpHeaders.UserAgent, USER_AGENT)
                 parameter("q", query.text)
-                query.formats.singleOrNull()?.let { parameter("ext", it.extension) }
+                // The table layout puts every field in a fixed column, which survives the site's
+                // frequent restyling of the card layout.
+                parameter("display", "table")
+                // Repeatable: the site filters on the set, and we can only open these two anyway.
+                query.formats.forEach { parameter("ext", it.extension) }
                 query.language?.let { parameter("lang", it) }
                 if (query.page > 1) parameter("page", query.page)
             }
@@ -77,9 +81,15 @@ class AnnasArchiveSource(
                     "response does not look like Anna's Archive (parked domain or block page)"
                 )
             }
-            val results = AnnasSearchParser.parse(html, base, id)
-                .filter { it.format == null || it.format in query.formats }
-            SearchPage(results, query.page, hasMore = results.isNotEmpty()).asSuccess()
+            val page = AnnasSearchParser.parse(html, base, id)
+            val results = page.results.filter { it.format == null || it.format in query.formats }
+            SearchPage(
+                results = results,
+                page = query.page,
+                // A page the site filled to the brim probably has another behind it. Counting
+                // records rather than results keeps that true when formats we cannot open are cut.
+                hasMore = page.recordCount >= AnnasSearchParser.RESULTS_PER_PAGE
+            ).asSuccess()
         }
     }
 

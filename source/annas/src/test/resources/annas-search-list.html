@@ -1,0 +1,64 @@
+<!--
+  Fixture: the default card result layout, structured after the site's own
+  templates/macros/aarecord_list.html (the `{% else %}` branch). The second record sits inside a
+  comment node, the way the site ships part of the list and un-comments it in JavaScript
+  (see the `NodeFilter.SHOW_COMMENT` walker in templates/page/search.html).
+-->
+<!doctype html>
+<html lang="en">
+<head><title>pride and prejudice - Search - Anna’s Archive</title></head>
+<body>
+<div class="js-aarecord-list-outer">
+  <div class="flex pt-3 pb-3 border-b last:border-b-0 border-gray-100">
+    <a href="/md5/0123456789abcdef0123456789abcdef" class="custom-a block mr-2 sm:mr-4 hover:opacity-80">
+      <div id="list_cover_aarecord_id__md5:0123456789abcdef0123456789abcdef" class="relative overflow-hidden w-[72px] h-[108px]">
+        <img class="relative inline-block" src="/covers/pride.jpg" alt="" referrerpolicy="no-referrer" loading="lazy"/>
+      </div>
+    </a>
+    <div class="grow overflow-hidden">
+      <div>
+        <a href="/md5/0123456789abcdef0123456789abcdef" class="line-clamp-[3] overflow-hidden break-words js-vim-focus custom-a text-[#2563eb] text-xl">Pride and Prejudice</a>
+        <a href="/search?q=Jane+Austen" class="line-clamp-[2] overflow-hidden break-words block custom-a text-sm italic"><span class="icon-[mdi--user]"></span> Jane Austen</a>
+        <a href="/search?q=Penguin+Classics" class="line-clamp-[2] overflow-hidden break-words block custom-a text-sm"><span class="icon-[mdi--book]"></span> Penguin Classics</a>
+      </div>
+      <div>
+        <div class="line-clamp-[5]"></div>
+        <div class="relative"><div class="line-clamp-[2] overflow-hidden break-words text-sm text-gray-600 mt-2 mb-2">It is a truth universally acknowledged that a single man in possession of a good fortune must be in want of a wife.</div></div>
+      </div>
+      <div class="text-gray-800 dark:text-slate-400 font-semibold text-sm leading-[1.2] mt-2">English [en], EPUB, 0.8MB, 📗 Book (fiction), Libgen.li, Libgen.rs, 2003</div>
+    </div>
+  </div>
+  <!--
+  <div class="flex pt-3 pb-3 border-b last:border-b-0 border-gray-100">
+    <a href="/md5/fedcba9876543210fedcba9876543210" class="custom-a block mr-2 sm:mr-4 hover:opacity-80">
+      <div id="list_cover_aarecord_id__md5:fedcba9876543210fedcba9876543210" class="relative overflow-hidden w-[72px] h-[108px]"></div>
+    </a>
+    <div class="grow overflow-hidden">
+      <div>
+        <a href="/md5/fedcba9876543210fedcba9876543210" class="line-clamp-[3] overflow-hidden break-words js-vim-focus custom-a text-[#2563eb] text-xl">Het Achterhuis</a>
+        <a href="/search?q=Anne+Frank" class="line-clamp-[2] overflow-hidden break-words block custom-a text-sm italic"><span class="icon-[mdi--user]"></span> Anne Frank</a>
+        <a href="/search?q=Prometheus" class="line-clamp-[2] overflow-hidden break-words block custom-a text-sm"><span class="icon-[mdi--book]"></span> Prometheus</a>
+      </div>
+      <div class="text-gray-800 dark:text-slate-400 font-semibold text-sm leading-[1.2] mt-2">Dutch [nl], PDF, 12.5MB, 📕 Book (non-fiction), Z-Library, 1947</div>
+    </div>
+  </div>
+  -->
+  <div class="flex pt-3 pb-3 border-b last:border-b-0 border-gray-100">
+    <a href="/md5/aaaabbbbccccddddeeeeffff00001111" class="custom-a block mr-2 sm:mr-4 hover:opacity-80">
+      <div id="list_cover_aarecord_id__md5:aaaabbbbccccddddeeeeffff00001111" class="relative overflow-hidden w-[72px] h-[108px]"></div>
+    </a>
+    <div class="grow overflow-hidden">
+      <div>
+        <a href="/md5/aaaabbbbccccddddeeeeffff00001111" class="line-clamp-[3] overflow-hidden break-words js-vim-focus custom-a text-[#2563eb] text-xl">Kindle Only Edition</a>
+        <a href="/search?q=Some+Author" class="line-clamp-[2] overflow-hidden break-words block custom-a text-sm italic"><span class="icon-[mdi--user]"></span> Some Author</a>
+      </div>
+      <div class="text-gray-800 dark:text-slate-400 font-semibold text-sm leading-[1.2] mt-2">English [en], AZW3, 1.1MB, 📗 Book (fiction), Libgen.li, 2015</div>
+    </div>
+  </div>
+</div>
+<div class="mt-4">
+  <a href="/md5/0123456789abcdef0123456789abcdef">Recently downloaded: Pride and Prejudice</a>
+  <a href="/search?q=austen">More by Jane Austen</a>
+</div>
+</body>
+</html>

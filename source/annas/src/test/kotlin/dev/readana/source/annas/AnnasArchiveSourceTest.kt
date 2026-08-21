@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 
 class AnnasArchiveSourceTest {
-    private val searchHtml = checkNotNull(javaClass.getResource("/annas-search.html")).readText()
+    private val searchHtml = checkNotNull(javaClass.getResource("/annas-search-table.html")).readText()
     private val parkedHtml = checkNotNull(javaClass.getResource("/parked-domain.html")).readText()
     private val mirrors = listOf("https://one.test", "https://two.test", "https://three.test")
 
@@ -64,9 +64,25 @@ class AnnasArchiveSourceTest {
 
         assertTrue(url.startsWith("https://one.test/search?"))
         assertTrue("q=pride" in url)
+        assertTrue("display=table" in url, "the table layout is the one we parse: $url")
         assertTrue("ext=epub" in url)
         assertTrue("lang=en" in url)
         assertTrue("page=2" in url)
+    }
+
+    @Test
+    fun `a search for both formats asks for both`() = runTest {
+        var url = ""
+        val source = source { request ->
+            url = request.url.toString()
+            respond(searchHtml, HttpStatusCode.OK, htmlHeaders)
+        }
+
+        // The default query wants everything the app can open; the filter is repeatable.
+        source.search(SearchQuery("pride"))
+
+        assertTrue("ext=epub" in url, url)
+        assertTrue("ext=pdf" in url, url)
     }
 
     @Test
