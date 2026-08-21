@@ -6,7 +6,6 @@ import dev.readana.core.data.repository.SettingsRepository
 import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.HeadingSensitivity
 import dev.readana.core.model.ReaderSettings
-import dev.readana.core.model.ReaderTheme
 import dev.readana.core.model.SourceSettings
 import dev.readana.core.testing.FakeBookSource
 import dev.readana.core.testing.MainDispatcherRule
@@ -50,17 +49,6 @@ class SettingsViewModelTest {
 
         viewModel.setLibraryFolder(null)
         assertNull(settings.libraryFolderNow())
-    }
-
-    @Test
-    fun `writes reader preferences through the repository`() = runTest {
-        val viewModel = viewModel()
-
-        viewModel.setTheme(ReaderTheme.Sepia)
-        viewModel.setKeepScreenOn(false)
-
-        assertEquals(ReaderTheme.Sepia, settings.readerNow().theme)
-        assertEquals(false, settings.readerNow().keepScreenOn)
     }
 
     @Test

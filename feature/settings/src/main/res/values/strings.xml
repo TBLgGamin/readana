@@ -1,31 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="feature_settings_title">Settings</string>
-    <string name="feature_settings_section_reading">Reading</string>
-    <string name="feature_settings_font_scale">Font size: %1$.1f×</string>
-    <string name="feature_settings_theme">Theme</string>
-    <string name="feature_settings_theme_system">System</string>
-    <string name="feature_settings_theme_light">Light</string>
-    <string name="feature_settings_theme_sepia">Sepia</string>
-    <string name="feature_settings_theme_dark">Dark</string>
-    <string name="feature_settings_theme_black">Black</string>
-    <string name="feature_settings_page_turn_mode">Page turning</string>
-    <string name="feature_settings_page_turn_paginated">Pages</string>
-    <string name="feature_settings_page_turn_scrolled">Scrolling</string>
-    <string name="feature_settings_columns">Columns</string>
-    <string name="feature_settings_columns_auto">Auto</string>
-    <string name="feature_settings_columns_one">One</string>
-    <string name="feature_settings_columns_two">Two</string>
     <string name="feature_settings_expand">Show settings</string>
     <string name="feature_settings_collapse">Hide settings</string>
-    <string name="feature_settings_summary_font_scale">%1$.1f× text</string>
     <string name="feature_settings_summary_conversion_on">PDFs converted</string>
     <string name="feature_settings_summary_conversion_off">PDFs kept as-is</string>
     <string name="feature_settings_summary_no_sources">No sources enabled</string>
     <string name="feature_settings_summary_member_key">member key set</string>
     <string name="feature_settings_background_summary">Keep downloads alive on Xiaomi</string>
-    <string name="feature_settings_keep_screen_on">Keep screen on while reading</string>
-    <string name="feature_settings_volume_keys">Volume keys turn pages</string>
     <string name="feature_settings_section_storage">Storage</string>
     <string name="feature_settings_library_folder">Library folder</string>
     <string name="feature_settings_library_folder_default">App storage (private)</string>

@@ -194,7 +194,9 @@ internal fun DiscoverScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 placeholder = { Text(stringResource(R.string.feature_discover_search_hint)) },
-                trailingIcon = {
+                // Leading, as in the library. It still runs the search, because unlike the library
+                // this one costs a network round trip and only happens when asked.
+                leadingIcon = {
                     IconButton(onClick = onSearch) {
                         Icon(
                             ReadanaIcons.Discover,
@@ -202,6 +204,16 @@ internal fun DiscoverScreen(
                                 R.string.feature_discover_search_action
                             )
                         )
+                    }
+                },
+                trailingIcon = {
+                    if (uiState.query.isNotEmpty()) {
+                        IconButton(onClick = { onQueryChange("") }) {
+                            Icon(
+                                ReadanaIcons.Close,
+                                contentDescription = stringResource(R.string.feature_discover_search_clear)
+                            )
+                        }
                     }
                 },
                 singleLine = true,

@@ -17,6 +17,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Settings drops its Reading section. Everything in it — theme, text size, line height, margins,
+  page turning, columns, keep-screen-on, volume keys — is already in the reader's own settings
+  sheet, where you can see what a change does to the page in front of you.
+- Discover's search icon moved to the left of the box, as in the library, and the box gained a
+  clear button. Tapping the icon still runs the search.
+
 - Tapping download queues the book straight away. Working out where a file actually comes from can
   mean answering a browser check or sitting out a wait-list, so that now happens in the download
   job — under the foreground service that survives leaving the app — instead of holding up the tap.

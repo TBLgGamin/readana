@@ -56,10 +56,6 @@ import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.LoadingState
 import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.HeadingSensitivity
-import dev.readana.core.model.PageTurnMode
-import dev.readana.core.model.ReaderColumns
-import dev.readana.core.model.ReaderSettings
-import dev.readana.core.model.ReaderTheme
 import dev.readana.core.model.SourceSettings
 
 private const val PERSISTABLE_FLAGS =
@@ -70,12 +66,6 @@ internal fun SettingsRoute(modifier: Modifier = Modifier, viewModel: SettingsVie
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     SettingsScreen(
         uiState = uiState,
-        onFontScaleChange = viewModel::setFontScale,
-        onThemeChange = viewModel::setTheme,
-        onPageTurnModeChange = viewModel::setPageTurnMode,
-        onColumnsChange = viewModel::setColumns,
-        onKeepScreenOnChange = viewModel::setKeepScreenOn,
-        onVolumeKeysChange = viewModel::setVolumeKeysTurnPages,
         onLibraryFolderChange = viewModel::setLibraryFolder,
         onSourceEnabledChange = viewModel::setSourceEnabled,
         onAnnasMirrorsChange = viewModel::setAnnasMirrors,
@@ -92,12 +82,6 @@ internal fun SettingsRoute(modifier: Modifier = Modifier, viewModel: SettingsVie
 @Composable
 internal fun SettingsScreen(
     uiState: SettingsUiState,
-    onFontScaleChange: (Float) -> Unit,
-    onThemeChange: (ReaderTheme) -> Unit,
-    onPageTurnModeChange: (PageTurnMode) -> Unit,
-    onColumnsChange: (ReaderColumns) -> Unit,
-    onKeepScreenOnChange: (Boolean) -> Unit,
-    onVolumeKeysChange: (Boolean) -> Unit,
     onLibraryFolderChange: (String?) -> Unit,
     onSourceEnabledChange: (sourceId: String, enabled: Boolean) -> Unit,
     onAnnasMirrorsChange: (String) -> Unit,
@@ -131,23 +115,6 @@ internal fun SettingsScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    SettingsGroup(
-                        title = stringResource(R.string.feature_settings_section_reading),
-                        summary = uiState.reader.summary(),
-                        icon = ReadanaIcons.Library,
-                        expanded = openGroup == SettingsGroupId.Reading,
-                        onToggle = { toggle(SettingsGroupId.Reading) }
-                    ) {
-                        ReaderSection(
-                            settings = uiState.reader,
-                            onFontScaleChange = onFontScaleChange,
-                            onThemeChange = onThemeChange,
-                            onPageTurnModeChange = onPageTurnModeChange,
-                            onColumnsChange = onColumnsChange,
-                            onKeepScreenOnChange = onKeepScreenOnChange,
-                            onVolumeKeysChange = onVolumeKeysChange
-                        )
-                    }
                     SettingsGroup(
                         title = stringResource(R.string.feature_settings_section_sources),
                         summary = uiState.sourcesSummary(),
@@ -206,7 +173,7 @@ internal fun SettingsScreen(
     }
 }
 
-private enum class SettingsGroupId { Reading, Sources, Conversion, Storage, Background }
+private enum class SettingsGroupId { Sources, Conversion, Storage, Background }
 
 /**
  * One collapsible settings group. Collapsed it is a single row — icon, name and what the settings
@@ -260,13 +227,6 @@ private fun SettingsGroup(
 }
 
 @Composable
-private fun ReaderSettings.summary(): String = listOf(
-    stringResource(theme.labelRes()),
-    stringResource(R.string.feature_settings_summary_font_scale, fontScale),
-    stringResource(columns.labelRes())
-).joinToString(SUMMARY_SEPARATOR)
-
-@Composable
 private fun ConversionSettings.summary(): String = if (!autoConvertPdf) {
     stringResource(R.string.feature_settings_summary_conversion_off)
 } else {
@@ -289,81 +249,6 @@ private fun SettingsUiState.Loaded.sourcesSummary(): String {
 }
 
 private const val SUMMARY_SEPARATOR = " · "
-
-private fun ReaderTheme.labelRes(): Int = when (this) {
-    ReaderTheme.System -> R.string.feature_settings_theme_system
-    ReaderTheme.Light -> R.string.feature_settings_theme_light
-    ReaderTheme.Sepia -> R.string.feature_settings_theme_sepia
-    ReaderTheme.Dark -> R.string.feature_settings_theme_dark
-    ReaderTheme.Black -> R.string.feature_settings_theme_black
-}
-
-private fun PageTurnMode.labelRes(): Int = when (this) {
-    PageTurnMode.Paginated -> R.string.feature_settings_page_turn_paginated
-    PageTurnMode.Scrolled -> R.string.feature_settings_page_turn_scrolled
-}
-
-private fun ReaderColumns.labelRes(): Int = when (this) {
-    ReaderColumns.Auto -> R.string.feature_settings_columns_auto
-    ReaderColumns.One -> R.string.feature_settings_columns_one
-    ReaderColumns.Two -> R.string.feature_settings_columns_two
-}
-
-@Composable
-private fun ReaderSection(
-    settings: ReaderSettings,
-    onFontScaleChange: (Float) -> Unit,
-    onThemeChange: (ReaderTheme) -> Unit,
-    onPageTurnModeChange: (PageTurnMode) -> Unit,
-    onColumnsChange: (ReaderColumns) -> Unit,
-    onKeepScreenOnChange: (Boolean) -> Unit,
-    onVolumeKeysChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.feature_settings_font_scale, settings.fontScale))
-        Slider(
-            value = settings.fontScale,
-            onValueChange = onFontScaleChange,
-            valueRange = ReaderSettings.FONT_SCALE_RANGE
-        )
-
-        Text(stringResource(R.string.feature_settings_theme))
-        ChipRow(
-            options = ReaderTheme.entries,
-            selected = settings.theme,
-            label = { stringResource(it.labelRes()) },
-            onSelect = onThemeChange
-        )
-
-        Text(stringResource(R.string.feature_settings_page_turn_mode))
-        ChipRow(
-            options = PageTurnMode.entries,
-            selected = settings.pageTurnMode,
-            label = { stringResource(it.labelRes()) },
-            onSelect = onPageTurnModeChange
-        )
-
-        Text(stringResource(R.string.feature_settings_columns))
-        ChipRow(
-            options = ReaderColumns.entries,
-            selected = settings.columns,
-            label = { stringResource(it.labelRes()) },
-            onSelect = onColumnsChange
-        )
-
-        SwitchRow(
-            label = stringResource(R.string.feature_settings_keep_screen_on),
-            checked = settings.keepScreenOn,
-            onCheckedChange = onKeepScreenOnChange
-        )
-        SwitchRow(
-            label = stringResource(R.string.feature_settings_volume_keys),
-            checked = settings.volumeKeysTurnPages,
-            onCheckedChange = onVolumeKeysChange
-        )
-    }
-}
 
 /**
  * How PDFs become EPUB. Only the choices a reader can judge from the result are exposed; the

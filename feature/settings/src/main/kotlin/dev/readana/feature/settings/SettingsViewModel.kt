@@ -7,10 +7,6 @@ import dev.readana.core.data.repository.BookSourceRegistry
 import dev.readana.core.data.repository.SettingsRepository
 import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.HeadingSensitivity
-import dev.readana.core.model.PageTurnMode
-import dev.readana.core.model.ReaderColumns
-import dev.readana.core.model.ReaderSettings
-import dev.readana.core.model.ReaderTheme
 import dev.readana.core.model.SourceSettings
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,13 +22,11 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
     val uiState: StateFlow<SettingsUiState> =
         combine(
-            settingsRepository.readerSettings,
             settingsRepository.sourceSettings,
             settingsRepository.conversionSettings,
             settingsRepository.libraryFolderUri
-        ) { reader, sourceSettings, conversionSettings, libraryFolderUri ->
+        ) { sourceSettings, conversionSettings, libraryFolderUri ->
             SettingsUiState.Loaded(
-                reader = reader,
                 sources = sourceSettings,
                 conversion = conversionSettings,
                 libraryFolderUri = libraryFolderUri,
@@ -52,22 +46,6 @@ class SettingsViewModel @Inject constructor(
             SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
             SettingsUiState.Loading
         )
-
-    fun setFontScale(scale: Float) = updateReader {
-        it.copy(fontScale = scale.coerceIn(ReaderSettings.FONT_SCALE_RANGE))
-    }
-
-    fun setTheme(theme: ReaderTheme) = updateReader { it.copy(theme = theme) }
-
-    fun setPageTurnMode(mode: PageTurnMode) = updateReader { it.copy(pageTurnMode = mode) }
-
-    fun setColumns(columns: ReaderColumns) = updateReader { it.copy(columns = columns) }
-
-    fun setKeepScreenOn(enabled: Boolean) = updateReader { it.copy(keepScreenOn = enabled) }
-
-    fun setVolumeKeysTurnPages(enabled: Boolean) = updateReader {
-        it.copy(volumeKeysTurnPages = enabled)
-    }
 
     /** Persisted SAF tree URI of the library folder; null puts new books back in app storage. */
     fun setLibraryFolder(uri: String?) {
@@ -109,10 +87,6 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.updateConversionSettings(transform) }
     }
 
-    private fun updateReader(transform: (ReaderSettings) -> ReaderSettings) {
-        viewModelScope.launch { settingsRepository.updateReaderSettings(transform) }
-    }
-
     private fun updateSources(transform: (SourceSettings) -> SourceSettings) {
         viewModelScope.launch { settingsRepository.updateSourceSettings(transform) }
     }
@@ -128,7 +102,6 @@ sealed interface SettingsUiState {
     data object Loading : SettingsUiState
 
     data class Loaded(
-        val reader: ReaderSettings,
         val sources: SourceSettings,
         val conversion: ConversionSettings,
         val sourceToggles: List<SourceToggle>,
