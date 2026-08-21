@@ -35,12 +35,13 @@ Milestones are sized so each one ships something usable on the tablet.
 - [x] In-app browser flow for sources that need it (Anna's slow downloads), capturing the resulting file
 - [x] HyperOS battery-restriction guidance in-app
 
-## M4 — PDF → EPUB
+## M4 — PDF → EPUB ✅ (2026-08-21)
 
-- [ ] Auto-convert on import/download (keep original), conversion progress + report
-- [ ] Images/figures extraction into the EPUB; multi-column detection; table of contents from PDF outline
-- [ ] Conversion settings (headers/footers, heading sensitivity), per-book re-convert
-- [ ] Quality corpus: a handful of public-domain PDFs with golden EPUB snapshots
+- [x] Auto-convert on import/download (keep original), conversion progress + report
+- [x] Images/figures extraction into the EPUB; multi-column detection; table of contents from PDF outline
+- [x] Conversion settings (headers/footers, heading sensitivity), per-book re-convert
+- [x] Quality corpus with golden content snapshots — PDFs generated rather than checked in, see
+      [ADR 0012](adr/0012-conversion-golden-corpus.md); real-world scans remain future work
 
 ## M5 — More sources
 

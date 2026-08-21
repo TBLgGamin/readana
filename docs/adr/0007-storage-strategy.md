@@ -1,6 +1,6 @@
 # 0007 — Library storage strategy
 
-Date: 2026-08-20 · Status: accepted
+Date: 2026-08-20 · Status: accepted (amended by [0011](0011-single-row-conversion-model.md))
 
 ## Context
 
@@ -15,7 +15,9 @@ gone on uninstall), SAF document tree (user-visible, survives uninstall, needs a
 - Optional: the user picks a library folder with `ACTION_OPEN_DOCUMENT_TREE`; the persisted tree
   URI is stored in DataStore (`libraryFolderUri`) and files are written through `DocumentFile`.
 - Metadata (title, authors, progress, origin) always lives in Room; files are referenced by URI.
-- Converted EPUBs sit next to their original PDF; both are library entries linked by `BookOrigin`.
+- Converted EPUBs sit next to their original PDF on disk. ~~Both are library entries linked by
+  `BookOrigin`.~~ **Amended by [0011](0011-single-row-conversion-model.md):** one library entry per
+  book, pointing at the EPUB, with the kept PDF recorded on that same row.
 
 ## Consequences
 

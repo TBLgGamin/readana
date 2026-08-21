@@ -4,9 +4,11 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import dev.readana.core.data.datastore.SettingsKeys
+import dev.readana.core.data.datastore.toConversionSettings
 import dev.readana.core.data.datastore.toReaderSettings
 import dev.readana.core.data.datastore.toSourceSettings
 import dev.readana.core.data.datastore.write
+import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.SourceSettings
 import javax.inject.Inject
@@ -23,6 +25,10 @@ interface SettingsRepository {
     val sourceSettings: Flow<SourceSettings>
 
     suspend fun updateSourceSettings(transform: (SourceSettings) -> SourceSettings)
+
+    val conversionSettings: Flow<ConversionSettings>
+
+    suspend fun updateConversionSettings(transform: (ConversionSettings) -> ConversionSettings)
 
     /** Persisted SAF tree URI of the user-chosen library folder, or null for app-private storage. */
     val libraryFolderUri: Flow<String?>
@@ -48,6 +54,15 @@ class DataStoreSettingsRepository @Inject constructor(private val dataStore: Dat
     override suspend fun updateSourceSettings(transform: (SourceSettings) -> SourceSettings) {
         dataStore.edit { preferences ->
             preferences.write(transform(preferences.toSourceSettings()))
+        }
+    }
+
+    override val conversionSettings: Flow<ConversionSettings> =
+        dataStore.data.map { it.toConversionSettings() }.distinctUntilChanged()
+
+    override suspend fun updateConversionSettings(transform: (ConversionSettings) -> ConversionSettings) {
+        dataStore.edit { preferences ->
+            preferences.write(transform(preferences.toConversionSettings()))
         }
     }
 

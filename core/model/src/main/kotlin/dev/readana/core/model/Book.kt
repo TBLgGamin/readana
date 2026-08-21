@@ -12,11 +12,14 @@ data class Book(
     /** `content://` or `file://` URI of the readable file (always EPUB once conversion has run). */
     val fileUri: String,
     val coverUri: String?,
+    /** Size of the file as it arrived, kept stable across conversion so duplicate checks still work. */
     val sizeBytes: Long?,
     val addedAt: Instant,
     val lastOpenedAt: Instant?,
     val progress: ReadingProgress?,
-    val origin: BookOrigin?
+    val origin: BookOrigin?,
+    /** Set once a PDF has been converted; the original file is kept alongside the EPUB. */
+    val conversion: ConversionInfo? = null
 ) {
     val authorsLabel: String
         get() = authors.joinToString(", ")

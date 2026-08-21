@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.readana.core.data.repository.BookSourceRegistry
 import dev.readana.core.data.repository.SettingsRepository
+import dev.readana.core.model.ConversionSettings
+import dev.readana.core.model.HeadingSensitivity
 import dev.readana.core.model.PageTurnMode
 import dev.readana.core.model.ReaderColumns
 import dev.readana.core.model.ReaderSettings
@@ -26,11 +28,13 @@ class SettingsViewModel @Inject constructor(
         combine(
             settingsRepository.readerSettings,
             settingsRepository.sourceSettings,
+            settingsRepository.conversionSettings,
             settingsRepository.libraryFolderUri
-        ) { reader, sourceSettings, libraryFolderUri ->
+        ) { reader, sourceSettings, conversionSettings, libraryFolderUri ->
             SettingsUiState.Loaded(
                 reader = reader,
                 sources = sourceSettings,
+                conversion = conversionSettings,
                 libraryFolderUri = libraryFolderUri,
                 sourceToggles = sources.all.map { source ->
                     SourceToggle(
@@ -83,6 +87,22 @@ class SettingsViewModel @Inject constructor(
         it.copy(annasSecretKey = key.trim().ifEmpty { null })
     }
 
+    fun setAutoConvertPdf(enabled: Boolean) = updateConversion { it.copy(autoConvertPdf = enabled) }
+
+    fun setRemoveHeadersAndFooters(enabled: Boolean) = updateConversion {
+        it.copy(removeHeadersAndFooters = enabled)
+    }
+
+    fun setHeadingSensitivity(sensitivity: HeadingSensitivity) = updateConversion {
+        it.copy(headingSensitivity = sensitivity)
+    }
+
+    fun setExtractImages(enabled: Boolean) = updateConversion { it.copy(extractImages = enabled) }
+
+    private fun updateConversion(transform: (ConversionSettings) -> ConversionSettings) {
+        viewModelScope.launch { settingsRepository.updateConversionSettings(transform) }
+    }
+
     private fun updateReader(transform: (ReaderSettings) -> ReaderSettings) {
         viewModelScope.launch { settingsRepository.updateReaderSettings(transform) }
     }
@@ -104,6 +124,7 @@ sealed interface SettingsUiState {
     data class Loaded(
         val reader: ReaderSettings,
         val sources: SourceSettings,
+        val conversion: ConversionSettings,
         val sourceToggles: List<SourceToggle>,
         val libraryFolderUri: String? = null
     ) : SettingsUiState

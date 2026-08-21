@@ -9,6 +9,7 @@ import dev.readana.core.common.result.AppResult
 import dev.readana.core.common.result.asFailure
 import dev.readana.core.common.result.asSuccess
 import dev.readana.core.data.FakeSettingsRepository
+import dev.readana.core.data.conversion.FakeConversionManager
 import dev.readana.core.data.database.ReadanaDatabase
 import dev.readana.core.data.importing.BookImporter
 import dev.readana.core.data.importing.ImportResult
@@ -235,6 +236,8 @@ class DefaultBookDownloadManagerTest {
             downloadsRepository = downloads,
             sources = registry,
             importer = NoopImporter(),
+            conversionManager = FakeConversionManager(),
+            settingsRepository = settings,
             partsDir = partsDir,
             ioDispatcher = UnconfinedTestDispatcher()
         )

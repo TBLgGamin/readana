@@ -29,9 +29,11 @@ object Xhtml {
 
     fun paragraph(text: String): String = "<p>${Xml.escape(text)}</p>\n"
 
-    fun heading(level: Int, text: String): String {
+    /** [id] makes the heading linkable from the navigation document. */
+    fun heading(level: Int, text: String, id: String? = null): String {
         val clamped = level.coerceIn(MIN_HEADING_LEVEL, MAX_HEADING_LEVEL)
-        return "<h$clamped>${Xml.escape(text)}</h$clamped>\n"
+        val anchor = id?.let { " id=\"${Xml.escape(it)}\"" }.orEmpty()
+        return "<h$clamped$anchor>${Xml.escape(text)}</h$clamped>\n"
     }
 
     fun image(href: String, alt: String): String =

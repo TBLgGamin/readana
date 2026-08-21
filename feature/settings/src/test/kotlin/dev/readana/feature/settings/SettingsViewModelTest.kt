@@ -3,6 +3,8 @@ package dev.readana.feature.settings
 import app.cash.turbine.test
 import dev.readana.core.data.repository.BookSourceRegistry
 import dev.readana.core.data.repository.SettingsRepository
+import dev.readana.core.model.ConversionSettings
+import dev.readana.core.model.HeadingSensitivity
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.ReaderTheme
 import dev.readana.core.model.SourceSettings
@@ -60,11 +62,28 @@ class SettingsViewModelTest {
         assertEquals(ReaderTheme.Sepia, settings.readerNow().theme)
         assertEquals(false, settings.readerNow().keepScreenOn)
     }
+
+    @Test
+    fun `writes conversion settings`() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.setAutoConvertPdf(false)
+        viewModel.setRemoveHeadersAndFooters(false)
+        viewModel.setHeadingSensitivity(HeadingSensitivity.Aggressive)
+        viewModel.setExtractImages(false)
+
+        val conversion = settings.conversionNow()
+        assertEquals(false, conversion.autoConvertPdf)
+        assertEquals(false, conversion.removeHeadersAndFooters)
+        assertEquals(HeadingSensitivity.Aggressive, conversion.headingSensitivity)
+        assertEquals(false, conversion.extractImages)
+    }
 }
 
 private class FakeSettingsRepository : SettingsRepository {
     private val reader = MutableStateFlow(ReaderSettings())
     private val sources = MutableStateFlow(SourceSettings())
+    private val conversion = MutableStateFlow(ConversionSettings())
     private val libraryFolder = MutableStateFlow<String?>(null)
 
     override val readerSettings: Flow<ReaderSettings> = reader
@@ -75,6 +94,11 @@ private class FakeSettingsRepository : SettingsRepository {
 
     override suspend fun updateSourceSettings(transform: (SourceSettings) -> SourceSettings) = sources.update(transform)
 
+    override val conversionSettings: Flow<ConversionSettings> = conversion
+
+    override suspend fun updateConversionSettings(transform: (ConversionSettings) -> ConversionSettings) =
+        conversion.update(transform)
+
     override val libraryFolderUri: Flow<String?> = libraryFolder
 
     override suspend fun setLibraryFolderUri(uri: String?) {
@@ -82,6 +106,8 @@ private class FakeSettingsRepository : SettingsRepository {
     }
 
     fun readerNow(): ReaderSettings = reader.value
+
+    fun conversionNow(): ConversionSettings = conversion.value
 
     fun libraryFolderNow(): String? = libraryFolder.value
 }

@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.SourceSettings
 
@@ -26,6 +27,11 @@ internal object SettingsKeys {
     val ANNAS_SECRET_KEY = stringPreferencesKey("source_annas_secret_key")
     val ANNAS_DOWNLOADS_LEFT = intPreferencesKey("source_annas_downloads_left")
     val ANNAS_DOWNLOADS_PER_DAY = intPreferencesKey("source_annas_downloads_per_day")
+
+    val CONVERSION_AUTO = booleanPreferencesKey("conversion_auto_pdf")
+    val CONVERSION_STRIP_HEADERS = booleanPreferencesKey("conversion_strip_headers")
+    val CONVERSION_HEADING_SENSITIVITY = stringPreferencesKey("conversion_heading_sensitivity")
+    val CONVERSION_EXTRACT_IMAGES = booleanPreferencesKey("conversion_extract_images")
 
     val LIBRARY_FOLDER_URI = stringPreferencesKey("library_folder_uri")
 
@@ -106,6 +112,27 @@ internal fun MutablePreferences.write(settings: SourceSettings) {
 
 private fun MutablePreferences.writeOrRemove(key: Preferences.Key<Int>, value: Int?) {
     if (value == null) remove(key) else this[key] = value
+}
+
+internal fun Preferences.toConversionSettings(): ConversionSettings {
+    val defaults = ConversionSettings()
+    return ConversionSettings(
+        autoConvertPdf = this[SettingsKeys.CONVERSION_AUTO] ?: defaults.autoConvertPdf,
+        removeHeadersAndFooters = this[SettingsKeys.CONVERSION_STRIP_HEADERS]
+            ?: defaults.removeHeadersAndFooters,
+        headingSensitivity = enumOrDefault(
+            this[SettingsKeys.CONVERSION_HEADING_SENSITIVITY],
+            defaults.headingSensitivity
+        ),
+        extractImages = this[SettingsKeys.CONVERSION_EXTRACT_IMAGES] ?: defaults.extractImages
+    )
+}
+
+internal fun MutablePreferences.write(settings: ConversionSettings) {
+    this[SettingsKeys.CONVERSION_AUTO] = settings.autoConvertPdf
+    this[SettingsKeys.CONVERSION_STRIP_HEADERS] = settings.removeHeadersAndFooters
+    this[SettingsKeys.CONVERSION_HEADING_SENSITIVITY] = settings.headingSensitivity.name
+    this[SettingsKeys.CONVERSION_EXTRACT_IMAGES] = settings.extractImages
 }
 
 private inline fun <reified E : Enum<E>> enumOrDefault(name: String?, default: E): E =

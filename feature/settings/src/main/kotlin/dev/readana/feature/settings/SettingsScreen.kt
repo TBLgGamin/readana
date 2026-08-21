@@ -42,6 +42,8 @@ import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.readana.core.designsystem.component.LoadingState
+import dev.readana.core.model.ConversionSettings
+import dev.readana.core.model.HeadingSensitivity
 import dev.readana.core.model.PageTurnMode
 import dev.readana.core.model.ReaderColumns
 import dev.readana.core.model.ReaderSettings
@@ -66,6 +68,10 @@ internal fun SettingsRoute(modifier: Modifier = Modifier, viewModel: SettingsVie
         onSourceEnabledChange = viewModel::setSourceEnabled,
         onAnnasMirrorsChange = viewModel::setAnnasMirrors,
         onAnnasSecretKeyChange = viewModel::setAnnasSecretKey,
+        onAutoConvertChange = viewModel::setAutoConvertPdf,
+        onRemoveHeadersChange = viewModel::setRemoveHeadersAndFooters,
+        onHeadingSensitivityChange = viewModel::setHeadingSensitivity,
+        onExtractImagesChange = viewModel::setExtractImages,
         modifier = modifier
     )
 }
@@ -84,6 +90,10 @@ internal fun SettingsScreen(
     onSourceEnabledChange: (sourceId: String, enabled: Boolean) -> Unit,
     onAnnasMirrorsChange: (String) -> Unit,
     onAnnasSecretKeyChange: (String) -> Unit,
+    onAutoConvertChange: (Boolean) -> Unit,
+    onRemoveHeadersChange: (Boolean) -> Unit,
+    onHeadingSensitivityChange: (HeadingSensitivity) -> Unit,
+    onExtractImagesChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -109,6 +119,14 @@ internal fun SettingsScreen(
                     onColumnsChange = onColumnsChange,
                     onKeepScreenOnChange = onKeepScreenOnChange,
                     onVolumeKeysChange = onVolumeKeysChange
+                )
+                HorizontalDivider()
+                ConversionSection(
+                    settings = uiState.conversion,
+                    onAutoConvertChange = onAutoConvertChange,
+                    onRemoveHeadersChange = onRemoveHeadersChange,
+                    onHeadingSensitivityChange = onHeadingSensitivityChange,
+                    onExtractImagesChange = onExtractImagesChange
                 )
                 HorizontalDivider()
                 StorageSection(
@@ -186,6 +204,62 @@ private fun ReaderSection(
             onCheckedChange = onVolumeKeysChange
         )
     }
+}
+
+/**
+ * How PDFs become EPUB. Only the choices a reader can judge from the result are exposed; the
+ * reflow engine's other tunables keep their defaults (ADR 0011).
+ */
+@Composable
+private fun ConversionSection(
+    settings: ConversionSettings,
+    onAutoConvertChange: (Boolean) -> Unit,
+    onRemoveHeadersChange: (Boolean) -> Unit,
+    onHeadingSensitivityChange: (HeadingSensitivity) -> Unit,
+    onExtractImagesChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle(stringResource(R.string.feature_settings_section_conversion))
+        SwitchRow(
+            label = stringResource(R.string.feature_settings_conversion_auto),
+            checked = settings.autoConvertPdf,
+            onCheckedChange = onAutoConvertChange
+        )
+        Text(
+            text = stringResource(R.string.feature_settings_conversion_auto_help),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        SwitchRow(
+            label = stringResource(R.string.feature_settings_conversion_headers),
+            checked = settings.removeHeadersAndFooters,
+            onCheckedChange = onRemoveHeadersChange
+        )
+        SwitchRow(
+            label = stringResource(R.string.feature_settings_conversion_images),
+            checked = settings.extractImages,
+            onCheckedChange = onExtractImagesChange
+        )
+        Text(stringResource(R.string.feature_settings_conversion_headings))
+        ChipRow(
+            options = HeadingSensitivity.entries,
+            selected = settings.headingSensitivity,
+            label = { stringResource(it.labelRes()) },
+            onSelect = onHeadingSensitivityChange
+        )
+        Text(
+            text = stringResource(R.string.feature_settings_conversion_headings_help),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+private fun HeadingSensitivity.labelRes(): Int = when (this) {
+    HeadingSensitivity.Conservative -> R.string.feature_settings_conversion_headings_conservative
+    HeadingSensitivity.Balanced -> R.string.feature_settings_conversion_headings_balanced
+    HeadingSensitivity.Aggressive -> R.string.feature_settings_conversion_headings_aggressive
 }
 
 /**
@@ -384,7 +458,7 @@ private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
 private fun <T> ChipRow(
     options: List<T>,
     selected: T,
-    label: (T) -> String,
+    label: @Composable (T) -> String,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier
 ) {

@@ -4,6 +4,10 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dev.readana.core.data.conversion.BookConverter
+import dev.readana.core.data.conversion.ConversionManager
+import dev.readana.core.data.conversion.DefaultBookConverter
+import dev.readana.core.data.conversion.DefaultConversionManager
 import dev.readana.core.data.downloads.BookDownloadManager
 import dev.readana.core.data.downloads.DefaultBookDownloadManager
 import dev.readana.core.data.downloads.DownloadScheduler
@@ -57,4 +61,10 @@ abstract class DataModule {
 
     @Binds
     abstract fun bindsBookDownloadManager(impl: DefaultBookDownloadManager): BookDownloadManager
+
+    @Binds
+    abstract fun bindsBookConverter(impl: DefaultBookConverter): BookConverter
+
+    @Binds
+    abstract fun bindsConversionManager(impl: DefaultConversionManager): ConversionManager
 }

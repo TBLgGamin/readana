@@ -4,7 +4,10 @@ package dev.readana.engine.reflow
 sealed interface Block {
     val text: String
 
-    data class Heading(val level: Int, override val text: String) : Block {
+    /** Page the block starts on; the outline maps its entries onto blocks through this. */
+    val pageIndex: Int
+
+    data class Heading(val level: Int, override val text: String, override val pageIndex: Int = 0) : Block {
         init {
             require(level in 1..MAX_LEVEL) { "Heading level must be 1..$MAX_LEVEL but was $level" }
         }
@@ -14,7 +17,22 @@ sealed interface Block {
         }
     }
 
-    data class Paragraph(override val text: String) : Block
+    data class Paragraph(override val text: String, override val pageIndex: Int = 0) : Block
+
+    /**
+     * A figure lifted out of the page. Not a data class: [bytes] would make equality meaningless.
+     * [text] is the alt text, which is all a text-only consumer can use.
+     */
+    class Image(
+        val bytes: ByteArray,
+        val mediaType: String,
+        val pixelWidth: Int,
+        val pixelHeight: Int,
+        val altText: String,
+        override val pageIndex: Int
+    ) : Block {
+        override val text: String get() = altText
+    }
 }
 
 /** Tunables for the PDF → reflowable text heuristics. Defaults suit typical body text at 9–12pt. */
@@ -32,5 +50,10 @@ data class ReflowOptions(
     val shortLineFraction: Float = 0.7f,
     /** Font size at least this multiple of the body size marks a heading. */
     val headingSizeFactor: Float = 1.15f,
-    val maxHeadingChars: Int = 120
+    val maxHeadingChars: Int = 120,
+    /**
+     * Split pages that look like two columns. A safety valve rather than a user setting: the
+     * detector is conservative, but a pathological layout can still be forced back to one column.
+     */
+    val detectColumns: Boolean = true
 )

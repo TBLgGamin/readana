@@ -110,7 +110,7 @@ class ReflowEngineTest {
         )
 
         val blocks = engine.reflow(listOf(page))
-        val book = EpubAssembler.assemble(blocks, dev.readana.engine.epub.EpubMetadata(title = "Test"))
+        val book = EpubAssembler.assemble(blocks, dev.readana.engine.epub.EpubMetadata(title = "Test")).book
 
         assertEquals(Block.Heading(1, "Chapter One"), blocks.first())
         assertEquals(listOf("Chapter One", "Chapter Two"), book.chapters.map { it.title })
@@ -147,7 +147,7 @@ class ReflowEngineTest {
             blocks,
             dev.readana.engine.epub.EpubMetadata(title = "Chunky"),
             maxParagraphsPerChapter = 5
-        )
+        ).book
 
         assertEquals(12, blocks.size)
         assertEquals(3, book.chapters.size)

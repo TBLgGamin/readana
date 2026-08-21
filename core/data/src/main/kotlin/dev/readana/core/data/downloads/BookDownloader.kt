@@ -6,11 +6,14 @@ import dev.readana.core.common.coroutines.ReadanaDispatchers
 import dev.readana.core.common.coroutines.suspendRunCatching
 import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
+import dev.readana.core.data.conversion.ConversionManager
 import dev.readana.core.data.database.DownloadEntity
 import dev.readana.core.data.importing.BookImporter
 import dev.readana.core.data.importing.ImportResult
 import dev.readana.core.data.repository.BookSourceRegistry
 import dev.readana.core.data.repository.DownloadsRepository
+import dev.readana.core.data.repository.SettingsRepository
+import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
 import dev.readana.core.model.BookOrigin
 import dev.readana.core.model.DownloadErrorKind
@@ -35,6 +38,7 @@ import java.io.RandomAccessFile
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 /**
@@ -49,6 +53,8 @@ class BookDownloader @Inject constructor(
     private val downloadsRepository: DownloadsRepository,
     private val sources: BookSourceRegistry,
     private val importer: BookImporter,
+    private val conversionManager: ConversionManager,
+    private val settingsRepository: SettingsRepository,
     @DownloadsDirectory private val partsDir: File,
     @Dispatcher(ReadanaDispatchers.IO) private val ioDispatcher: CoroutineDispatcher
 ) {
@@ -283,14 +289,27 @@ class BookDownloader @Inject constructor(
             is AppResult.Failure -> fail(entity.id, DownloadErrorKind.Storage, imported.error.message)
 
             is AppResult.Success -> {
-                val bookId = when (val outcome = imported.value) {
-                    is ImportResult.Imported -> outcome.book.id
-                    is ImportResult.Duplicate -> outcome.existing.id
+                val book = when (val outcome = imported.value) {
+                    is ImportResult.Imported -> outcome.book
+                    is ImportResult.Duplicate -> outcome.existing
                 }
-                downloadsRepository.markCompleted(entity.id, bookId)
+                convertIfPdf(entity.id, book)
+                downloadsRepository.markCompleted(entity.id, book.id)
                 Outcome.Success
             }
         }
+    }
+
+    /**
+     * A downloaded PDF is converted before the job is marked done, so the queue reports
+     * `Converting` instead of claiming the book is ready. A failed conversion still leaves a
+     * readable PDF behind, so it does not fail the download.
+     */
+    private suspend fun convertIfPdf(jobId: String, book: Book) {
+        if (book.format != BookFormat.PDF) return
+        if (!settingsRepository.conversionSettings.first().autoConvertPdf) return
+        downloadsRepository.setStatus(jobId, DownloadStatus.Converting)
+        conversionManager.convertAndWait(book.id)
     }
 
     private suspend fun fail(jobId: String, kind: DownloadErrorKind, message: String): Outcome {

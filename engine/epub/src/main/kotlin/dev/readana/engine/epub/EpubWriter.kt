@@ -107,14 +107,29 @@ class EpubWriter {
         }
     }
 
-    internal fun navDocument(book: EpubBook): String = buildString {
-        append(xhtmlHead(book.metadata.language, "Contents", stylesheetHref = STYLESHEET_HREF))
-        append("<nav epub:type=\"toc\" id=\"toc\">\n<h1>Contents</h1>\n<ol>\n")
-        book.chapters.forEach { chapter ->
-            append("<li><a href=\"${chapterHref(chapter)}\">${Xml.escape(chapter.title)}</a></li>\n")
+    internal fun navDocument(book: EpubBook): String {
+        val entries = book.navigation
+            ?: book.chapters.map { NavEntry(it.title, chapterHref(it)) }
+        return buildString {
+            append(xhtmlHead(book.metadata.language, "Contents", stylesheetHref = STYLESHEET_HREF))
+            append("<nav epub:type=\"toc\" id=\"toc\">\n<h1>Contents</h1>\n")
+            appendNavList(entries, depth = 1)
+            append("</nav>\n")
+            append(XHTML_FOOT)
         }
-        append("</ol>\n</nav>\n")
-        append(XHTML_FOOT)
+    }
+
+    private fun StringBuilder.appendNavList(entries: List<NavEntry>, depth: Int) {
+        append("<ol>\n")
+        entries.forEach { entry ->
+            append("<li><a href=\"${Xml.escape(entry.href)}\">${Xml.escape(entry.title)}</a>")
+            if (entry.children.isNotEmpty() && depth < MAX_NAV_DEPTH) {
+                append('\n')
+                appendNavList(entry.children, depth + 1)
+            }
+            append("</li>\n")
+        }
+        append("</ol>\n")
     }
 
     internal fun chapterDocument(book: EpubBook, chapter: EpubChapter): String = buildString {
@@ -144,6 +159,9 @@ class EpubWriter {
         internal const val STYLESHEET_ID = "stylesheet"
         internal const val COVER_ID = "cover-image"
         val RESERVED_IDS: Set<String> = setOf(NAV_ID, STYLESHEET_ID, COVER_ID)
+
+        /** EPUB readers rarely show more, and deeper lists mostly reflect noisy PDF outlines. */
+        internal const val MAX_NAV_DEPTH = 3
 
         /** Fixed timestamp so identical input produces byte-identical output. */
         private const val ENTRY_TIME = 1_767_225_600_000L // 2026-01-01T00:00:00Z

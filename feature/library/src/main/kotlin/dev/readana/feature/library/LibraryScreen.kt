@@ -102,9 +102,41 @@ internal fun LibraryRoute(
         onRetryDownload = viewModel::retryDownload,
         onCancelDownload = viewModel::cancelDownload,
         onDismissDownload = viewModel::dismissDownload,
+        onConvert = viewModel::convert,
         onDismissMessage = viewModel::consumeMessage,
         modifier = modifier
     )
+}
+
+/** Determinate where the extractor reports pages, indeterminate during the later phases. */
+@Composable
+private fun ConversionStrip(conversion: ActiveConversion, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        if (conversion.totalPages > 0) {
+            LinearProgressIndicator(
+                progress = { conversion.currentPage.toFloat() / conversion.totalPages },
+                modifier = Modifier.fillMaxWidth()
+            )
+        } else {
+            LinearProgressIndicator(Modifier.fillMaxWidth())
+        }
+        Text(
+            text = if (conversion.totalPages > 0) {
+                stringResource(
+                    R.string.feature_library_converting_pages,
+                    conversion.title,
+                    conversion.currentPage,
+                    conversion.totalPages
+                )
+            } else {
+                stringResource(R.string.feature_library_converting, conversion.title)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = GridSpacing, vertical = 4.dp)
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -121,6 +153,7 @@ internal fun LibraryScreen(
     onRetryDownload: (String) -> Unit,
     onCancelDownload: (String) -> Unit,
     onDismissDownload: (String) -> Unit,
+    onConvert: (String) -> Unit,
     onDismissMessage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -172,6 +205,9 @@ internal fun LibraryScreen(
                     modifier = Modifier.padding(horizontal = GridSpacing, vertical = 4.dp)
                 )
             }
+            uiState.conversions.forEach { conversion ->
+                ConversionStrip(conversion)
+            }
             DownloadsSection(
                 downloads = uiState.downloads,
                 onOpenBook = onOpenBook,
@@ -190,11 +226,13 @@ internal fun LibraryScreen(
     uiState.detailsBook?.let { book ->
         BookDetailsSheet(
             book = book,
+            isConverting = uiState.conversions.any { it.bookId == book.id },
             onOpen = {
                 onShowDetails(null)
                 onOpenBook(book.id)
             },
             onDelete = { onRequestDelete(book) },
+            onConvert = { onConvert(book.id) },
             onDismiss = { onShowDetails(null) }
         )
     }
@@ -369,6 +407,13 @@ private fun messageText(message: LibraryMessage): String = when (message) {
         R.string.feature_library_download_error,
         message.error.message
     )
+
+    is LibraryMessage.Converted -> stringResource(R.string.feature_library_converted, message.title)
+
+    is LibraryMessage.ConversionFailed -> stringResource(
+        R.string.feature_library_conversion_failed,
+        message.error.message
+    )
 }
 
 @Preview(showBackground = true, widthDp = 800, heightDp = 600)
@@ -394,6 +439,7 @@ private fun LibraryScreenPreview() {
             onRetryDownload = {},
             onCancelDownload = {},
             onDismissDownload = {},
+            onConvert = {},
             onDismissMessage = {}
         )
     }
@@ -415,6 +461,7 @@ private fun LibraryScreenEmptyPreview() {
             onRetryDownload = {},
             onCancelDownload = {},
             onDismissDownload = {},
+            onConvert = {},
             onDismissMessage = {}
         )
     }

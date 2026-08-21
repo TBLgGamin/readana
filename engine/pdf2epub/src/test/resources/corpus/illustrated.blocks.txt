@@ -1,0 +1,3 @@
+P|p0|The diagram below shows the arrangement described in the text above it, drawn to scale and labelled for reference.
+IMG|p0|image/png|64x32
+P|p0|Beneath the figure the discussion resumes and runs on for a further couple of lines so it reads as ordinary body text.

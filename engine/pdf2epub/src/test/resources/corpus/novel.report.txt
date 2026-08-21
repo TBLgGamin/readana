@@ -1,0 +1,9 @@
+pages=3
+blocks=6
+headings=3
+chapters=3
+images=0
+multiColumnPages=0
+outlineUsed=false
+droppedNavEntries=0
+warnings=[]

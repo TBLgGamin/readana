@@ -13,6 +13,7 @@ import dev.readana.core.data.repository.SettingsRepository
 import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
 import dev.readana.core.model.Bookmark
+import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.Highlight
 import dev.readana.core.model.HighlightTint
 import dev.readana.core.model.ReaderSettings
@@ -433,6 +434,10 @@ private class FakeSettingsRepository : SettingsRepository {
     override val sourceSettings: Flow<SourceSettings> = sources
 
     override suspend fun updateSourceSettings(transform: (SourceSettings) -> SourceSettings) = sources.update(transform)
+
+    override val conversionSettings: Flow<ConversionSettings> = MutableStateFlow(ConversionSettings())
+
+    override suspend fun updateConversionSettings(transform: (ConversionSettings) -> ConversionSettings) = Unit
 
     override val libraryFolderUri: Flow<String?> = folder
 

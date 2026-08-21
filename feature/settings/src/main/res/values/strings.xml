@@ -20,6 +20,16 @@
     <string name="feature_settings_annas_mirrors_help">One URL per line, tried in order. Leave empty for the built-in defaults.</string>
     <string name="feature_settings_annas_secret_key">Member secret key (optional)</string>
     <string name="feature_settings_annas_secret_key_help">Enables the fast-download API. Without it, downloads open in a browser.</string>
+    <string name="feature_settings_section_conversion">PDF conversion</string>
+    <string name="feature_settings_conversion_auto">Convert PDFs to EPUB</string>
+    <string name="feature_settings_conversion_auto_help">Converted books reflow to your font size. The original PDF is always kept, and you can convert or re-convert any book from its details.</string>
+    <string name="feature_settings_conversion_headers">Remove repeated headers and footers</string>
+    <string name="feature_settings_conversion_images">Include figures and images</string>
+    <string name="feature_settings_conversion_headings">Heading detection</string>
+    <string name="feature_settings_conversion_headings_help">How readily larger or bold lines become chapter headings. Fewer headings means fewer, longer chapters.</string>
+    <string name="feature_settings_conversion_headings_conservative">Fewer</string>
+    <string name="feature_settings_conversion_headings_balanced">Balanced</string>
+    <string name="feature_settings_conversion_headings_aggressive">More</string>
     <string name="feature_settings_section_background">Downloads &amp; background</string>
     <string name="feature_settings_background_help">Xiaomi\'s battery manager stops background downloads. Set Readana to “No restrictions” and turn Autostart on, or downloads will pause whenever you leave the app.</string>
     <string name="feature_settings_background_battery">Battery settings</string>

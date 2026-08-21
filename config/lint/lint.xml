@@ -15,6 +15,14 @@
     <issue id="MissingTranslation" severity="ignore" />
     <!-- Third-party lint jars built against older lint APIs shouldn't break the build. -->
     <issue id="ObsoleteLintCustomCheck" severity="ignore" />
+    <!--
+      PDFBox pulls in BouncyCastle for encrypted PDFs. The permissive trust manager lint finds is
+      inside that library's own bytecode; Readana never uses its TLS helpers (all networking goes
+      through Ktor/OkHttp). Scoped to those jars so the check still fires on our code.
+    -->
+    <issue id="TrustAllX509TrustManager">
+        <ignore regexp="bcpkix|bcprov|bcutil" />
+    </issue>
 
     <!-- Keep these loud. -->
     <issue id="UnusedResources" severity="error" />

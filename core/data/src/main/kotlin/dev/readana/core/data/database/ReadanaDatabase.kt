@@ -11,13 +11,14 @@ import androidx.room.RoomDatabase
         HighlightEntity::class,
         DownloadEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
-    // Each version only adds a table, so Room can write the migrations itself.
+    // Every version only adds tables or nullable columns, so Room can write the migrations itself.
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
         AutoMigration(from = 2, to = 3),
-        AutoMigration(from = 3, to = 4)
+        AutoMigration(from = 3, to = 4),
+        AutoMigration(from = 4, to = 5)
     ]
 )
 abstract class ReadanaDatabase : RoomDatabase() {

@@ -51,4 +51,39 @@
     <string name="feature_library_download_open">Read</string>
     <string name="feature_library_download_dismiss">Remove from list</string>
     <string name="feature_library_download_error">Download failed: %1$s</string>
+    <string name="feature_library_details_convert">Convert to EPUB</string>
+    <string name="feature_library_details_reconvert">Re-convert</string>
+    <string name="feature_library_details_converting">Converting…</string>
+    <string name="feature_library_details_converted">Converted</string>
+    <string name="feature_library_details_original">Original</string>
+    <string name="feature_library_details_conversion">Conversion</string>
+    <string name="feature_library_conversion_report_title">Conversion report</string>
+    <string name="feature_library_conversion_report_close">Close</string>
+    <string name="feature_library_conversion_pages">Pages read</string>
+    <string name="feature_library_conversion_chapters">Chapters</string>
+    <string name="feature_library_conversion_headings">Headings</string>
+    <string name="feature_library_conversion_images">Figures</string>
+    <string name="feature_library_conversion_columns">Two-column pages</string>
+    <string name="feature_library_conversion_source">Chapters from</string>
+    <string name="feature_library_conversion_source_outline">the PDF\'s own contents</string>
+    <string name="feature_library_conversion_source_headings">detected headings</string>
+    <string name="feature_library_reconvert_title">Convert this book again?</string>
+    <string name="feature_library_reconvert_message">The original PDF is converted again with your current settings. Your reading position is reset; bookmarks and highlights are kept.</string>
+    <string name="feature_library_reconvert_confirm">Convert</string>
+    <string name="feature_library_converting">Converting “%1$s”…</string>
+    <string name="feature_library_converting_pages">Converting “%1$s” · page %2$d of %3$d</string>
+    <string name="feature_library_converted">Converted “%1$s”</string>
+    <string name="feature_library_conversion_failed">Could not convert: %1$s</string>
+    <plurals name="feature_library_conversion_chapter_count">
+        <item quantity="one">%1$d chapter</item>
+        <item quantity="other">%1$d chapters</item>
+    </plurals>
+    <plurals name="feature_library_conversion_image_count">
+        <item quantity="one">%1$d figure</item>
+        <item quantity="other">%1$d figures</item>
+    </plurals>
+    <plurals name="feature_library_conversion_warning_count">
+        <item quantity="one">%1$d note</item>
+        <item quantity="other">%1$d notes</item>
+    </plurals>
 </resources>

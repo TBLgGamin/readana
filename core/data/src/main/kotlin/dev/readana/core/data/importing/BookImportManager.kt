@@ -3,7 +3,10 @@ package dev.readana.core.data.importing
 import dev.readana.core.common.coroutines.ApplicationScope
 import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
+import dev.readana.core.data.conversion.ConversionManager
+import dev.readana.core.data.repository.SettingsRepository
 import dev.readana.core.model.Book
+import dev.readana.core.model.BookFormat
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -13,6 +16,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -41,6 +45,8 @@ interface BookImportManager {
 @Singleton
 class DefaultBookImportManager @Inject constructor(
     private val importer: BookImporter,
+    private val conversionManager: ConversionManager,
+    private val settingsRepository: SettingsRepository,
     @ApplicationScope private val scope: CoroutineScope
 ) : BookImportManager {
     private val _activeImports = MutableStateFlow(0)
@@ -54,12 +60,25 @@ class DefaultBookImportManager @Inject constructor(
             scope.launch {
                 _activeImports.update { it + 1 }
                 try {
-                    _events.emit(importer.import(uri).toEvent())
+                    val outcome = importer.import(uri)
+                    _events.emit(outcome.toEvent())
+                    outcome.convertIfPdf()
                 } finally {
                     _activeImports.update { it - 1 }
                 }
             }
         }
+    }
+
+    /**
+     * A freshly imported PDF is queued for conversion; the original stays on disk, so a failure
+     * just leaves a readable PDF behind.
+     */
+    private suspend fun AppResult<ImportResult>.convertIfPdf() {
+        val book = ((this as? AppResult.Success)?.value as? ImportResult.Imported)?.book ?: return
+        if (book.format != BookFormat.PDF) return
+        if (!settingsRepository.conversionSettings.first().autoConvertPdf) return
+        conversionManager.enqueue(book.id)
     }
 
     private fun AppResult<ImportResult>.toEvent(): ImportEvent = when (this) {

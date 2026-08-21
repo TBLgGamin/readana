@@ -1,11 +1,12 @@
 package dev.readana.engine.reflow
 
+import dev.readana.engine.reflow.model.DocumentContent
+import dev.readana.engine.reflow.model.PageContent
 import dev.readana.engine.reflow.model.PageText
 import dev.readana.engine.reflow.model.TextLine
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
-import kotlin.math.roundToInt
 
 /**
  * Turns positioned page text (from a PDF) into reflowable blocks using layout heuristics,
@@ -19,32 +20,61 @@ import kotlin.math.roundToInt
  * Pure Kotlin so it is unit-testable without Android or PDFBox.
  */
 class ReflowEngine(private val options: ReflowOptions = ReflowOptions()) {
-    fun reflow(pages: List<PageText>): List<Block> {
-        val populated = pages
+    /** Text-only entry point, kept for callers that have no images or outline. */
+    fun reflow(pages: List<PageText>): List<Block> = reflow(DocumentContent(pages.map { PageContent(it) })).blocks
+
+    fun reflow(document: DocumentContent): ReflowResult {
+        val populated = document.pages
             .map { page ->
                 page.copy(
-                    lines = page.lines.filter {
-                        it.text.isNotBlank()
-                    }.sortedBy { it.baseline }
+                    text = page.text.copy(
+                        lines = page.text.lines.filter { it.text.isNotBlank() }.sortedBy { it.baseline }
+                    )
                 )
             }
-            .filter { it.lines.isNotEmpty() }
-        if (populated.isEmpty()) return emptyList()
+            .filter { it.text.lines.isNotEmpty() || it.images.isNotEmpty() }
+        if (populated.isEmpty()) return ReflowResult(emptyList(), multiColumnPages = 0)
 
         val body = if (options.removeRepeatedHeadersAndFooters) {
-            HeaderFooterFilter(
-                options
-            ).filter(populated)
+            filterHeadersAndFooters(populated)
         } else {
             populated
         }
-        if (body.isEmpty()) return emptyList()
+        if (body.isEmpty()) return ReflowResult(emptyList(), multiColumnPages = 0)
 
-        val stats = LayoutStats.from(body)
-        val paragraphs = ParagraphBuilder(options, stats).build(body)
-        return HeadingClassifier(options, stats).classify(paragraphs)
+        val stats = LayoutStats.from(body.map { it.text }.filter { it.lines.isNotEmpty() })
+            ?: return ReflowResult(emptyList(), multiColumnPages = 0)
+
+        val segmenter = PageSegmenter(options)
+        val items = segmenter.segment(body, stats.bodyFontSize)
+        val paragraphs = ParagraphBuilder(options, stats).build(items)
+        return ReflowResult(
+            blocks = HeadingClassifier(options, stats).classify(paragraphs),
+            multiColumnPages = segmenter.multiColumnPages
+        )
+    }
+
+    /** Runs the header/footer filter over the text while keeping each page's images attached. */
+    private fun filterHeadersAndFooters(pages: List<PageContent>): List<PageContent> {
+        val withText = pages.filter { it.text.lines.isNotEmpty() }
+        val filtered = HeaderFooterFilter(options).filter(withText.map { it.text })
+            .associateBy { it.index }
+        return pages.mapNotNull { page ->
+            val text = filtered[page.text.index]
+            when {
+                text != null -> page.copy(text = text)
+
+                // Every line was a running header, but a figure on that page still counts.
+                page.images.isNotEmpty() -> page.copy(text = page.text.copy(lines = emptyList()))
+
+                else -> null
+            }
+        }
     }
 }
+
+/** Blocks plus what the heuristics noticed while producing them. */
+data class ReflowResult(val blocks: List<Block>, val multiColumnPages: Int)
 
 internal class HeaderFooterFilter(private val options: ReflowOptions) {
     fun filter(pages: List<PageText>): List<PageText> {
@@ -89,22 +119,15 @@ internal class HeaderFooterFilter(private val options: ReflowOptions) {
 }
 
 /** Typography facts about the document used to calibrate the heuristics. */
-internal data class LayoutStats(
-    val bodyFontSize: Float,
-    val lineSpacing: Float,
-    val typicalLineWidth: Float,
-    private val leftMargins: Map<Int, Float>
-) {
-    fun leftMargin(page: PageText): Float = leftMargins[page.index] ?: page.lines.minOf { it.left }
-
+internal data class LayoutStats(val bodyFontSize: Float, val lineSpacing: Float, val typicalLineWidth: Float) {
     companion object {
         private const val BODY_FONT_TOLERANCE = 0.1f
         private const val MAX_SPACING_FACTOR = 3f
         private const val DEFAULT_SPACING_FACTOR = 1.2f
-        private const val MARGIN_PERCENTILE = 0.1f
 
-        fun from(pages: List<PageText>): LayoutStats {
+        fun from(pages: List<PageText>): LayoutStats? {
             val lines = pages.flatMap { it.lines }
+            if (lines.isEmpty()) return null
             val bodyFontSize = lines.groupBy { it.fontSize }
                 .maxBy { (_, group) -> group.sumOf { it.text.length } }
                 .key
@@ -119,12 +142,8 @@ internal data class LayoutStats(
                 .median() ?: (bodyFontSize * DEFAULT_SPACING_FACTOR)
 
             val width = bodyLines.map { it.width }.median() ?: lines.maxOf { it.width }
-            val margins = pages.associate { page ->
-                page.index to
-                    page.lines.map { it.left }.percentile(MARGIN_PERCENTILE)
-            }
 
-            return LayoutStats(bodyFontSize, spacing, width, margins)
+            return LayoutStats(bodyFontSize, spacing, width)
         }
 
         private fun List<Float>.median(): Float? {
@@ -139,55 +158,70 @@ internal data class LayoutStats(
                 (sorted[middle - 1] + sorted[middle]) / 2f
             }
         }
-
-        private fun List<Float>.percentile(fraction: Float): Float {
-            val sorted = sorted()
-            val index = ((sorted.size - 1) * fraction).roundToInt().coerceIn(0, sorted.size - 1)
-            return sorted[index]
-        }
     }
 }
 
-internal class RawParagraph(firstLine: TextLine) {
-    val lines = mutableListOf(firstLine)
-    val fontSize: Float = firstLine.fontSize
-    val isBold: Boolean = firstLine.isBold
-    val text: String
-        get() = joinLines(lines.map { it.text })
+/** A run of lines that will become one paragraph, or a figure standing on its own. */
+internal sealed interface Chunk {
+    val pageIndex: Int
+
+    class Text(first: ReadingItem.Line) : Chunk {
+        val lines = mutableListOf(first.line)
+        val fontSize: Float = first.line.fontSize
+        val isBold: Boolean = first.line.isBold
+        override val pageIndex: Int = first.pageIndex
+        val text: String
+            get() = joinLines(lines.map { it.text })
+    }
+
+    class Figure(val item: ReadingItem.Image) : Chunk {
+        override val pageIndex: Int = item.pageIndex
+    }
 }
 
 internal class ParagraphBuilder(private val options: ReflowOptions, private val stats: LayoutStats) {
-    fun build(pages: List<PageText>): List<RawParagraph> {
-        val paragraphs = mutableListOf<RawParagraph>()
-        var previous: Pair<TextLine, PageText>? = null
-        for (page in pages) {
-            for (line in page.lines) {
-                val prev = previous
-                if (prev == null || startsNewParagraph(prev.first, prev.second, line, page)) {
-                    paragraphs += RawParagraph(line)
-                } else {
-                    paragraphs.last().lines += line
+    fun build(items: List<ReadingItem>): List<Chunk> {
+        val chunks = mutableListOf<Chunk>()
+        var previous: ReadingItem.Line? = null
+        for (item in items) {
+            when (item) {
+                is ReadingItem.Image -> {
+                    chunks += Chunk.Figure(item)
+                    // A figure interrupts the text around it, whatever the spacing says.
+                    previous = null
                 }
-                previous = line to page
+
+                is ReadingItem.Line -> {
+                    val prev = previous
+                    val open = chunks.lastOrNull() as? Chunk.Text
+                    if (prev == null || open == null || startsNewParagraph(prev, item)) {
+                        chunks += Chunk.Text(item)
+                    } else {
+                        open.lines += item.line
+                    }
+                    previous = item
+                }
             }
         }
-        return paragraphs
+        return chunks
     }
 
-    private fun startsNewParagraph(prev: TextLine, prevPage: PageText, line: TextLine, page: PageText): Boolean {
+    private fun startsNewParagraph(prev: ReadingItem.Line, next: ReadingItem.Line): Boolean {
         val fontChanged =
-            abs(line.fontSize - prev.fontSize) >
-                max(line.fontSize, prev.fontSize) * FONT_CHANGE_TOLERANCE
-        if (fontChanged || line.isBold != prev.isBold) return true
+            abs(next.line.fontSize - prev.line.fontSize) >
+                max(next.line.fontSize, prev.line.fontSize) * FONT_CHANGE_TOLERANCE
+        if (fontChanged || next.line.isBold != prev.line.isBold) return true
 
-        val indent = line.left - stats.leftMargin(page)
+        // Measured against this column's own left edge, so a second column is not all "indented".
+        val indent = next.line.left - next.columnLeft
         if (indent > options.indentFactor * stats.bodyFontSize) return true
 
-        val prevIsShort = prev.width < options.shortLineFraction * stats.typicalLineWidth
-        if (prevIsShort && prev.text.endsWithSentenceTerminator()) return true
+        val prevIsShort = prev.line.width < options.shortLineFraction * stats.typicalLineWidth
+        if (prevIsShort && prev.line.text.endsWithSentenceTerminator()) return true
 
-        if (page.index == prevPage.index) {
-            val gap = line.baseline - prev.baseline
+        // Only meaningful within one column of one page; a paragraph may run across the break.
+        if (next.pageIndex == prev.pageIndex && next.columnIndex == prev.columnIndex) {
+            val gap = next.line.baseline - prev.line.baseline
             if (gap > options.paragraphGapFactor * stats.lineSpacing) return true
         }
         return false
@@ -199,27 +233,34 @@ internal class ParagraphBuilder(private val options: ReflowOptions, private val 
 }
 
 internal class HeadingClassifier(private val options: ReflowOptions, private val stats: LayoutStats) {
-    fun classify(paragraphs: List<RawParagraph>): List<Block> {
-        val headingSizes = paragraphs.filter {
-            isHeading(it)
-        }.map { it.fontSize }.distinct().sortedDescending()
-        return paragraphs
-            .filter { it.text.isNotBlank() }
-            .map { paragraph ->
-                if (isHeading(paragraph)) {
-                    val level = (
-                        headingSizes.indexOf(
-                            paragraph.fontSize
-                        ) + 1
-                        ).coerceIn(1, Block.Heading.MAX_LEVEL)
-                    Block.Heading(level, paragraph.text)
-                } else {
-                    Block.Paragraph(paragraph.text)
+    fun classify(chunks: List<Chunk>): List<Block> {
+        val texts = chunks.filterIsInstance<Chunk.Text>()
+        val headingSizes = texts.filter { isHeading(it) }.map { it.fontSize }.distinct().sortedDescending()
+        return chunks.mapNotNull { chunk ->
+            when (chunk) {
+                is Chunk.Figure -> Block.Image(
+                    bytes = chunk.item.image.bytes,
+                    mediaType = chunk.item.image.mediaType,
+                    pixelWidth = chunk.item.image.pixelWidth,
+                    pixelHeight = chunk.item.image.pixelHeight,
+                    altText = "",
+                    pageIndex = chunk.pageIndex
+                )
+
+                is Chunk.Text -> chunk.takeIf { it.text.isNotBlank() }?.let { paragraph ->
+                    if (isHeading(paragraph)) {
+                        val level = (headingSizes.indexOf(paragraph.fontSize) + 1)
+                            .coerceIn(1, Block.Heading.MAX_LEVEL)
+                        Block.Heading(level, paragraph.text, paragraph.pageIndex)
+                    } else {
+                        Block.Paragraph(paragraph.text, paragraph.pageIndex)
+                    }
                 }
             }
+        }
     }
 
-    private fun isHeading(paragraph: RawParagraph): Boolean {
+    private fun isHeading(paragraph: Chunk.Text): Boolean {
         val larger = paragraph.fontSize >= options.headingSizeFactor * stats.bodyFontSize
         val boldAtBodySize =
             paragraph.isBold && paragraph.fontSize >= stats.bodyFontSize * BOLD_SIZE_TOLERANCE

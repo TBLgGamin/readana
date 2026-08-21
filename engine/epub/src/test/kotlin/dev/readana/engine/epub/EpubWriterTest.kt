@@ -90,6 +90,35 @@ class EpubWriterTest {
     }
 
     @Test
+    fun `a nested table of contents with image resources passes epubcheck`() {
+        val file = temporaryFolder.newFile("nested.epub")
+        file.outputStream().use { writer.write(nestedNavBook(), it) }
+
+        val report = DefaultReportImpl(file.name)
+        EpubCheck(file, report).doValidate()
+
+        assertEquals(0, report.fatalErrorCount, "epubcheck reported fatal errors (see test output)")
+        assertEquals(0, report.errorCount, "epubcheck reported errors (see test output)")
+    }
+
+    @Test
+    fun `nav renders children as a nested list`() {
+        val nav = writer.navDocument(nestedNavBook())
+
+        assertTrue("""<a href="text/ch-1.xhtml">Chapter One</a>""" in nav)
+        assertTrue("""<a href="text/ch-1.xhtml#h-0001">A Section</a>""" in nav)
+        // The child list is nested inside its parent's <li>, not appended after it.
+        assertTrue(nav.indexOf("A Section") < nav.indexOf("Chapter Two"))
+    }
+
+    @Test
+    fun `an empty table of contents is rejected`() {
+        assertFailsWith<IllegalArgumentException> {
+            EpubBook(EpubMetadata(title = "x"), listOf(chapter("ch-1")), navigation = emptyList())
+        }
+    }
+
+    @Test
     fun `rejects duplicate and reserved chapter ids`() {
         val metadata = EpubMetadata(title = "x")
         assertFailsWith<IllegalArgumentException> {
@@ -128,6 +157,39 @@ class EpubWriterTest {
             )
         ),
         cover = EpubResource("images/cover.png", "image/png", ONE_PIXEL_PNG)
+    )
+
+    private fun nestedNavBook(): EpubBook = EpubBook(
+        metadata = EpubMetadata(
+            title = "Nested",
+            identifier = "urn:uuid:8f6a5e1e-3b2a-4d4e-9c1d-2f5a7b8c9d01",
+            modified = Instant.parse("2026-08-20T12:00:00Z")
+        ),
+        chapters = listOf(
+            EpubChapter(
+                id = "ch-1",
+                title = "Chapter One",
+                bodyXhtml = Xhtml.heading(1, "Chapter One") +
+                    Xhtml.paragraph("Opening.") +
+                    Xhtml.heading(2, "A Section", id = "h-0001") +
+                    Xhtml.paragraph("Section body.") +
+                    Xhtml.image("../images/img-0001.png", "A figure")
+            ),
+            EpubChapter(
+                id = "ch-2",
+                title = "Chapter Two",
+                bodyXhtml = Xhtml.heading(1, "Chapter Two") + Xhtml.paragraph("More.")
+            )
+        ),
+        resources = listOf(EpubResource("images/img-0001.png", "image/png", ONE_PIXEL_PNG)),
+        navigation = listOf(
+            NavEntry(
+                title = "Chapter One",
+                href = "text/ch-1.xhtml",
+                children = listOf(NavEntry("A Section", "text/ch-1.xhtml#h-0001"))
+            ),
+            NavEntry(title = "Chapter Two", href = "text/ch-2.xhtml")
+        )
     )
 
     private companion object {

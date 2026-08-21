@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.readana.android.library)
     alias(libs.plugins.readana.android.room)
     alias(libs.plugins.readana.hilt)
+    // The conversion report is stored as JSON in a column, so @Serializable needs the plugin.
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -14,6 +16,8 @@ dependencies {
     api(projects.source.api)
     implementation(projects.source.gutenberg)
     implementation(projects.source.annas)
+    // PDF → EPUB conversion; the dependency runs data → engine, never the other way.
+    api(projects.engine.pdf2epub)
 
     // Readium parses publications for the importer (metadata + cover) and for the reader.
     api(libs.readium.shared)

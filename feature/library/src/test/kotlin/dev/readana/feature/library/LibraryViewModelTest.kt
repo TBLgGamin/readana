@@ -5,6 +5,8 @@ import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
 import dev.readana.core.common.result.asFailure
 import dev.readana.core.common.result.asSuccess
+import dev.readana.core.data.conversion.ConversionEvent
+import dev.readana.core.data.conversion.ConversionManager
 import dev.readana.core.data.downloads.BookDownloadManager
 import dev.readana.core.data.downloads.CapturedDownload
 import dev.readana.core.data.downloads.EnqueueOutcome
@@ -22,6 +24,8 @@ import dev.readana.core.model.DownloadJob
 import dev.readana.core.model.DownloadStatus
 import dev.readana.core.model.ReadingProgress
 import dev.readana.core.testing.MainDispatcherRule
+import dev.readana.engine.pdf2epub.ConversionPhase
+import dev.readana.engine.pdf2epub.ConversionProgress
 import dev.readana.source.api.SearchResult
 import java.time.Instant
 import kotlin.test.Test
@@ -48,8 +52,9 @@ class LibraryViewModelTest {
     private val importManager = FakeBookImportManager()
     private val importer = FakeBookImporter()
     private val downloadManager = FakeBookDownloadManager()
+    private val conversionManager = FakeConversionManager()
 
-    private fun viewModel() = LibraryViewModel(repository, importManager, importer, downloadManager)
+    private fun viewModel() = LibraryViewModel(repository, importManager, importer, downloadManager, conversionManager)
 
     @Test
     fun `shows a loading state until the first books arrive`() {
@@ -260,6 +265,53 @@ class LibraryViewModelTest {
         assertNull(viewModel.uiState.value.message)
     }
 
+    @Test
+    fun `shows conversion progress with the book's title`() = runTest {
+        repository.upsert(book("1", title = "Moby Dick"))
+        val viewModel = viewModel()
+
+        conversionManager.setActive(
+            mapOf("1" to ConversionProgress(ConversionPhase.Extracting, currentPage = 4, totalPages = 20))
+        )
+        runCurrent()
+
+        val conversion = viewModel.uiState.value.conversions.single()
+        assertEquals("Moby Dick", conversion.title)
+        assertEquals(4, conversion.currentPage)
+        assertEquals(20, conversion.totalPages)
+    }
+
+    @Test
+    fun `converting a book reaches the manager and closes the sheet`() = runTest {
+        val target = book("1")
+        repository.upsert(target)
+        val viewModel = viewModel()
+        viewModel.setDetails(target)
+
+        viewModel.convert("1")
+
+        assertEquals(listOf("1"), conversionManager.enqueued)
+        assertNull(viewModel.uiState.value.detailsBook)
+    }
+
+    @Test
+    fun `conversion outcomes become messages`() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.uiState.test {
+            awaitItem()
+
+            conversionManager.emit(ConversionEvent.Succeeded(book("1", title = "Moby Dick"), report = null))
+            assertEquals("Moby Dick", assertIs<LibraryMessage.Converted>(awaitItem().message).title)
+
+            viewModel.consumeMessage()
+            assertNull(awaitItem().message)
+
+            conversionManager.emit(ConversionEvent.Failed("1", AppError.Parse("broken")))
+            assertIs<LibraryMessage.ConversionFailed>(awaitItem().message)
+        }
+    }
+
     private fun downloadJob(id: String, status: DownloadStatus) = DownloadJob(
         id = id,
         sourceId = "annas-archive",
@@ -350,6 +402,28 @@ private class FakeBookImporter : BookImporter {
         deleted += bookId
         return Unit.asSuccess()
     }
+}
+
+private class FakeConversionManager : ConversionManager {
+    val enqueued = mutableListOf<String>()
+    private val _active = MutableStateFlow<Map<String, ConversionProgress>>(emptyMap())
+    private val _events = MutableSharedFlow<ConversionEvent>(extraBufferCapacity = 8)
+
+    override val active: StateFlow<Map<String, ConversionProgress>> = _active
+
+    override val events: SharedFlow<ConversionEvent> = _events
+
+    fun setActive(value: Map<String, ConversionProgress>) {
+        _active.value = value
+    }
+
+    suspend fun emit(event: ConversionEvent) = _events.emit(event)
+
+    override fun enqueue(bookId: String) {
+        enqueued += bookId
+    }
+
+    override suspend fun convertAndWait(bookId: String): AppResult<Book> = AppError.Unexpected("not used").asFailure()
 }
 
 private class FakeBookDownloadManager : BookDownloadManager {

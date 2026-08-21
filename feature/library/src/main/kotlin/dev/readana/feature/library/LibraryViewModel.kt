@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
+import dev.readana.core.data.conversion.ConversionEvent
+import dev.readana.core.data.conversion.ConversionManager
 import dev.readana.core.data.downloads.BookDownloadManager
 import dev.readana.core.data.downloads.RetryOutcome
 import dev.readana.core.data.importing.BookImportManager
@@ -38,6 +40,7 @@ data class LibraryUiState(
     val activeImports: Int = 0,
     /** Newest first; finished rows stay until the user dismisses them. */
     val downloads: List<DownloadJob> = emptyList(),
+    val conversions: List<ActiveConversion> = emptyList(),
     val message: LibraryMessage? = null,
     val effect: LibraryEffect? = null
 )
@@ -46,6 +49,9 @@ data class LibraryUiState(
 sealed interface LibraryEffect {
     data class OpenBrowser(val download: BrowserDownload) : LibraryEffect
 }
+
+/** A conversion in flight, for the progress strip. */
+data class ActiveConversion(val bookId: String, val title: String, val currentPage: Int, val totalPages: Int)
 
 /** One-shot outcomes worth a snackbar. */
 sealed interface LibraryMessage {
@@ -60,14 +66,19 @@ sealed interface LibraryMessage {
     data class DeleteFailed(val error: AppError) : LibraryMessage
 
     data class DownloadFailed(val error: AppError) : LibraryMessage
+
+    data class Converted(val title: String) : LibraryMessage
+
+    data class ConversionFailed(val error: AppError) : LibraryMessage
 }
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
-    libraryRepository: LibraryRepository,
+    private val libraryRepository: LibraryRepository,
     private val importManager: BookImportManager,
     private val importer: BookImporter,
-    private val downloadManager: BookDownloadManager
+    private val downloadManager: BookDownloadManager,
+    private val conversionManager: ConversionManager
 ) : ViewModel() {
     private val query = MutableStateFlow("")
     private val sort = MutableStateFlow(LibrarySort.Recent)
@@ -102,6 +113,25 @@ class LibraryViewModel @Inject constructor(
         viewModelScope.launch {
             downloadManager.jobs.collect { jobs ->
                 _uiState.update { it.copy(downloads = jobs) }
+            }
+        }
+        viewModelScope.launch {
+            combine(conversionManager.active, libraryRepository.books) { active, books ->
+                active.map { (bookId, progress) ->
+                    ActiveConversion(
+                        bookId = bookId,
+                        title = books.firstOrNull { it.id == bookId }?.title.orEmpty(),
+                        currentPage = progress.currentPage,
+                        totalPages = progress.totalPages
+                    )
+                }
+            }.collect { conversions ->
+                _uiState.update { it.copy(conversions = conversions) }
+            }
+        }
+        viewModelScope.launch {
+            conversionManager.events.collect { event ->
+                _uiState.update { it.copy(message = event.toMessage()) }
             }
         }
     }
@@ -162,6 +192,17 @@ class LibraryViewModel @Inject constructor(
     fun consumeMessage() = _uiState.update { it.copy(message = null) }
 
     fun consumeEffect() = _uiState.update { it.copy(effect = null) }
+
+    /** Converts a PDF, or runs a converted book through the engine again with current settings. */
+    fun convert(bookId: String) {
+        conversionManager.enqueue(bookId)
+        _uiState.update { it.copy(detailsBook = null) }
+    }
+
+    private fun ConversionEvent.toMessage(): LibraryMessage = when (this) {
+        is ConversionEvent.Succeeded -> LibraryMessage.Converted(book.title)
+        is ConversionEvent.Failed -> LibraryMessage.ConversionFailed(error)
+    }
 
     private fun ImportEvent.toMessage(): LibraryMessage = when (this) {
         is ImportEvent.Succeeded -> LibraryMessage.Imported(book.title)

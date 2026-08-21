@@ -3,9 +3,12 @@ package dev.readana.core.data.database
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import dev.readana.core.data.conversion.decodeConversionReport
+import dev.readana.core.data.conversion.encodeToJson
 import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
 import dev.readana.core.model.BookOrigin
+import dev.readana.core.model.ConversionInfo
 import dev.readana.core.model.ReadingProgress
 import java.time.Instant
 
@@ -26,7 +29,12 @@ data class BookEntity(
     @ColumnInfo(name = "progress_fraction") val progressFraction: Float?,
     @ColumnInfo(name = "source_id") val sourceId: String?,
     @ColumnInfo(name = "source_record_id") val sourceRecordId: String?,
-    @ColumnInfo(name = "original_format") val originalFormat: String?
+    @ColumnInfo(name = "original_format") val originalFormat: String?,
+    /** Where the PDF this EPUB was converted from still lives; null when nothing was converted. */
+    @ColumnInfo(name = "original_file_uri") val originalFileUri: String? = null,
+    @ColumnInfo(name = "converted_at") val convertedAt: Long? = null,
+    /** JSON of the conversion report, for the details sheet. */
+    @ColumnInfo(name = "conversion_report") val conversionReport: String? = null
 )
 
 private const val AUTHOR_SEPARATOR = "|"
@@ -52,6 +60,13 @@ fun BookEntity.toModel(): Book = Book(
             originalFormat =
                 originalFormat?.let(BookFormat::valueOf) ?: BookFormat.valueOf(format)
         )
+    },
+    conversion = originalFileUri?.let { original ->
+        ConversionInfo(
+            originalFileUri = original,
+            convertedAt = Instant.ofEpochMilli(convertedAt ?: 0),
+            report = conversionReport.decodeConversionReport()
+        )
     }
 )
 
@@ -70,5 +85,8 @@ fun Book.toEntity(): BookEntity = BookEntity(
     progressFraction = progress?.fraction,
     sourceId = origin?.sourceId,
     sourceRecordId = origin?.recordId,
-    originalFormat = origin?.originalFormat?.name
+    originalFormat = origin?.originalFormat?.name,
+    originalFileUri = conversion?.originalFileUri,
+    convertedAt = conversion?.convertedAt?.toEpochMilli(),
+    conversionReport = conversion?.report?.encodeToJson()
 )

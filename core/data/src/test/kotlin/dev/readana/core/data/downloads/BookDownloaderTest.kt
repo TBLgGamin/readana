@@ -8,6 +8,8 @@ import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
 import dev.readana.core.common.result.asFailure
 import dev.readana.core.common.result.asSuccess
+import dev.readana.core.data.FakeSettingsRepository
+import dev.readana.core.data.conversion.FakeConversionManager
 import dev.readana.core.data.importing.BookImporter
 import dev.readana.core.data.importing.ImportResult
 import dev.readana.core.data.repository.BookSourceRegistry
@@ -49,6 +51,8 @@ class BookDownloaderTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val downloads = FakeDownloadsRepository()
     private val importer = RecordingImporter()
+    private val conversions = FakeConversionManager()
+    private val settings = FakeSettingsRepository()
     private lateinit var partsDir: File
 
     @Before
@@ -219,6 +223,8 @@ class BookDownloaderTest {
             downloadsRepository = downloads,
             sources = BookSourceRegistry(setOf(source)),
             importer = importer,
+            conversionManager = conversions,
+            settingsRepository = settings,
             partsDir = partsDir,
             ioDispatcher = UnconfinedTestDispatcher()
         )

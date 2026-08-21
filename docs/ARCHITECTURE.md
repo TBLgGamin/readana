@@ -50,17 +50,17 @@ Green nodes are pure Kotlin/JVM modules: no Android dependency, millisecond unit
 |-------|----------------|----------|
 | `app` | `ReadanaApplication` (Hilt root), `MainActivity` (FragmentActivity for Readium), `ReadanaApp` (adaptive nav + `NavDisplay`), Konsist tests | yes |
 | `feature/*` | One screen family each: `XxxKey` (NavKey), `xxxEntry()` (entry provider), `XxxRoute` (wires ViewModel), `XxxScreen` (stateless UI), `XxxViewModel` | yes |
-| `core/data` | Room (`books`, `bookmarks`, `highlights`, `downloads`), DataStore (`SettingsKeys`), repositories, `BookSourceRegistry`, `ReadiumPublicationOpener`, the import pipeline (`BookStorage`, `BookImporter`, `BookImportManager`), the download pipeline (`BookDownloadManager`, `BookDownloader`, `DownloadWorker`), all Hilt modules | yes |
+| `core/data` | Room (`books`, `bookmarks`, `highlights`, `downloads`), DataStore (`SettingsKeys`), repositories, `BookSourceRegistry`, `ReadiumPublicationOpener`, the import pipeline (`BookStorage`, `BookImporter`, `BookImportManager`), the download pipeline (`BookDownloadManager`, `BookDownloader`, `DownloadWorker`), the conversion pipeline (`BookConverter`, `ConversionManager`), all Hilt modules | yes |
 | `core/designsystem` | `ReadanaTheme` (Material 3 Expressive), `ReadanaIcons`, `EmptyState`, `LoadingState`, `BookCover` (Coil) | yes |
-| `core/model` | `Book`, `BookFormat`, `ReadingProgress`, `Bookmark`, `Highlight`, `ReaderSettings`, `SourceSettings`, `DownloadJob`, `BrowserDownload` | no |
+| `core/model` | `Book`, `BookFormat`, `ReadingProgress`, `Bookmark`, `Highlight`, `ReaderSettings`, `SourceSettings`, `ConversionSettings`, `ConversionInfo`, `DownloadJob`, `BrowserDownload` | no |
 | `core/common` | `AppResult`/`AppError`, `@Dispatcher`/`@ApplicationScope`, `suspendRunCatching`, `VolumeKeyRelay` | no |
 | `core/testing` | `MainDispatcherRule`, `FakeBookSource` | no |
 | `source/api` | `BookSource`, `SearchQuery/Page/Result`, `DownloadRequest`, `DownloadQuota`, `BrowserLogin`, `FileNames` | no |
 | `source/gutenberg` | Gutendex JSON client | no |
 | `source/annas` | HTML search parser, member fast-download API, `MirrorResolver` | no |
-| `engine/epub` | `EpubBook` model, `EpubWriter` (EPUB 3.3, epubcheck-validated) | no |
-| `engine/reflow` | `PageText` model, `ReflowEngine` heuristics, `EpubAssembler` | no |
-| `engine/pdf2epub` | `PdfBoxTextExtractor`, `PdfToEpubConverter` | yes (PDFBox needs a Context) |
+| `engine/epub` | `EpubBook` model, `NavEntry`, `EpubWriter` (EPUB 3.3, epubcheck-validated) | no |
+| `engine/reflow` | `PageContent`/`PageText` models, `ReadingOrder` (column detection), `ReflowEngine` heuristics, `EpubAssembler` | no |
+| `engine/pdf2epub` | `PdfBoxContentExtractor` (text, figures, outline), `PageImageCollector`, `PdfToEpubConverter` | yes (PDFBox needs a Context) |
 
 ## Data flow
 
@@ -105,7 +105,29 @@ DiscoverViewModel ── SearchQuery ──▶ BookSourceRegistry ──▶ each
                           downloads row Completed ──▶ Library queue offers "Read"
 ```
 
-Conversion of downloaded PDFs (`DownloadStatus.Converting`) is M4.
+### PDF → EPUB (M4)
+
+Runs after an import or a download whose file turned out to be a PDF, and on demand from the book's
+details sheet. One book at a time: PDFBox plus bitmap decoding is memory-hungry (ADR 0011).
+
+```
+ConversionManager (application scope, one job at a time) ──▶ BookConverter
+        │                                                          │ reads the kept original PDF
+        ▼                                                          ▼
+   progress per book                            PdfBoxContentExtractor  ── text + figures + outline
+   (Library strip)                                                 ▼
+                                        ReflowEngine ── ReadingOrder: two-column detection, figures
+                                                     ── paragraphs, hyphen repair, headings
+                                                                   ▼
+                                        EpubAssembler ── chapters from the PDF outline when it maps,
+                                                         else from headings; nested nav; image
+                                                         resources deduped by content
+                                                                   ▼
+                                        EpubWriter ──▶ .epub ──▶ BookStorage
+                                                                   ▼
+                    one library row: format EPUB, file_uri the EPUB, original_file_uri the PDF,
+                    progress cleared, report stored for the details sheet
+```
 
 ### Read (M2)
 

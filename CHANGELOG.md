@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- PDF to EPUB: PDFs are converted on import and after a download so they reflow at your font size,
+  keeping the original file. Figures are carried across, two-column pages are read column by column,
+  and the PDF's own bookmarks become the table of contents when it has them. Progress shows in the
+  Library; the book's details sheet reports what the converter made of it and can convert again.
+- Conversion settings: auto-convert on or off, header/footer removal, heading sensitivity and
+  whether to include figures.
 - Downloads: tapping a Discover result queues a resumable transfer that runs as a WorkManager job
   with a progress notification, resumes with a `Range` request after a dropped connection, and
   hands the finished file to the existing import pipeline. The queue lives in a `downloads` table

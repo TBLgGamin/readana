@@ -1,6 +1,7 @@
 package dev.readana.core.data
 
 import dev.readana.core.data.repository.SettingsRepository
+import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.SourceSettings
 import kotlinx.coroutines.flow.Flow
@@ -11,10 +12,12 @@ import kotlinx.coroutines.flow.update
 class FakeSettingsRepository(
     reader: ReaderSettings = ReaderSettings(),
     sources: SourceSettings = SourceSettings(),
+    conversion: ConversionSettings = ConversionSettings(),
     libraryFolder: String? = null
 ) : SettingsRepository {
     private val reader = MutableStateFlow(reader)
     private val sources = MutableStateFlow(sources)
+    private val conversion = MutableStateFlow(conversion)
     private val libraryFolder = MutableStateFlow(libraryFolder)
 
     override val readerSettings: Flow<ReaderSettings> = this.reader
@@ -30,6 +33,12 @@ class FakeSettingsRepository(
 
     override suspend fun updateSourceSettings(transform: (SourceSettings) -> SourceSettings) {
         sources.update(transform)
+    }
+
+    override val conversionSettings: Flow<ConversionSettings> = this.conversion
+
+    override suspend fun updateConversionSettings(transform: (ConversionSettings) -> ConversionSettings) {
+        conversion.update(transform)
     }
 
     override val libraryFolderUri: Flow<String?> = this.libraryFolder

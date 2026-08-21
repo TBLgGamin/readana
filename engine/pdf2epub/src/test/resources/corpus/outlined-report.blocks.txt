@@ -1,0 +1,6 @@
+H1|p0|Introduction
+P|p0|This report sets out what was measured and why it matters here. A second line keeps the paragraph a real width.
+H1|p1|Method
+P|p1|Measurements were repeated three times under identical conditions. A second line keeps the paragraph a real width.
+H1|p2|Results
+P|p2|Every run agreed to within the tolerance stated in the method. A second line keeps the paragraph a real width.
