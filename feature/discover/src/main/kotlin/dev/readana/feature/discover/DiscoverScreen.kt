@@ -27,12 +27,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -60,6 +60,7 @@ import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.BookCover
 import dev.readana.core.designsystem.component.BookGridSkeleton
 import dev.readana.core.designsystem.component.EmptyState
+import dev.readana.core.designsystem.component.WavyProgress
 import dev.readana.core.designsystem.theme.ReadanaTheme
 import dev.readana.core.model.BookFormat
 import dev.readana.core.model.BrowserDownload
@@ -171,6 +172,7 @@ internal fun DiscoverScreen(
 ) {
     // Long-pressing a cover opens what the source knows about it, the way the library does.
     var details by remember { mutableStateOf<SearchResult?>(null) }
+    var editions by remember { mutableStateOf<ResultGroup?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val messageText = uiState.message?.let { messageText(it) }
     val currentOnMessageShown by rememberUpdatedState(onDismissMessage)
@@ -222,7 +224,7 @@ internal fun DiscoverScreen(
             )
             // Only while re-searching over results already on screen; a fresh search shows skeletons.
             if (uiState.isSearching && uiState.results.isNotEmpty()) {
-                LinearProgressIndicator(Modifier.fillMaxWidth())
+                WavyProgress(Modifier.fillMaxWidth())
             }
             if (uiState.isVerifying) {
                 Text(
@@ -240,13 +242,21 @@ internal fun DiscoverScreen(
                 onDownload = onDownload,
                 onSelectTrending = onSelectTrending,
                 onDownloadTrending = onDownloadTrending,
-                onShowDetails = { details = it }
+                onShowDetails = { details = it },
+                onShowEditions = { editions = it }
             )
         }
     }
 
     details?.let { result ->
         ResultDetailsSheet(result = result, onDismiss = { details = null })
+    }
+    editions?.let { group ->
+        EditionsSheet(
+            group = group,
+            onDownload = onDownload,
+            onDismiss = { editions = null }
+        )
     }
 }
 
@@ -257,6 +267,7 @@ private fun DiscoverContent(
     onSelectTrending: (TrendingBook) -> Unit,
     onDownloadTrending: (TrendingBook) -> Unit,
     onShowDetails: (SearchResult) -> Unit,
+    onShowEditions: (ResultGroup) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val waitingForFirstResults = uiState.isSearching && uiState.results.isEmpty()
@@ -293,6 +304,7 @@ private fun DiscoverContent(
             results = uiState.results,
             onDownload = onDownload,
             onShowDetails = onShowDetails,
+            onShowEditions = onShowEditions,
             modifier = modifier
         )
     }
@@ -314,12 +326,31 @@ private fun Modifier.bookDetailsGesture(onShowDetails: () -> Unit): Modifier {
     )
 }
 
+/** How many other copies of this book the search found; opens the picker. */
+@Composable
+private fun EditionsBadge(count: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = BADGE_ALPHA),
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+    ) {
+        Text(
+            text = pluralStringResource(R.plurals.feature_discover_editions_badge, count, count),
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        )
+    }
+}
+
 /** Search hits as a two-up cover grid. */
 @Composable
 private fun ResultGrid(
-    results: List<SearchResult>,
+    results: List<ResultGroup>,
     onDownload: (SearchResult) -> Unit,
     onShowDetails: (SearchResult) -> Unit,
+    onShowEditions: (ResultGroup) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyVerticalGrid(
@@ -329,11 +360,12 @@ private fun ResultGrid(
         horizontalArrangement = Arrangement.spacedBy(GridSpacing),
         verticalArrangement = Arrangement.spacedBy(GridSpacing)
     ) {
-        items(results, key = { "${it.sourceId}:${it.recordId}" }) { result ->
+        items(results, key = { it.key }) { group ->
             ResultCard(
-                result = result,
-                onDownload = { onDownload(result) },
-                onShowDetails = { onShowDetails(result) }
+                group = group,
+                onDownload = { onDownload(group.best) },
+                onShowDetails = { onShowDetails(group.best) },
+                onShowEditions = { onShowEditions(group) }
             )
         }
     }
@@ -341,11 +373,13 @@ private fun ResultGrid(
 
 @Composable
 private fun ResultCard(
-    result: SearchResult,
+    group: ResultGroup,
     onDownload: () -> Unit,
     onShowDetails: () -> Unit,
+    onShowEditions: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val result = group.best
     Column(modifier = modifier) {
         Box {
             BookCover(
@@ -363,6 +397,13 @@ private fun ResultCard(
                 Icon(
                     ReadanaIcons.Download,
                     contentDescription = stringResource(R.string.feature_discover_download_action)
+                )
+            }
+            if (group.hasChoices) {
+                EditionsBadge(
+                    count = group.editions.size,
+                    onClick = onShowEditions,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(6.dp)
                 )
             }
         }
@@ -501,9 +542,12 @@ private fun DiscoverScreenPreview() {
                 query = "austen",
                 hasSearched = true,
                 sourceNames = listOf("Anna's Archive"),
-                results = listOf(
-                    previewResult("0123456789abcdef0123456789abcdef", "Pride and Prejudice", "Jane Austen"),
-                    previewResult("fedcba9876543210fedcba9876543210", "Emma", "Jane Austen")
+                results = ResultGrouping.group(
+                    listOf(
+                        previewResult("0123456789abcdef0123456789abcdef", "Pride and Prejudice", "Jane Austen"),
+                        previewResult("aaaabbbbccccddddeeeeffff00001111", "Pride and Prejudice", "Austen, Jane"),
+                        previewResult("fedcba9876543210fedcba9876543210", "Emma", "Jane Austen")
+                    )
                 )
             ),
             onQueryChange = {},
@@ -539,6 +583,8 @@ private fun DiscoverTrendingPreview() {
         )
     }
 }
+
+private const val BADGE_ALPHA = 0.85f
 
 private fun previewResult(md5: String, title: String, author: String) = SearchResult(
     sourceId = SourceId("annas-archive"),

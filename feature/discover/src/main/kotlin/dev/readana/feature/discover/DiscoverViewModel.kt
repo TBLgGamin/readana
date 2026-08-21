@@ -107,9 +107,13 @@ class DiscoverViewModel @Inject constructor(
             _uiState.update { state ->
                 state.copy(
                     isSearching = false,
-                    results = outcomes.flatMap { (_, outcome) ->
-                        (outcome as? AppResult.Success)?.value?.results.orEmpty()
-                    },
+                    // Shadow libraries list the same work many times over, so a page of hits is
+                    // mostly repeats; the grid shows one entry per book with the rest behind it.
+                    results = ResultGrouping.group(
+                        outcomes.flatMap { (_, outcome) ->
+                            (outcome as? AppResult.Success)?.value?.results.orEmpty()
+                        }
+                    ),
                     sourceErrors = outcomes.mapNotNull { (source, outcome) ->
                         (outcome as? AppResult.Failure)?.let {
                             SourceError(
@@ -210,7 +214,7 @@ data class DiscoverUiState(
     /** A source is answering a "checking your browser" page right now. */
     val isVerifying: Boolean = false,
     val hasSearched: Boolean = false,
-    val results: List<SearchResult> = emptyList(),
+    val results: List<ResultGroup> = emptyList(),
     /** Suggestions shown until the user searches for something. */
     val trending: List<TrendingBook> = emptyList(),
     /** Starts true so the shelf opens on skeletons rather than flashing the empty state. */

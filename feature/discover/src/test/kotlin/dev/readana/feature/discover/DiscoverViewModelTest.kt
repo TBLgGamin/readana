@@ -82,7 +82,7 @@ class DiscoverViewModelTest {
         assertTrue(state.hasSearched)
         assertEquals(false, state.isSearching)
         assertEquals(listOf("Broken", "Gutenberg"), state.sourceNames)
-        assertEquals(listOf("Pride and Prejudice"), state.results.map { it.title })
+        assertEquals(listOf("Pride and Prejudice"), state.results.map { it.best.title })
         assertEquals(listOf("Broken"), state.sourceErrors.map { it.sourceName })
         assertEquals("pride", gutenberg.queries.single().text)
     }
@@ -119,7 +119,7 @@ class DiscoverViewModelTest {
         downloads.outcome = { EnqueueOutcome.Enqueued(job(it.title), fastDownloadsLeft = 4) }
         val viewModel = searchedViewModel()
 
-        viewModel.download(viewModel.uiState.value.results.single())
+        viewModel.download(viewModel.uiState.value.results.single().best)
         advanceUntilIdle()
 
         val message = assertIs<DiscoverMessage.Queued>(viewModel.uiState.value.message)
@@ -136,7 +136,7 @@ class DiscoverViewModelTest {
         downloads.outcome = { EnqueueOutcome.AlreadyInLibrary(book()) }
         val viewModel = searchedViewModel()
 
-        viewModel.download(viewModel.uiState.value.results.single())
+        viewModel.download(viewModel.uiState.value.results.single().best)
         advanceUntilIdle()
 
         val message = assertIs<DiscoverMessage.AlreadyInLibrary>(viewModel.uiState.value.message)
@@ -181,7 +181,7 @@ class DiscoverViewModelTest {
         downloads.outcome = { EnqueueOutcome.Failed(AppError.Unauthorized("bad key")) }
         val viewModel = searchedViewModel()
 
-        viewModel.download(viewModel.uiState.value.results.single())
+        viewModel.download(viewModel.uiState.value.results.single().best)
         advanceUntilIdle()
 
         assertIs<DiscoverMessage.Failed>(viewModel.uiState.value.message)

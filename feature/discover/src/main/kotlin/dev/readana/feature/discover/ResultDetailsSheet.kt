@@ -56,7 +56,7 @@ internal fun ResultDetailsSheet(result: SearchResult, onDismiss: () -> Unit, mod
                 )
                 BookFact(
                     label = stringResource(R.string.feature_discover_details_language),
-                    value = result.language?.let { language(it) } ?: unknown
+                    value = result.language?.let { languageName(it) } ?: unknown
                 )
                 BookFact(
                     label = stringResource(R.string.feature_discover_details_year),
@@ -85,5 +85,5 @@ internal fun ResultDetailsSheet(result: SearchResult, onDismiss: () -> Unit, mod
 }
 
 /** "en" says little on a details sheet; the reader's own language name says plenty. */
-private fun language(code: String): String =
+internal fun languageName(code: String): String =
     Locale.forLanguageTag(code).getDisplayLanguage(Locale.getDefault()).ifEmpty { code }

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.readana.core.designsystem.ReadanaIcons
+import dev.readana.core.designsystem.component.WavyProgress
 import dev.readana.core.designsystem.theme.ReadanaTheme
 import dev.readana.core.model.BookFormat
 import dev.readana.core.model.DownloadErrorKind
@@ -117,12 +117,12 @@ private fun DownloadRow(
             if (job.isActive) {
                 val fraction = job.fraction
                 if (fraction != null) {
-                    LinearProgressIndicator(
+                    WavyProgress(
                         progress = { fraction },
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
                     )
                 } else {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+                    WavyProgress(modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
                 }
             }
         }

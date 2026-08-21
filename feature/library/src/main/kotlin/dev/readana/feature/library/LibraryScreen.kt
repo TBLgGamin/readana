@@ -21,7 +21,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -48,6 +47,7 @@ import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.BookCover
 import dev.readana.core.designsystem.component.EmptyState
 import dev.readana.core.designsystem.component.LoadingState
+import dev.readana.core.designsystem.component.WavyProgress
 import dev.readana.core.designsystem.theme.ReadanaTheme
 import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
@@ -113,12 +113,12 @@ internal fun LibraryRoute(
 private fun ConversionStrip(conversion: ActiveConversion, modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxWidth()) {
         if (conversion.totalPages > 0) {
-            LinearProgressIndicator(
+            WavyProgress(
                 progress = { conversion.currentPage.toFloat() / conversion.totalPages },
                 modifier = Modifier.fillMaxWidth()
             )
         } else {
-            LinearProgressIndicator(Modifier.fillMaxWidth())
+            WavyProgress(Modifier.fillMaxWidth())
         }
         Text(
             text = if (conversion.totalPages > 0) {
@@ -198,7 +198,7 @@ internal fun LibraryScreen(
                 SearchField(query = uiState.query, onQueryChange = onQueryChange)
             }
             if (uiState.activeImports > 0) {
-                LinearProgressIndicator(Modifier.fillMaxWidth())
+                WavyProgress(Modifier.fillMaxWidth())
                 Text(
                     text = stringResource(R.string.feature_library_importing),
                     style = MaterialTheme.typography.bodySmall,
@@ -351,10 +351,12 @@ private fun BookCard(book: Book, onClick: () -> Unit, onLongClick: () -> Unit, m
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(8.dp))
+        // One line, always: a title that wraps pushes this card's progress bar below its
+        // neighbours' and the row stops lining up.
         Text(
             text = book.title,
             style = MaterialTheme.typography.titleSmall,
-            maxLines = 2,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         Text(
@@ -365,7 +367,7 @@ private fun BookCard(book: Book, onClick: () -> Unit, onLongClick: () -> Unit, m
             overflow = TextOverflow.Ellipsis
         )
         book.progress?.let { progress ->
-            LinearProgressIndicator(
+            WavyProgress(
                 progress = { progress.fraction },
                 modifier = Modifier
                     .fillMaxWidth()

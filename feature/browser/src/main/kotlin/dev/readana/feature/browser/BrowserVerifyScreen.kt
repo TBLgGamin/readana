@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -31,6 +30,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.readana.core.designsystem.ReadanaIcons
+import dev.readana.core.designsystem.component.WavyProgress
 
 /**
  * Shows the site's "checking your browser" page so the user can answer it themselves.
@@ -69,7 +69,7 @@ internal fun BrowserVerifyScreen(key: BrowserVerifyKey, onDone: () -> Unit, modi
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             if (progress in 1..99) {
-                LinearProgressIndicator(progress = { progress / 100f }, modifier = Modifier.fillMaxWidth())
+                WavyProgress(progress = { progress / 100f }, modifier = Modifier.fillMaxWidth())
             }
             Text(
                 text = stringResource(R.string.feature_browser_verify_hint),

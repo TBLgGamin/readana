@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -32,6 +31,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.readana.core.designsystem.ReadanaIcons
+import dev.readana.core.designsystem.component.WavyProgress
 
 @Composable
 internal fun BrowserRoute(
@@ -97,7 +97,7 @@ internal fun BrowserScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             if (uiState.loadProgress in 1..99) {
-                LinearProgressIndicator(
+                WavyProgress(
                     progress = { uiState.loadProgress / 100f },
                     modifier = Modifier.fillMaxWidth()
                 )

@@ -11,7 +11,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -33,6 +32,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.EmptyState
+import dev.readana.core.designsystem.component.WavyProgress
 
 /** Full-text search within the open book, one page of hits at a time. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,7 +68,7 @@ internal fun ReaderSearchSheet(
             keyboardActions = KeyboardActions(onSearch = { onSearch(draft) })
         )
         if (state.isSearching) {
-            LinearProgressIndicator(Modifier.fillMaxWidth())
+            WavyProgress(Modifier.fillMaxWidth())
         }
         when {
             !state.hasSearched -> Unit

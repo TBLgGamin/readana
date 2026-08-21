@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Search results group the copies of a book together. Shadow libraries index the same work many
+  times over, so a page of hits was mostly repeats; now each book appears once, showing the copy
+  the app can actually open, with a "3 versions" badge that opens a picker listing every copy by
+  language, format, size and year. Nothing is hidden — the picker downloads whichever one you tap.
+
 - Holding a book in Discover opens the same details sheet the library uses — cover, title, author,
   format, size, language, year, publisher and source — with no actions on it, since the cover it
   was opened from already carries the download button. A plain tap opens it too.
@@ -16,6 +21,10 @@ All notable changes to this project are documented here. The format follows
   queued so a wrong edition is obvious.
 
 ### Changed
+
+- Every progress bar in the app is Material 3 Expressive's wavy indicator.
+- Library titles stay on one line, so the progress bars across a row line up instead of one card
+  sitting lower than its neighbours.
 
 - Settings drops its Reading section. Everything in it — theme, text size, line height, margins,
   page turning, columns, keep-screen-on, volume keys — is already in the reader's own settings

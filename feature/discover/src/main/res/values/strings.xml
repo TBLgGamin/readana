@@ -21,6 +21,14 @@
     <string name="feature_discover_verifying">Checking with the source&#8230; this is usually quick.</string>
     <string name="feature_discover_verify_in_browser">Open in browser to continue</string>
     <string name="feature_discover_message_not_found">No source has “%1$s”</string>
+    <plurals name="feature_discover_editions_badge">
+        <item quantity="one">%1$d version</item>
+        <item quantity="other">%1$d versions</item>
+    </plurals>
+    <plurals name="feature_discover_editions_subtitle">
+        <item quantity="one">%1$d version found</item>
+        <item quantity="other">%1$d versions found — pick one to download</item>
+    </plurals>
     <string name="feature_discover_details_unknown">Unknown</string>
     <string name="feature_discover_details_format">Format</string>
     <string name="feature_discover_details_size">Size</string>
