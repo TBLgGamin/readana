@@ -12,3 +12,5 @@ Short, dated records of the decisions that shape the project. Add a new file
 | [0005](0005-quality-tooling.md) | Build and quality tooling choices | accepted |
 | [0006](0006-navigation3-and-hilt.md) | Navigation 3 and Hilt | accepted |
 | [0007](0007-storage-strategy.md) | Library storage strategy | accepted |
+| [0008](0008-import-pipeline.md) | Book import pipeline | accepted |
+| [0009](0009-material3-expressive.md) | Material 3 Expressive for the whole UI | accepted |

@@ -22,7 +22,9 @@ graph TD
     feature_reader --> core_designsystem
     feature_settings --> core_designsystem
     feature_reader --> readium[(Readium toolkit)]
+    core_designsystem --> coil[(Coil)]
 
+    core_data --> readium
     core_data --> core_model[core:model]
     core_data --> core_common[core:common]
     core_data --> source_api[source:api]
@@ -48,10 +50,10 @@ Green nodes are pure Kotlin/JVM modules: no Android dependency, millisecond unit
 |-------|----------------|----------|
 | `app` | `ReadanaApplication` (Hilt root), `MainActivity` (FragmentActivity for Readium), `ReadanaApp` (adaptive nav + `NavDisplay`), Konsist tests | yes |
 | `feature/*` | One screen family each: `XxxKey` (NavKey), `xxxEntry()` (entry provider), `XxxRoute` (wires ViewModel), `XxxScreen` (stateless UI), `XxxViewModel` | yes |
-| `core/data` | Room (`BookEntity`, `BookDao`, `ReadanaDatabase`), DataStore (`SettingsKeys`), repositories, `BookSourceRegistry`, all Hilt modules | yes |
-| `core/designsystem` | `ReadanaTheme`, `ReadanaIcons`, `EmptyState`, `LoadingState`, `BookCoverPlaceholder` | yes |
-| `core/model` | `Book`, `BookFormat`, `ReadingProgress`, `ReaderSettings`, `SourceSettings`, `DownloadJob` | no |
-| `core/common` | `AppResult`/`AppError`, `@Dispatcher`/`@ApplicationScope`, `suspendRunCatching` | no |
+| `core/data` | Room (`books`, `bookmarks`, `highlights`), DataStore (`SettingsKeys`), repositories, `BookSourceRegistry`, `ReadiumPublicationOpener`, the import pipeline (`BookStorage`, `BookImporter`, `BookImportManager`), all Hilt modules | yes |
+| `core/designsystem` | `ReadanaTheme` (Material 3 Expressive), `ReadanaIcons`, `EmptyState`, `LoadingState`, `BookCover` (Coil) | yes |
+| `core/model` | `Book`, `BookFormat`, `ReadingProgress`, `Bookmark`, `Highlight`, `ReaderSettings`, `SourceSettings`, `DownloadJob` | no |
+| `core/common` | `AppResult`/`AppError`, `@Dispatcher`/`@ApplicationScope`, `suspendRunCatching`, `VolumeKeyRelay` | no |
 | `core/testing` | `MainDispatcherRule`, `FakeBookSource` | no |
 | `source/api` | `BookSource`, `SearchQuery/Page/Result`, `DownloadRequest`, `FileNames` | no |
 | `source/gutenberg` | Gutendex JSON client | no |
@@ -61,6 +63,23 @@ Green nodes are pure Kotlin/JVM modules: no Android dependency, millisecond unit
 | `engine/pdf2epub` | `PdfBoxTextExtractor`, `PdfToEpubConverter` | yes (PDFBox needs a Context) |
 
 ## Data flow
+
+### Import → library (M1)
+
+```
+File picker / "Open with Readana" intent ──▶ BookImportManager.enqueue(uris)   (application scope)
+                                                   ▼
+                                         BookImporter.import(uri)
+                                                   │ BookMetadataExtractor (Readium): title,
+                                                   │ authors, language, cover — from the original
+                                                   │ file, before anything is copied
+                                                   │ duplicate by (title, size)? ──▶ report, no copy
+                                                   ▼
+                                         BookStorage.store()  ──▶ app storage or SAF folder
+                                         BookStorage.writeCover() ──▶ filesDir/covers/<id>.png
+                                                   ▼
+                                         LibraryRepository.upsert(Book) ──▶ Room ──▶ Library (Flow)
+```
 
 ### Discover → download → convert → library (M3/M4 target)
 
@@ -78,12 +97,18 @@ DiscoverViewModel ── SearchQuery ──▶ BookSourceRegistry ──▶ each
                           LibraryRepository.upsert(Book)  ──▶ Room ──▶ Library screen (Flow)
 ```
 
-### Read (M2 target)
+### Read (M2)
 
-`ReaderKey(bookId)` → `ReaderViewModel.open()` → `ReadiumPublicationOpener` (AssetRetriever +
-PublicationOpener, pdfium for PDFs) → `Publication` → Readium `EpubNavigatorFragment` hosted in
-Compose via `AndroidFragment`, with reader settings from DataStore mapped to Readium
-`EpubPreferences`; progress is saved as a Readium `Locator` JSON + fraction.
+`ReaderKey(bookId)` → `ReaderViewModel.open()` → `ReaderSessionFactory` →
+`ReadiumPublicationOpener` (AssetRetriever + PublicationOpener, pdfium for PDFs) → `Publication` →
+a `ReaderSession` holding the navigator's `FragmentFactory`, the table of contents and the position
+list. `ReaderNavigatorHostFragment` owns a child fragment manager whose factory is set before
+`super.onCreate`, which is what lets Readium's `EpubNavigatorFragment` (and
+`PdfNavigatorFragment`) be restored after a configuration change; Compose hosts that host through
+`AndroidFragment`. Reader settings from DataStore are mapped to Readium `EpubPreferences` /
+`PdfiumPreferences` and submitted on every change. The current `Locator` flows back to the
+ViewModel, which persists it (debounced) as JSON plus a fraction, and drives the progress slider,
+bookmarks and highlight decorations.
 
 ## Cross-cutting decisions
 
@@ -97,6 +122,12 @@ Compose via `AndroidFragment`, with reader settings from DataStore mapped to Rea
   called inside `withContext(io)`.
 - **Storage** (ADR 0007): files default to app-specific storage (`getExternalFilesDir`), with an
   optional SAF tree for a user-visible library folder; metadata always in Room.
+- **Import** (ADR 0008): the Readium opener is shared from `core/data`; metadata is read before the
+  copy; duplicates are (title, size); imports run on the application scope.
+- **Design** (ADR 0009): Material 3 Expressive everywhere, stock components only; material3 is
+  pinned ahead of the Compose BOM because the expressive APIs are internal in 1.4.0.
+- **Database**: schema versions are additive and use Room auto-migrations; exported schemas are
+  committed and `MigrationTestHelper` validates each upgrade.
 
 ## Testing strategy
 
@@ -104,8 +135,11 @@ Compose via `AndroidFragment`, with reader settings from DataStore mapped to Rea
 |-------|------|---------|
 | Pure Kotlin | JUnit 4 + kotlin-test | `ReflowEngineTest`, `EpubWriterTest` (+ epubcheck), `AnnasSearchParserTest` |
 | HTTP clients | Ktor `MockEngine` + fixtures | `GutendexSourceTest`, `AnnasArchiveSourceTest` (mirror failover) |
-| Room | Robolectric in-memory DB + Turbine | `RoomLibraryRepositoryTest` |
-| ViewModels | `MainDispatcherRule` + fakes + Turbine | `LibraryViewModelTest`, `DiscoverViewModelTest` |
+| Room | Robolectric in-memory DB + Turbine | `RoomLibraryRepositoryTest`, `RoomBookmarksRepositoryTest`, `RoomHighlightsRepositoryTest` |
+| Migrations | `MigrationTestHelper` on the committed schemas | `ReadanaDatabaseMigrationTest` |
+| Import | Robolectric + real `BookStorage` + fake extractor | `DefaultBookImporterTest`, `BookStorageTest` |
+| ViewModels | `MainDispatcherRule` + fakes + Turbine | `LibraryViewModelTest`, `DiscoverViewModelTest`, `ReaderViewModelTest` |
+| Readium mappers | Robolectric (Readium's preference types need Android) | `ReadiumPreferencesTest` |
 | Architecture | Konsist | `ArchitectureTest` |
 | UI | Compose previews now; Roborazzi screenshot tests planned | — |
 

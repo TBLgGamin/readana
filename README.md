@@ -7,9 +7,10 @@ EPUBs and PDFs from pluggable book sources, convert PDFs to reflowable EPUB on t
 keep everything in a persistent on-tablet library, and read with the controls you expect from a
 dedicated e-reader app.
 
-> **Status: M0 – project scaffold.** The build, quality gates, module structure, data layer and
-> source abstraction are in place; the reading view, downloads and conversion UI land in the
-> next milestones. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status: M2 – library, import and reader.** Books can be imported from the system file picker or
+> from another app's "Open with", and read with the Readium navigator: reading settings, progress,
+> table of contents, bookmarks, in-book search and highlights. Downloads and PDF → EPUB conversion
+> land in the next milestones. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## What it will do
 
@@ -18,14 +19,14 @@ dedicated e-reader app.
 | **Discover** | One search box fanned out to every configured `BookSource` (Project Gutenberg today; Anna's Archive with member API + browser fallback; OPDS catalogs later). |
 | **Download** | WorkManager-driven background downloads that survive HyperOS's aggressive process killing, with progress in the library. |
 | **Convert** | On-device PDF → EPUB: PDFBox text extraction → layout heuristics (headers/footers, paragraphs, hyphenation, headings) → valid EPUB 3. Validated with epubcheck in tests. |
-| **Library** | Room database + files in app storage (or a user-chosen SAF folder), covers, reading progress, sort/filter. |
+| **Library** | Room database + files in app storage (or a user-chosen SAF folder), covers extracted on import, reading progress, sort and search. |
 | **Read** | Readium Kotlin Toolkit navigator: paginated/scrolled, tap zones & swipe, font/size/margins/line-height, themes (light/sepia/dark/black), brightness gesture, progress slider, TOC, search, highlights, TTS later. |
 
 ## Stack
 
 | Concern | Choice | Why |
 |---------|--------|-----|
-| Language / UI | Kotlin 2.4, Jetpack Compose (BOM 2026.08), Material 3 + adaptive layouts | Native performance, tablet window-size classes, first-class Readium support |
+| Language / UI | Kotlin 2.4, Jetpack Compose (BOM 2026.08), Material 3 Expressive + adaptive layouts | Native performance, tablet window-size classes, first-class Readium support |
 | Build | Gradle 9.7 (wrapper, checksum-pinned), AGP 9.3 with built-in Kotlin, convention plugins in `build-logic/`, version catalog | Current stable toolchain; modules stay 5–10 lines each |
 | Architecture | Multi-module (app / feature / core / engine / source), Hilt, Navigation 3, unidirectional state | Clear seams, fast tests, swap-able sources and engines |
 | Reading engine | [Readium Kotlin Toolkit](https://github.com/readium/kotlin-toolkit) 3.3 (BSD-3) | Mature EPUB 2/3 + PDF support, used by 100+ apps |

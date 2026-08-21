@@ -13,20 +13,20 @@ Milestones are sized so each one ships something usable on the tablet.
 - [x] Screens: Library grid, Discover search, Settings, Reader placeholder that opens publications through Readium
 - [x] Docs: README, architecture, device notes, research, ADRs
 
-## M1 — Library & import
+## M1 — Library & import ✅ (2026-08-21)
 
-- [ ] Import EPUB/PDF from the system file picker and from "Open with Readana" intents
-- [ ] Copy/move files into app storage (optional SAF library folder), extract cover + metadata via Readium
-- [ ] Library sorting (recent, title, author), search, delete, book details sheet
-- [ ] Coil image loading for covers
+- [x] Import EPUB/PDF from the system file picker and from "Open with Readana" intents
+- [x] Copy/move files into app storage (optional SAF library folder), extract cover + metadata via Readium
+- [x] Library sorting (recent, title, author), search, delete, book details sheet
+- [x] Coil image loading for covers
 
-## M2 — Reader
+## M2 — Reader ✅ (2026-08-21)
 
-- [ ] Readium `EpubNavigatorFragment` hosted in Compose (`AndroidFragment`), PDF via pdfium navigator
-- [ ] Controls: tap zones & swipe, paginated/scrolled, font family/size, margins, line height, themes (light/sepia/dark/black), brightness gesture, keep-screen-on, volume-key paging
-- [ ] Progress slider + chapter/TOC drawer, bookmarks, in-book search, progress persisted as Readium locator
-- [ ] Tablet layout: two-page spread in landscape, immersive mode
-- [ ] Highlights/notes (Readium decorations) and dictionary lookup (stretch)
+- [x] Readium `EpubNavigatorFragment` hosted in Compose (`AndroidFragment`), PDF via pdfium navigator
+- [x] Controls: tap zones & swipe, paginated/scrolled, font family/size, margins, line height, themes (light/sepia/dark/black), brightness gesture, keep-screen-on, volume-key paging
+- [x] Progress slider + chapter/TOC drawer, bookmarks, in-book search, progress persisted as Readium locator
+- [x] Tablet layout: two-page spread in landscape, immersive mode
+- [x] Highlights/notes (Readium decorations) and dictionary lookup (stretch)
 
 ## M3 — Downloads
 
