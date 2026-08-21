@@ -15,6 +15,7 @@ dependencies {
     api(libs.androidx.compose.ui)
     api(libs.androidx.compose.ui.tooling.preview)
 
-    // Covers are files that the importer extracted, so Coil's core is enough (no network fetcher).
+    // Covers come from imported files *and* from search results, so Coil needs a network fetcher.
+    // The loader itself is built in the app module, which owns the shared HttpClient.
     implementation(libs.coil.compose)
 }

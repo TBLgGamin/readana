@@ -7,8 +7,11 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,9 +19,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -34,13 +38,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.readana.core.data.repository.SourceDefaults
+import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.LoadingState
 import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.HeadingSensitivity
@@ -103,49 +111,198 @@ internal fun SettingsScreen(
         when (uiState) {
             SettingsUiState.Loading -> LoadingState(Modifier.padding(padding))
 
-            is SettingsUiState.Loaded -> Column(
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ReaderSection(
-                    settings = uiState.reader,
-                    onFontScaleChange = onFontScaleChange,
-                    onThemeChange = onThemeChange,
-                    onPageTurnModeChange = onPageTurnModeChange,
-                    onColumnsChange = onColumnsChange,
-                    onKeepScreenOnChange = onKeepScreenOnChange,
-                    onVolumeKeysChange = onVolumeKeysChange
-                )
-                HorizontalDivider()
-                ConversionSection(
-                    settings = uiState.conversion,
-                    onAutoConvertChange = onAutoConvertChange,
-                    onRemoveHeadersChange = onRemoveHeadersChange,
-                    onHeadingSensitivityChange = onHeadingSensitivityChange,
-                    onExtractImagesChange = onExtractImagesChange
-                )
-                HorizontalDivider()
-                StorageSection(
-                    libraryFolderUri = uiState.libraryFolderUri,
-                    onLibraryFolderChange = onLibraryFolderChange
-                )
-                HorizontalDivider()
-                SourcesSection(
-                    settings = uiState.sources,
-                    toggles = uiState.sourceToggles,
-                    onSourceEnabledChange = onSourceEnabledChange,
-                    onAnnasMirrorsChange = onAnnasMirrorsChange,
-                    onAnnasSecretKeyChange = onAnnasSecretKeyChange
-                )
-                HorizontalDivider()
-                BackgroundWorkSection()
+            is SettingsUiState.Loaded -> {
+                // One group open at a time: the whole list stays scannable, and each header says
+                // what its settings are currently doing so most questions need no tap at all.
+                var openGroup by rememberSaveable { mutableStateOf<SettingsGroupId?>(null) }
+                fun toggle(id: SettingsGroupId) {
+                    openGroup = if (openGroup == id) null else id
+                }
+
+                Column(
+                    modifier = Modifier
+                        .padding(padding)
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SettingsGroup(
+                        title = stringResource(R.string.feature_settings_section_reading),
+                        summary = uiState.reader.summary(),
+                        icon = ReadanaIcons.Library,
+                        expanded = openGroup == SettingsGroupId.Reading,
+                        onToggle = { toggle(SettingsGroupId.Reading) }
+                    ) {
+                        ReaderSection(
+                            settings = uiState.reader,
+                            onFontScaleChange = onFontScaleChange,
+                            onThemeChange = onThemeChange,
+                            onPageTurnModeChange = onPageTurnModeChange,
+                            onColumnsChange = onColumnsChange,
+                            onKeepScreenOnChange = onKeepScreenOnChange,
+                            onVolumeKeysChange = onVolumeKeysChange
+                        )
+                    }
+                    SettingsGroup(
+                        title = stringResource(R.string.feature_settings_section_sources),
+                        summary = uiState.sourcesSummary(),
+                        icon = ReadanaIcons.Discover,
+                        expanded = openGroup == SettingsGroupId.Sources,
+                        onToggle = { toggle(SettingsGroupId.Sources) }
+                    ) {
+                        SourcesSection(
+                            settings = uiState.sources,
+                            toggles = uiState.sourceToggles,
+                            onSourceEnabledChange = onSourceEnabledChange,
+                            onAnnasMirrorsChange = onAnnasMirrorsChange,
+                            onAnnasSecretKeyChange = onAnnasSecretKeyChange
+                        )
+                    }
+                    SettingsGroup(
+                        title = stringResource(R.string.feature_settings_section_conversion),
+                        summary = uiState.conversion.summary(),
+                        icon = ReadanaIcons.Convert,
+                        expanded = openGroup == SettingsGroupId.Conversion,
+                        onToggle = { toggle(SettingsGroupId.Conversion) }
+                    ) {
+                        ConversionSection(
+                            settings = uiState.conversion,
+                            onAutoConvertChange = onAutoConvertChange,
+                            onRemoveHeadersChange = onRemoveHeadersChange,
+                            onHeadingSensitivityChange = onHeadingSensitivityChange,
+                            onExtractImagesChange = onExtractImagesChange
+                        )
+                    }
+                    SettingsGroup(
+                        title = stringResource(R.string.feature_settings_section_storage),
+                        summary = uiState.libraryFolderUri?.let { folderLabel(it) }
+                            ?: stringResource(R.string.feature_settings_library_folder_default),
+                        icon = ReadanaIcons.Folder,
+                        expanded = openGroup == SettingsGroupId.Storage,
+                        onToggle = { toggle(SettingsGroupId.Storage) }
+                    ) {
+                        StorageSection(
+                            libraryFolderUri = uiState.libraryFolderUri,
+                            onLibraryFolderChange = onLibraryFolderChange
+                        )
+                    }
+                    SettingsGroup(
+                        title = stringResource(R.string.feature_settings_section_background),
+                        summary = stringResource(R.string.feature_settings_background_summary),
+                        icon = ReadanaIcons.Download,
+                        expanded = openGroup == SettingsGroupId.Background,
+                        onToggle = { toggle(SettingsGroupId.Background) }
+                    ) {
+                        BackgroundWorkSection()
+                    }
+                }
             }
         }
     }
+}
+
+private enum class SettingsGroupId { Reading, Sources, Conversion, Storage, Background }
+
+/**
+ * One collapsible settings group. Collapsed it is a single row — icon, name and what the settings
+ * inside currently add up to — so the screen reads as a short list instead of a wall of controls.
+ */
+@Composable
+private fun SettingsGroup(
+    title: String,
+    summary: String,
+    icon: ImageVector,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggle)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Icon(
+                imageVector = if (expanded) ReadanaIcons.ExpandLess else ReadanaIcons.ExpandMore,
+                contentDescription = stringResource(
+                    if (expanded) R.string.feature_settings_collapse else R.string.feature_settings_expand
+                )
+            )
+        }
+        AnimatedVisibility(visible = expanded) {
+            Column(
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                content = content
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReaderSettings.summary(): String = listOf(
+    stringResource(theme.labelRes()),
+    stringResource(R.string.feature_settings_summary_font_scale, fontScale),
+    stringResource(columns.labelRes())
+).joinToString(SUMMARY_SEPARATOR)
+
+@Composable
+private fun ConversionSettings.summary(): String = if (!autoConvertPdf) {
+    stringResource(R.string.feature_settings_summary_conversion_off)
+} else {
+    listOf(
+        stringResource(R.string.feature_settings_summary_conversion_on),
+        stringResource(headingSensitivity.labelRes())
+    ).joinToString(SUMMARY_SEPARATOR)
+}
+
+@Composable
+private fun SettingsUiState.Loaded.sourcesSummary(): String {
+    val enabled = sourceToggles.filter { it.enabled }
+    if (enabled.isEmpty()) return stringResource(R.string.feature_settings_summary_no_sources)
+    val names = enabled.joinToString(SUMMARY_SEPARATOR) { it.name }
+    return if (sources.annasSecretKey.isNullOrBlank()) {
+        names
+    } else {
+        names + SUMMARY_SEPARATOR + stringResource(R.string.feature_settings_summary_member_key)
+    }
+}
+
+private const val SUMMARY_SEPARATOR = " · "
+
+private fun ReaderTheme.labelRes(): Int = when (this) {
+    ReaderTheme.System -> R.string.feature_settings_theme_system
+    ReaderTheme.Light -> R.string.feature_settings_theme_light
+    ReaderTheme.Sepia -> R.string.feature_settings_theme_sepia
+    ReaderTheme.Dark -> R.string.feature_settings_theme_dark
+    ReaderTheme.Black -> R.string.feature_settings_theme_black
+}
+
+private fun PageTurnMode.labelRes(): Int = when (this) {
+    PageTurnMode.Paginated -> R.string.feature_settings_page_turn_paginated
+    PageTurnMode.Scrolled -> R.string.feature_settings_page_turn_scrolled
+}
+
+private fun ReaderColumns.labelRes(): Int = when (this) {
+    ReaderColumns.Auto -> R.string.feature_settings_columns_auto
+    ReaderColumns.One -> R.string.feature_settings_columns_one
+    ReaderColumns.Two -> R.string.feature_settings_columns_two
 }
 
 @Composable
@@ -160,8 +317,6 @@ private fun ReaderSection(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionTitle(stringResource(R.string.feature_settings_section_reading))
-
         Text(stringResource(R.string.feature_settings_font_scale, settings.fontScale))
         Slider(
             value = settings.fontScale,
@@ -173,7 +328,7 @@ private fun ReaderSection(
         ChipRow(
             options = ReaderTheme.entries,
             selected = settings.theme,
-            label = { it.name },
+            label = { stringResource(it.labelRes()) },
             onSelect = onThemeChange
         )
 
@@ -181,7 +336,7 @@ private fun ReaderSection(
         ChipRow(
             options = PageTurnMode.entries,
             selected = settings.pageTurnMode,
-            label = { it.name },
+            label = { stringResource(it.labelRes()) },
             onSelect = onPageTurnModeChange
         )
 
@@ -189,7 +344,7 @@ private fun ReaderSection(
         ChipRow(
             options = ReaderColumns.entries,
             selected = settings.columns,
-            label = { it.name },
+            label = { stringResource(it.labelRes()) },
             onSelect = onColumnsChange
         )
 
@@ -220,7 +375,6 @@ private fun ConversionSection(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionTitle(stringResource(R.string.feature_settings_section_conversion))
         SwitchRow(
             label = stringResource(R.string.feature_settings_conversion_auto),
             checked = settings.autoConvertPdf,
@@ -283,7 +437,6 @@ private fun StorageSection(
     }
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionTitle(stringResource(R.string.feature_settings_section_storage))
         Text(stringResource(R.string.feature_settings_library_folder))
         Text(
             text = libraryFolderUri?.let { folderLabel(it) }
@@ -341,7 +494,6 @@ private fun SourcesSection(
     }
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionTitle(stringResource(R.string.feature_settings_section_sources))
         toggles.forEach { toggle ->
             SwitchRow(
                 label = toggle.name,
@@ -362,6 +514,9 @@ private fun SourcesSection(
             },
             modifier = Modifier.fillMaxWidth(),
             label = { Text(stringResource(R.string.feature_settings_annas_mirrors)) },
+            // An empty box does not mean "no mirrors": it means the built-in list is in use, so
+            // show that list as the placeholder rather than leaving it a mystery.
+            placeholder = { Text(SourceDefaults.ANNAS_MIRRORS.joinToString("\n")) },
             supportingText = { Text(stringResource(R.string.feature_settings_annas_mirrors_help)) },
             minLines = 2
         )
@@ -390,7 +545,6 @@ private fun SourcesSection(
 private fun BackgroundWorkSection(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionTitle(stringResource(R.string.feature_settings_section_background))
         Text(
             text = stringResource(R.string.feature_settings_background_help),
             style = MaterialTheme.typography.bodyMedium,

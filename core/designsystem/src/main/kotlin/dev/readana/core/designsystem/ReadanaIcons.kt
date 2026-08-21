@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Transform
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /** Single place to pick icons so screens stay consistent and swaps are one-line changes. */
@@ -37,4 +38,7 @@ object ReadanaIcons {
     val Refresh: ImageVector = Icons.Filled.Refresh
     val ExpandMore: ImageVector = Icons.Filled.ExpandMore
     val ExpandLess: ImageVector = Icons.Filled.ExpandLess
+
+    /** PDF → EPUB conversion. */
+    val Convert: ImageVector = Icons.Filled.Transform
 }

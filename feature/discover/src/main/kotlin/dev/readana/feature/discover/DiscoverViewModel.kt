@@ -173,7 +173,8 @@ data class DiscoverUiState(
     val results: List<SearchResult> = emptyList(),
     /** Suggestions shown until the user searches for something. */
     val trending: List<TrendingBook> = emptyList(),
-    val isLoadingTrending: Boolean = false,
+    /** Starts true so the shelf opens on skeletons rather than flashing the empty state. */
+    val isLoadingTrending: Boolean = true,
     val sourceErrors: List<SourceError> = emptyList(),
     val message: DiscoverMessage? = null,
     val effect: DiscoverEffect? = null

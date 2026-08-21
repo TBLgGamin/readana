@@ -90,6 +90,9 @@ dependencies {
     implementation(libs.androidx.compose.material3.adaptive.navigation3)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.timber)
+    // Search results carry remote cover art, so the image loader needs a network fetcher.
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.ktor3)
     // On-demand WorkManager init: the app supplies the Hilt worker factory (see ReadanaApplication).
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.hilt.work)

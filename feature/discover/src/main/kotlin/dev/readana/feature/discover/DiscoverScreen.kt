@@ -54,6 +54,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.BookCover
+import dev.readana.core.designsystem.component.BookGridSkeleton
 import dev.readana.core.designsystem.component.EmptyState
 import dev.readana.core.designsystem.theme.ReadanaTheme
 import dev.readana.core.model.BookFormat
@@ -164,7 +165,8 @@ internal fun DiscoverScreen(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { onSearch() })
             )
-            if (uiState.isSearching) {
+            // Only while re-searching over results already on screen; a fresh search shows skeletons.
+            if (uiState.isSearching && uiState.results.isNotEmpty()) {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
             }
             uiState.sourceErrors.forEach { sourceError ->
@@ -179,29 +181,52 @@ internal fun DiscoverScreen(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
                 )
             }
-            when {
-                !uiState.hasSearched && uiState.trending.isNotEmpty() -> TrendingGrid(
-                    books = uiState.trending,
-                    onSelect = onSelectTrending
-                )
-
-                !uiState.hasSearched -> EmptyState(
-                    icon = ReadanaIcons.Discover,
-                    title = stringResource(R.string.feature_discover_empty_title),
-                    description = stringResource(
-                        R.string.feature_discover_empty_description,
-                        uiState.sourceNames.joinToString(", ")
-                    )
-                )
-
-                !uiState.isSearching && uiState.results.isEmpty() -> EmptyState(
-                    icon = ReadanaIcons.Discover,
-                    title = stringResource(R.string.feature_discover_no_results_title)
-                )
-
-                else -> ResultGrid(results = uiState.results, onDownload = onDownload)
-            }
+            DiscoverContent(
+                uiState = uiState,
+                onDownload = onDownload,
+                onSelectTrending = onSelectTrending
+            )
         }
+    }
+}
+
+@Composable
+private fun DiscoverContent(
+    uiState: DiscoverUiState,
+    onDownload: (SearchResult) -> Unit,
+    onSelectTrending: (TrendingBook) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val waitingForFirstResults = uiState.isSearching && uiState.results.isEmpty()
+    val waitingForShelf = !uiState.hasSearched && uiState.isLoadingTrending
+    when {
+        // A grid of pulsing placeholders beats an empty screen while covers arrive.
+        waitingForFirstResults || waitingForShelf ->
+            BookGridSkeleton(modifier = modifier, columns = GRID_COLUMNS)
+
+        !uiState.hasSearched && uiState.trending.isNotEmpty() -> TrendingGrid(
+            books = uiState.trending,
+            onSelect = onSelectTrending,
+            modifier = modifier
+        )
+
+        !uiState.hasSearched -> EmptyState(
+            icon = ReadanaIcons.Discover,
+            title = stringResource(R.string.feature_discover_empty_title),
+            description = stringResource(
+                R.string.feature_discover_empty_description,
+                uiState.sourceNames.joinToString(", ")
+            ),
+            modifier = modifier
+        )
+
+        uiState.results.isEmpty() -> EmptyState(
+            icon = ReadanaIcons.Discover,
+            title = stringResource(R.string.feature_discover_no_results_title),
+            modifier = modifier
+        )
+
+        else -> ResultGrid(results = uiState.results, onDownload = onDownload, modifier = modifier)
     }
 }
 

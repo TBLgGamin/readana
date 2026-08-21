@@ -12,16 +12,37 @@ data class AnnasConfig(
     /** Member "secret key" that unlocks the JSON fast-download API. Null → browser download flow. */
     val secretKey: String? = null
 ) {
+    /**
+     * Mirrors ready to use. Typing `annas-archive.gl` is the obvious thing to do, so a missing
+     * scheme is filled in rather than silently dropping the entry and reporting "no mirror
+     * configured". Falls back to the built-in list when nothing usable is left.
+     */
     val normalizedMirrors: List<String>
-        get() = mirrors.map { it.trim().trimEnd('/') }.filter {
-            it.startsWith("https://") ||
-                it.startsWith("http://")
+        get() = mirrors.mapNotNull { it.normalizeMirror() }.ifEmpty { DEFAULT_MIRRORS }
+
+    private fun String.normalizeMirror(): String? {
+        val trimmed = trim().trimEnd('/')
+        if (trimmed.isEmpty()) return null
+        val withScheme = when {
+            trimmed.startsWith("https://") || trimmed.startsWith("http://") -> trimmed
+
+            // A scheme we cannot use (ftp://, file://) is a mistake, not a host to guess at.
+            SCHEME.containsMatchIn(trimmed) -> return null
+
+            else -> "https://$trimmed"
         }
+        return withScheme.takeIf { HOST.containsMatchIn(it) }
+    }
 
     val hasSecretKey: Boolean
         get() = !secretKey.isNullOrBlank()
 
     companion object {
+        private val SCHEME = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://")
+
+        /** A host with at least one dot, so a stray word does not become `https://word`. */
+        private val HOST = Regex("^https?://[^/\\s]+\\.[^/\\s]+")
+
         /**
          * Checked 2026-08-21 from a Dutch connection: `.gl` and `.pk` serve the site (and rate-limit
          * hard), `.li` answers with a redirect interstitial, and `.org`/`.se` no longer resolve at

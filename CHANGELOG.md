@@ -8,6 +8,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Cover art from search results and the popular shelf actually loads. Coil was configured without a
+  network fetcher back when covers were only ever local files, so every remote cover failed silently
+  and fell back to its title card. Covers are now memory- and disk-cached.
+- A mirror typed without `https://` no longer disappears. `annas-archive.gl` is the obvious thing to
+  enter, but only entries with a scheme survived, so a filled-in field could still report "No Anna's
+  Archive mirror configured". Missing schemes are filled in, and if nothing usable is left the
+  built-in list is used instead of failing. The field also shows the built-in mirrors as its
+  placeholder, so an empty box no longer looks unconfigured.
+
 - Anna's Archive searches no longer stop at the first mirror that refuses them. The site throttles
   scraping per IP and answers 403 or 429; those replies now move on to the next mirror instead of
   ending the search, and when every mirror is throttling, the message says so rather than "HTTP 403".
@@ -18,7 +27,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Settings is now five collapsible groups, one open at a time, each showing what its settings
+  currently add up to ("Sepia · 1.0× text · Auto") so most answers need no tap. Theme, page-turn and
+  column choices are proper labels instead of raw enum names.
 - Discover shows results as a two-column cover grid, with the download button on the cover.
+- Discover and its popular shelf show pulsing skeleton placeholders while covers load, instead of an
+  empty screen.
 - Project Gutenberg is no longer searched. Its public-domain-only catalogue mostly added noise; the
   `source:gutenberg` module is still in the tree if it is ever wanted back.
 
