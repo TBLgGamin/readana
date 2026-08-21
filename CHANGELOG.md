@@ -8,6 +8,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The assistant can show pictures. Illustrations from the pages you have already read are attached
+  to the question, so the model can see a plate and point at it, and an answer may also ask for a
+  picture of something it mentions — a ship, a bird, a building — which Readana looks up on
+  Wikipedia and shows with a credit. It never uses the providers' own web search: those return text
+  rather than pictures, two of the five do not have one, and anything they read would come back
+  into the conversation, which is exactly how a search about a book gives away its ending. Here the
+  model only writes down a subject and never sees what was found, so the no-spoilers guarantee is
+  untouched. Switchable off under Settings → Reading assistant.
+
 - The reader's bottom bar has a conversations button next to contents and settings, listing every
   chat held about the book, newest first, and reopening any of them.
 

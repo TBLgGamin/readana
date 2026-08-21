@@ -22,6 +22,9 @@ dependencies {
     implementation(libs.androidx.fragment.compose)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)
+    // Answers may point at a picture: a plate from the book, or one looked up for a subject.
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.ktor3)
 
     // Readium's preference and locator types touch android.* even in pure logic, so the reader's
     // unit tests run under Robolectric.

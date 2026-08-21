@@ -1,15 +1,19 @@
 package dev.readana.feature.reader
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.readana.ai.client.ImageAttachment
 import dev.readana.ai.client.ReadingContext
 import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
 import dev.readana.core.common.result.asSuccess
 import dev.readana.core.data.ai.AiAssistant
 import dev.readana.core.data.ai.AssistantEvent
+import dev.readana.core.data.ai.FoundPicture
+import dev.readana.core.data.ai.PictureSearch
 import dev.readana.core.data.repository.AiThreadsRepository
 import dev.readana.core.data.repository.LibraryRepository
 import dev.readana.core.data.repository.SettingsRepository
+import dev.readana.core.model.AiFigure
 import dev.readana.core.model.AiMessage
 import dev.readana.core.model.AiProviderConfig
 import dev.readana.core.model.AiProviderKind
@@ -62,6 +66,7 @@ class ReaderAssistantViewModelTest {
         settingsRepository = settings,
         libraryRepository = library,
         sessionStore = sessionStore,
+        pictures = NoPictures,
         ioDispatcher = mainDispatcherRule.testDispatcher
     )
 
@@ -247,6 +252,11 @@ private fun testBook(lastOpened: Instant? = null, progress: Float? = null) = Boo
     origin = null
 )
 
+/** No conversation here asks for a picture, so the lookup should never be reached. */
+private object NoPictures : PictureSearch {
+    override suspend fun find(subject: String): FoundPicture? = null
+}
+
 private class StubAssistant : AiAssistant {
     var failWith: AppError? = null
     var reusable: AiThread? = null
@@ -259,7 +269,8 @@ private class StubAssistant : AiAssistant {
         quote: String?,
         context: ReadingContext,
         chapterTitle: String?,
-        coveredFraction: Float?
+        coveredFraction: Float?,
+        figures: List<AiFigure>
     ): AppResult<AiThread> = AiThread(
         id = nextId++,
         bookId = book.id,
@@ -269,11 +280,12 @@ private class StubAssistant : AiAssistant {
         contextText = context.text,
         chapterTitle = chapterTitle,
         coveredFraction = coveredFraction,
+        figures = figures,
         createdAt = Instant.EPOCH,
         updatedAt = Instant.EPOCH
     ).asSuccess()
 
-    override fun reply(thread: AiThread, question: String?): Flow<AssistantEvent> {
+    override fun reply(thread: AiThread, question: String?, images: List<ImageAttachment>): Flow<AssistantEvent> {
         replies++
         val error = failWith
         return if (error != null) {

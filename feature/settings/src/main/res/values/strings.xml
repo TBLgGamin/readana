@@ -68,4 +68,6 @@
         <item quantity="other">After %1$d days away</item>
     </plurals>
     <string name="feature_settings_ai_privacy">Asking a question sends the part of the book you have read to the provider you picked. Nothing you have not reached is ever sent.</string>
+    <string name="feature_settings_ai_illustrate">Illustrate answers with pictures</string>
+    <string name="feature_settings_ai_illustrate_help">An answer may ask to show you a picture of something it mentions — a ship, a bird, a building. Readana looks it up on Wikipedia; what it finds is shown to you and never sent to the provider, so it cannot give away the plot. Pictures from the book itself are always available.</string>
 </resources>

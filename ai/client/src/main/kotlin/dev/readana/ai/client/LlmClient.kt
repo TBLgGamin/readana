@@ -55,10 +55,19 @@ enum class ChatRole { User, Assistant }
 
 data class ChatMessage(val role: ChatRole, val text: String)
 
+/**
+ * A picture handed to the model along with the question — a figure from the pages the reader has
+ * already been through. [id] is the marker the answer refers to it by, so what the model writes
+ * can be turned back into the picture on screen.
+ */
+class ImageAttachment(val id: String, val mediaType: String, val bytes: ByteArray)
+
 data class LlmRequest(
     val system: List<PromptBlock>,
     val messages: List<ChatMessage>,
-    val maxOutputTokens: Int = DEFAULT_MAX_OUTPUT_TOKENS
+    val maxOutputTokens: Int = DEFAULT_MAX_OUTPUT_TOKENS,
+    /** Attached to the last user turn, which is the one the model is answering. */
+    val images: List<ImageAttachment> = emptyList()
 ) {
     companion object {
         const val DEFAULT_MAX_OUTPUT_TOKENS = 1_024

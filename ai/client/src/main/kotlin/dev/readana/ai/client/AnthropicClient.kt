@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 /**
  * Anthropic's Messages API. Kept native rather than folded into the OpenAI-compatible client
@@ -74,10 +75,12 @@ internal class AnthropicClient(private val httpClient: HttpClient, private val e
                 cacheControl = if (block.cacheable) CacheControl() else null
             )
         },
-        messages = messages.map { message ->
+        // Pictures ride on the turn being answered, which is always the last one.
+        messages = messages.mapIndexed { index, message ->
+            val attached = if (index == messages.lastIndex) images else emptyList()
             RequestMessage(
                 role = if (message.role == ChatRole.User) ROLE_USER else ROLE_ASSISTANT,
-                content = message.text
+                content = MessageContent.anthropic(message.text, attached)
             )
         }
     )
@@ -158,7 +161,7 @@ private data class SystemBlock(
 private data class CacheControl(val type: String = "ephemeral")
 
 @Serializable
-private data class RequestMessage(val role: String, val content: String)
+private data class RequestMessage(val role: String, val content: JsonElement)
 
 @Serializable
 private data class ContentBlockDelta(val delta: TextDelta? = null)

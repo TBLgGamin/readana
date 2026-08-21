@@ -21,7 +21,8 @@ private data class AiSettingsDto(
     val activeProviderId: String? = null,
     val contextSize: String? = null,
     val recapEnabled: Boolean = true,
-    val recapAfterDays: Int = AiSettings.DEFAULT_RECAP_AFTER_DAYS
+    val recapAfterDays: Int = AiSettings.DEFAULT_RECAP_AFTER_DAYS,
+    val illustrateFromWeb: Boolean = true
 )
 
 @Serializable
@@ -51,7 +52,8 @@ internal fun AiSettings.encodeToJson(): String = json.encodeToString(
         activeProviderId = activeProviderId,
         contextSize = contextSize.name,
         recapEnabled = recapEnabled,
-        recapAfterDays = recapAfterDays
+        recapAfterDays = recapAfterDays,
+        illustrateFromWeb = illustrateFromWeb
     )
 )
 
@@ -71,7 +73,8 @@ internal fun String?.decodeAiSettings(): AiSettings {
         contextSize = AiContextSize.entries.firstOrNull { it.name == dto.contextSize }
             ?: AiContextSize.Medium,
         recapEnabled = dto.recapEnabled,
-        recapAfterDays = dto.recapAfterDays.coerceIn(AiSettings.RECAP_DAYS_RANGE)
+        recapAfterDays = dto.recapAfterDays.coerceIn(AiSettings.RECAP_DAYS_RANGE),
+        illustrateFromWeb = dto.illustrateFromWeb
     ).withBuiltIns().withActiveDefaulted()
 }
 

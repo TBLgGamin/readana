@@ -84,6 +84,7 @@ internal fun SettingsRoute(
             onTestProvider = aiViewModel::testProvider,
             onContextSizeChange = aiViewModel::setContextSize,
             onRecapEnabledChange = aiViewModel::setRecapEnabled,
+            onIllustrateChange = aiViewModel::setIllustrateFromWeb,
             onRecapAfterDaysChange = aiViewModel::setRecapAfterDays
         ),
         onLibraryFolderChange = viewModel::setLibraryFolder,

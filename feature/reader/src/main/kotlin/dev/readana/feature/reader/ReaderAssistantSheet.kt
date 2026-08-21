@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -147,7 +146,7 @@ private fun Conversation(state: AssistantUiState, modifier: Modifier = Modifier)
             .verticalScroll(listState),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        state.messages.forEach { message -> Turn(message) }
+        state.messages.forEach { message -> Turn(message, pictures = state.pictures) }
         val streaming = state.streaming
         when {
             state.phase == AssistantPhase.Gathering -> GatheringRow()
@@ -155,13 +154,13 @@ private fun Conversation(state: AssistantUiState, modifier: Modifier = Modifier)
             // An empty stream means the request is out but no word has come back yet.
             streaming != null && streaming.isEmpty() -> ThinkingRow()
 
-            streaming != null -> AnswerText(text = streaming)
+            streaming != null -> AssistantAnswer(text = streaming, pictures = state.pictures)
         }
     }
 }
 
 @Composable
-private fun Turn(message: AssistantMessage, modifier: Modifier = Modifier) {
+private fun Turn(message: AssistantMessage, pictures: Map<String, AssistantPicture>, modifier: Modifier = Modifier) {
     if (message.fromReader) {
         Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Surface(
@@ -177,15 +176,7 @@ private fun Turn(message: AssistantMessage, modifier: Modifier = Modifier) {
             }
         }
     } else {
-        AnswerText(text = message.text, modifier = modifier)
-    }
-}
-
-/** The model is asked for plain prose, so plain text is all this needs to be. */
-@Composable
-private fun AnswerText(text: String, modifier: Modifier = Modifier) {
-    SelectionContainer(modifier = modifier) {
-        Text(text = text, style = MaterialTheme.typography.bodyLarge)
+        AssistantAnswer(text = message.text, pictures = pictures, modifier = modifier)
     }
 }
 

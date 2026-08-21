@@ -34,6 +34,8 @@ internal class ReaderSession(
      * publications without a text service.
      */
     val textWalker: (Locator?) -> TextWalker?,
+    /** Reads one of the book's own illustrations back out, by the href a figure was recorded with. */
+    val loadFigure: suspend (String) -> ByteArray?,
     /** Fixed-layout EPUBs (for example comics) are page-based and cannot switch to scrolling. */
     val isFixedLayout: Boolean = false,
     val search: suspend (String) -> SearchIterator?,

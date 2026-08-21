@@ -103,7 +103,12 @@ data class AiSettings(
     val contextSize: AiContextSize = AiContextSize.Medium,
     /** Offer a recap when a book is reopened after [recapAfterDays]. */
     val recapEnabled: Boolean = true,
-    val recapAfterDays: Int = DEFAULT_RECAP_AFTER_DAYS
+    val recapAfterDays: Int = DEFAULT_RECAP_AFTER_DAYS,
+    /**
+     * Whether an answer may ask for a picture of something it mentions. Readana does the looking,
+     * on Wikipedia, and the result is never sent back to the model — so this cannot spoil a book.
+     */
+    val illustrateFromWeb: Boolean = true
 ) {
     val active: AiProviderConfig?
         get() = providers.firstOrNull { it.id == activeProviderId }

@@ -101,12 +101,11 @@ class DefaultAiAssistantTest {
         assistant().reply(thread, question = "Why?").toList()
 
         val system = recording.requests.single().system
-        assertEquals(4, system.size)
         assertTrue(system[0].text.contains("reading companion"))
         assertTrue(system[1].cacheable)
         assertTrue(system[1].text.contains("<book_so_far>"))
         assertTrue(system[2].text.contains("selected this passage"))
-        assertTrue(system[3].text.contains("Chapter 3"))
+        assertTrue(system.last().text.contains("Chapter 3"))
         assertEquals(1, system.count { it.cacheable })
     }
 

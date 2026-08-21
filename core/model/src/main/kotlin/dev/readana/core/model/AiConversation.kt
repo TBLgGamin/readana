@@ -15,6 +15,12 @@ enum class AiThreadKind {
 }
 
 /**
+ * An illustration from the book that a conversation may point at. Kept with the thread so a chat
+ * reopened later still shows the pictures its answers refer to.
+ */
+data class AiFigure(val id: String, val href: String, val caption: String?, val mediaType: String?)
+
+/**
  * One conversation about a book. The context is rendered once, when the thread starts, and stored
  * verbatim: follow-up questions resend the same bytes, so the answer never learns about text the
  * reader had not reached, and provider prompt caches keep hitting.
@@ -32,6 +38,8 @@ data class AiThread(
     /** Where the reader was when the thread started, for reuse checks and display. */
     val chapterTitle: String?,
     val coveredFraction: Float?,
+    /** Illustrations from the pages this conversation was given, in reading order. */
+    val figures: List<AiFigure> = emptyList(),
     val createdAt: Instant,
     val updatedAt: Instant
 ) {

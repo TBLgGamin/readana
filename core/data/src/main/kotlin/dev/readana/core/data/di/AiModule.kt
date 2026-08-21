@@ -11,6 +11,8 @@ import dev.readana.core.data.ai.AiAssistant
 import dev.readana.core.data.ai.AiProviderProbe
 import dev.readana.core.data.ai.DefaultAiAssistant
 import dev.readana.core.data.ai.DefaultAiProviderProbe
+import dev.readana.core.data.ai.PictureSearch
+import dev.readana.core.data.ai.WikipediaPictureSearch
 import dev.readana.core.data.repository.AiThreadsRepository
 import dev.readana.core.data.repository.RoomAiThreadsRepository
 import io.ktor.client.HttpClient
@@ -42,6 +44,9 @@ abstract class AiBindingsModule {
 
     @Binds
     abstract fun bindsAiProviderProbe(impl: DefaultAiProviderProbe): AiProviderProbe
+
+    @Binds
+    abstract fun bindsPictureSearch(impl: WikipediaPictureSearch): PictureSearch
 
     @Binds
     abstract fun bindsAiThreadsRepository(impl: RoomAiThreadsRepository): AiThreadsRepository

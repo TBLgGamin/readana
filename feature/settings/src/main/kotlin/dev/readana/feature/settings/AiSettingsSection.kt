@@ -69,6 +69,7 @@ internal fun AiSettingsSection(state: AiSettingsUiState, actions: AiSettingsActi
             Text(stringResource(R.string.feature_settings_ai_add_custom))
         }
         ContextSizeRow(state.settings.contextSize, actions.onContextSizeChange)
+        IllustrateRow(state.settings.illustrateFromWeb, actions.onIllustrateChange)
         RecapRow(state.settings, actions)
         Text(
             text = stringResource(R.string.feature_settings_ai_privacy),
@@ -285,6 +286,29 @@ private fun ContextSizeRow(selected: AiContextSize, onSelect: (AiContextSize) ->
     }
 }
 
+/**
+ * Answers may ask for a picture of something they mention. Readana looks it up on Wikipedia and
+ * shows it; the result never goes back to the model, so this cannot give away a plot.
+ */
+@Composable
+private fun IllustrateRow(enabled: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(stringResource(R.string.feature_settings_ai_illustrate))
+            Switch(checked = enabled, onCheckedChange = onChange)
+        }
+        Text(
+            text = stringResource(R.string.feature_settings_ai_illustrate_help),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
 @Composable
 private fun RecapRow(settings: AiSettings, actions: AiSettingsActions, modifier: Modifier = Modifier) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -388,5 +412,6 @@ internal data class AiSettingsActions(
     val onTestProvider: (String) -> Unit,
     val onContextSizeChange: (AiContextSize) -> Unit,
     val onRecapEnabledChange: (Boolean) -> Unit,
+    val onIllustrateChange: (Boolean) -> Unit,
     val onRecapAfterDaysChange: (Int) -> Unit
 )

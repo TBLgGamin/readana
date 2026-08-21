@@ -3,6 +3,7 @@ package dev.readana.feature.reader
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.readana.ai.client.ImageAttachment
 import dev.readana.ai.client.ReadingContext
 import dev.readana.ai.client.ReadingContextBuilder
 import dev.readana.core.common.coroutines.Dispatcher
@@ -11,9 +12,11 @@ import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
 import dev.readana.core.data.ai.AiAssistant
 import dev.readana.core.data.ai.AssistantEvent
+import dev.readana.core.data.ai.PictureSearch
 import dev.readana.core.data.repository.AiThreadsRepository
 import dev.readana.core.data.repository.LibraryRepository
 import dev.readana.core.data.repository.SettingsRepository
+import dev.readana.core.model.AiFigure
 import dev.readana.core.model.AiMessage
 import dev.readana.core.model.AiRole
 import dev.readana.core.model.AiSettings
@@ -67,8 +70,22 @@ internal data class AssistantUiState(
     /** How long the reader has been away, for the wording of that offer. */
     val daysAway: Int = 0,
     /** Whether the assistant can be used here at all. */
-    val enabled: Boolean = false
+    val enabled: Boolean = false,
+    /** Pictures an answer may point at, by the marker it writes: [figure:1], [image: …]. */
+    val pictures: Map<String, AssistantPicture> = emptyMap()
 )
+
+/** A picture the chat can show: either a plate from the book or one looked up for a subject. */
+internal data class AssistantPicture(
+    val bytes: ByteArray? = null,
+    val url: String? = null,
+    val caption: String? = null,
+    val sourceUrl: String? = null
+) {
+    override fun equals(other: Any?): Boolean = this === other
+
+    override fun hashCode(): Int = System.identityHashCode(this)
+}
 
 /**
  * Drives the reading assistant: Ask, Explain and the recap.
@@ -83,6 +100,7 @@ internal class ReaderAssistantViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val libraryRepository: LibraryRepository,
     private val sessionStore: ReaderSessionStore,
+    private val pictures: PictureSearch,
     @Dispatcher(ReadanaDispatchers.IO) private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AssistantUiState())
@@ -93,6 +111,7 @@ internal class ReaderAssistantViewModel @Inject constructor(
     private var replyJob: Job? = null
     private var threadsJob: Job? = null
     private var lastQuestion: String? = null
+    private var attachments: List<ImageAttachment> = emptyList()
     private var hasText: Boolean = false
     private var providerReady: Boolean = false
     private var availabilityJob: Job? = null
@@ -258,7 +277,15 @@ internal class ReaderAssistantViewModel @Inject constructor(
                 quote = quote,
                 context = context,
                 chapterTitle = chapterTitle,
-                coveredFraction = progression
+                coveredFraction = progression,
+                figures = context.figures.mapIndexed { index, figure ->
+                    AiFigure(
+                        id = FIGURE_PREFIX + (index + 1),
+                        href = figure.href,
+                        caption = figure.caption,
+                        mediaType = figure.mediaType
+                    )
+                }
             )
         ) {
             is AppResult.Failure -> _uiState.update {
@@ -267,8 +294,13 @@ internal class ReaderAssistantViewModel @Inject constructor(
 
             is AppResult.Success -> {
                 thread = created.value
-                _uiState.update {
-                    it.copy(threadId = created.value.id, phase = AssistantPhase.Idle)
+                attachments = loadFigures(created.value)
+                _uiState.update { state ->
+                    state.copy(
+                        threadId = created.value.id,
+                        phase = AssistantPhase.Idle,
+                        pictures = created.value.figurePictures(attachments)
+                    )
                 }
                 if (replyNow) stream(created.value, question)
             }
@@ -298,16 +330,19 @@ internal class ReaderAssistantViewModel @Inject constructor(
                 it.copy(messages = it.messages + AssistantMessage(fromReader = true, text = question))
             }
         }
-        assistant.reply(thread, question).collect { event ->
+        assistant.reply(thread, question, attachments).collect { event ->
             when (event) {
                 is AssistantEvent.Delta -> _uiState.update { it.copy(streaming = event.text) }
 
-                is AssistantEvent.Done -> _uiState.update {
-                    it.copy(
-                        messages = it.messages + AssistantMessage(fromReader = false, text = event.text),
-                        streaming = null,
-                        phase = AssistantPhase.Idle
-                    )
+                is AssistantEvent.Done -> {
+                    _uiState.update {
+                        it.copy(
+                            messages = it.messages + AssistantMessage(fromReader = false, text = event.text),
+                            streaming = null,
+                            phase = AssistantPhase.Idle
+                        )
+                    }
+                    illustrate(event.text)
                 }
 
                 is AssistantEvent.Failed -> _uiState.update {
@@ -320,6 +355,7 @@ internal class ReaderAssistantViewModel @Inject constructor(
     private suspend fun open(existing: AiThread) {
         thread = existing
         val stored = threadsRepository.messagesOf(existing.id)
+        attachments = loadFigures(existing)
         _uiState.update {
             it.copy(
                 visible = true,
@@ -331,8 +367,66 @@ internal class ReaderAssistantViewModel @Inject constructor(
                 phase = AssistantPhase.Idle,
                 error = null,
                 coveredFraction = existing.coveredFraction,
-                recapOffered = false
+                recapOffered = false,
+                pictures = existing.figurePictures(attachments)
             )
+        }
+        stored.filterNot { it.role == AiRole.User }.forEach { illustrate(it.text) }
+    }
+
+    /**
+     * Reads the conversation's illustrations out of the book. Only their whereabouts are stored,
+     * so a chat reopened weeks later still shows the plates its answers point at.
+     */
+    private suspend fun loadFigures(thread: AiThread): List<ImageAttachment> {
+        if (thread.figures.isEmpty()) return emptyList()
+        val session = sessionStore.session ?: return emptyList()
+        return withContext(ioDispatcher) {
+            thread.figures.mapNotNull { figure ->
+                val bytes = session.loadFigure(figure.href) ?: return@mapNotNull null
+                ImageAttachment(
+                    id = figure.id,
+                    mediaType = figure.mediaType ?: DEFAULT_IMAGE_TYPE,
+                    bytes = bytes
+                )
+            }
+        }
+    }
+
+    private fun AiThread.figurePictures(loaded: List<ImageAttachment>): Map<String, AssistantPicture> =
+        figures.mapNotNull { figure ->
+            val bytes = loaded.firstOrNull { it.id == figure.id }?.bytes ?: return@mapNotNull null
+            figure.id to AssistantPicture(bytes = bytes, caption = figure.caption)
+        }.toMap()
+
+    /**
+     * Looks up the subjects an answer asked to illustrate. The results are shown to the reader and
+     * never sent back, so nothing the web knows about this book can reach the conversation.
+     */
+    private suspend fun illustrate(answer: String) {
+        val settings = settingsRepository.aiSettings.first()
+        if (!settings.illustrateFromWeb) return
+        val wanted = IMAGE_MARKER.findAll(answer)
+            .map { it.groupValues[1].trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .take(MAX_LOOKED_UP)
+            .toList()
+        wanted.forEach { subject ->
+            val marker = imageMarkerFor(subject)
+            if (_uiState.value.pictures.containsKey(marker)) return@forEach
+            val found = pictures.find(subject) ?: return@forEach
+            _uiState.update { state ->
+                state.copy(
+                    pictures = state.pictures + (
+                        marker to AssistantPicture(
+                            url = found.imageUrl,
+                            caption = found.title,
+                            sourceUrl = found.pageUrl
+                        )
+                        )
+                )
+            }
         }
     }
 
@@ -394,5 +488,16 @@ internal class ReaderAssistantViewModel @Inject constructor(
     private companion object {
         /** Nothing to recap in the first pages. */
         const val MIN_PROGRESS_FOR_RECAP = 0.02f
+
+        const val FIGURE_PREFIX = "figure:"
+        const val DEFAULT_IMAGE_TYPE = "image/jpeg"
+
+        /** One answer may ask for a couple of pictures; it may not ask for a gallery. */
+        const val MAX_LOOKED_UP = 2
+
+        val IMAGE_MARKER = Regex("""\[image:([^\]]{1,120})]""")
     }
+
+    /** The key an [image: …] marker is stored under, matching what the sheet looks for. */
+    private fun imageMarkerFor(subject: String) = "image:" + subject.lowercase()
 }

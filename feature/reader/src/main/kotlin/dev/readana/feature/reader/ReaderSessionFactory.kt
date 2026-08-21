@@ -23,6 +23,7 @@ import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.services.positions
 import org.readium.r2.shared.publication.services.search.isSearchable
 import org.readium.r2.shared.publication.services.search.search
+import org.readium.r2.shared.util.Url
 
 /** Opens a book and builds the navigator that will render it. */
 internal interface ReaderSessionFactory {
@@ -111,6 +112,7 @@ internal class ReadiumReaderSessionFactory @Inject constructor(
         isSearchable = publication.isSearchable,
         hasText = publication.hasText(),
         textWalker = { anchor -> publication.textWalkerAt(anchor) },
+        loadFigure = { href -> Url(href)?.let { publication.readBytes(it) } },
         isFixedLayout = isFixedLayout,
         search = { query -> publication.search(query) },
         onClose = { publication.close() }

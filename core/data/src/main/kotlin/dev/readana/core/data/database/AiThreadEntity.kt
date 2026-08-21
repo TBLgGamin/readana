@@ -4,6 +4,8 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import dev.readana.core.data.ai.decodeAiFigures
+import dev.readana.core.data.ai.encodeToJson
 import dev.readana.core.model.AiThread
 import dev.readana.core.model.AiThreadKind
 import java.time.Instant
@@ -22,6 +24,7 @@ data class AiThreadEntity(
     @ColumnInfo(name = "context_text") val contextText: String,
     @ColumnInfo(name = "chapter_title") val chapterTitle: String?,
     @ColumnInfo(name = "covered_fraction") val coveredFraction: Float?,
+    @ColumnInfo(name = "figures_json") val figuresJson: String? = null,
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long
 )
@@ -35,6 +38,7 @@ fun AiThreadEntity.toModel(): AiThread = AiThread(
     contextText = contextText,
     chapterTitle = chapterTitle,
     coveredFraction = coveredFraction,
+    figures = figuresJson.decodeAiFigures(),
     createdAt = Instant.ofEpochMilli(createdAt),
     updatedAt = Instant.ofEpochMilli(updatedAt)
 )
@@ -48,6 +52,7 @@ fun AiThread.toEntity(): AiThreadEntity = AiThreadEntity(
     contextText = contextText,
     chapterTitle = chapterTitle,
     coveredFraction = coveredFraction,
+    figuresJson = figures.encodeToJson(),
     createdAt = createdAt.toEpochMilli(),
     updatedAt = updatedAt.toEpochMilli()
 )

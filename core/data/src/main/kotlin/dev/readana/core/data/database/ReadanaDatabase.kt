@@ -13,7 +13,7 @@ import androidx.room.RoomDatabase
         AiThreadEntity::class,
         AiMessageEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
     // Every version only adds tables or nullable columns, so Room can write the migrations itself.
     autoMigrations = [
@@ -21,7 +21,8 @@ import androidx.room.RoomDatabase
         AutoMigration(from = 2, to = 3),
         AutoMigration(from = 3, to = 4),
         AutoMigration(from = 4, to = 5),
-        AutoMigration(from = 5, to = 6)
+        AutoMigration(from = 5, to = 6),
+        AutoMigration(from = 6, to = 7)
     ]
 )
 abstract class ReadanaDatabase : RoomDatabase() {

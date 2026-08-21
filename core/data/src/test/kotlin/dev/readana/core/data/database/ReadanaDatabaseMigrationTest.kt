@@ -44,7 +44,7 @@ class ReadanaDatabaseMigrationTest {
             )
         }
 
-        helper.runMigrationsAndValidate(version = 6).use { connection ->
+        helper.runMigrationsAndValidate(version = 7).use { connection ->
             connection.prepare("SELECT title FROM books").use { statement ->
                 assertTrue(statement.step())
                 assertEquals("Moby Dick", statement.getText(0))

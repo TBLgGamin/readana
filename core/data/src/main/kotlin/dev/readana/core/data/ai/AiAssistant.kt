@@ -2,6 +2,7 @@ package dev.readana.core.data.ai
 
 import dev.readana.ai.client.ChatMessage
 import dev.readana.ai.client.ChatRole
+import dev.readana.ai.client.ImageAttachment
 import dev.readana.ai.client.LlmClient
 import dev.readana.ai.client.LlmClientFactory
 import dev.readana.ai.client.LlmEvent
@@ -15,6 +16,7 @@ import dev.readana.core.common.result.asFailure
 import dev.readana.core.common.result.asSuccess
 import dev.readana.core.data.repository.AiThreadsRepository
 import dev.readana.core.data.repository.SettingsRepository
+import dev.readana.core.model.AiFigure
 import dev.readana.core.model.AiMessage
 import dev.readana.core.model.AiRole
 import dev.readana.core.model.AiThread
@@ -55,11 +57,15 @@ interface AiAssistant {
         quote: String?,
         context: ReadingContext,
         chapterTitle: String?,
-        coveredFraction: Float?
+        coveredFraction: Float?,
+        figures: List<AiFigure> = emptyList()
     ): AppResult<AiThread>
 
-    /** Sends [question] (null for the opening turn of an Explain or Recap) and streams the answer. */
-    fun reply(thread: AiThread, question: String?): Flow<AssistantEvent>
+    /**
+     * Sends [question] (null for the opening turn of an Explain or Recap) and streams the answer.
+     * [images] are the book's own illustrations, loaded by the reader, that the model may point at.
+     */
+    fun reply(thread: AiThread, question: String?, images: List<ImageAttachment> = emptyList()): Flow<AssistantEvent>
 
     /** A stored recap still close enough to the reader's position to reuse, or null. */
     suspend fun reusableRecap(book: Book, coveredFraction: Float?): AiThread?
@@ -77,7 +83,8 @@ class DefaultAiAssistant @Inject constructor(
         quote: String?,
         context: ReadingContext,
         chapterTitle: String?,
-        coveredFraction: Float?
+        coveredFraction: Float?,
+        figures: List<AiFigure>
     ): AppResult<AiThread> {
         if (context.isEmpty) {
             return AppError.Unsupported("There is nothing read yet to ask about.").asFailure()
@@ -93,52 +100,62 @@ class DefaultAiAssistant @Inject constructor(
             contextText = AiPrompts.context(book, context.text),
             chapterTitle = chapterTitle,
             coveredFraction = coveredFraction,
+            figures = figures,
             createdAt = now,
             updatedAt = now
         )
         return threadsRepository.add(thread).asSuccess()
     }
 
-    override fun reply(thread: AiThread, question: String?): Flow<AssistantEvent> = flow {
-        val settings = settingsRepository.aiSettings.first()
-        val provider = settings.active
-        val client = provider?.let { clientFactory.create(it) }
-        if (client == null) {
-            emit(AssistantEvent.Failed(AppError.Unauthorized(NO_PROVIDER)))
-            return@flow
-        }
-
-        val history = threadsRepository.messagesOf(thread.id).map { it.toChatMessage() }
-        val userText = AiPrompts.question(question)
-        threadsRepository.addMessage(userMessage(thread, userText))
-
-        val request = requestFor(thread, history, userText)
-        val answer = StringBuilder()
-        val failure = collectAnswer(client, request, answer)
-
-        finish(thread, answer.toString(), failure)
-        emit(
-            if (failure != null && answer.isEmpty()) {
-                AssistantEvent.Failed(failure)
-            } else {
-                AssistantEvent.Done(answer.toString())
+    override fun reply(thread: AiThread, question: String?, images: List<ImageAttachment>): Flow<AssistantEvent> =
+        flow {
+            val settings = settingsRepository.aiSettings.first()
+            val provider = settings.active
+            val client = provider?.let { clientFactory.create(it) }
+            if (client == null) {
+                emit(AssistantEvent.Failed(AppError.Unauthorized(NO_PROVIDER)))
+                return@flow
             }
-        )
-    }
+
+            val history = threadsRepository.messagesOf(thread.id).map { it.toChatMessage() }
+            val userText = AiPrompts.question(question)
+            threadsRepository.addMessage(userMessage(thread, userText))
+
+            val request = requestFor(thread, history, userText, images, settings.illustrateFromWeb)
+            val answer = StringBuilder()
+            val failure = collectAnswer(client, request, answer)
+
+            finish(thread, answer.toString(), failure)
+            emit(
+                if (failure != null && answer.isEmpty()) {
+                    AssistantEvent.Failed(failure)
+                } else {
+                    AssistantEvent.Done(answer.toString())
+                }
+            )
+        }
 
     /**
      * The rules come first and the book second, and both are byte-identical across a thread, so the
      * provider can serve the expensive part from its prompt cache on every follow-up.
      */
-    private fun requestFor(thread: AiThread, history: List<ChatMessage>, userText: String) = LlmRequest(
+    private fun requestFor(
+        thread: AiThread,
+        history: List<ChatMessage>,
+        userText: String,
+        images: List<ImageAttachment>,
+        mayIllustrate: Boolean
+    ) = LlmRequest(
         system = listOfNotNull(
             PromptBlock(AiPrompts.rules(thread.kind)),
             PromptBlock(thread.contextText, cacheable = true),
             AiPrompts.selection(thread.quote)?.let { PromptBlock(it) },
+            AiPrompts.pictures(thread.figures, mayIllustrate)?.let { PromptBlock(it) },
             AiPrompts.position(thread.chapterTitle)?.let { PromptBlock(it) }
         ),
         messages = history + ChatMessage(ChatRole.User, userText),
-        maxOutputTokens = maxTokensFor(thread.kind)
+        maxOutputTokens = maxTokensFor(thread.kind),
+        images = images
     )
 
     /** Streams into [answer] and returns what went wrong, or null. */

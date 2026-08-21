@@ -51,6 +51,15 @@ request timeout and a two-minute socket timeout.
 member key does. A Keystore-wrapped store would be better and is a candidate for later; it is not
 worth blocking the feature on.
 
+**Pictures are fetched by the app, never by the model.** Illustrations from the walked pages are
+attached to the request as vision input, and an answer can ask for a picture of a subject by
+writing `[image: …]`, which Readana resolves against Wikipedia (no key, free licensing, a page to
+credit) and renders. The providers' own web-search tools were rejected for this: they return text
+and citations rather than pictures, DeepSeek and local servers have none, OpenRouter bills per
+search — and decisively, whatever they read re-enters the conversation, which is precisely how a
+search about a novel tells the reader how it ends. A one-way lookup keeps the guarantee: the model
+writes a subject, the reader sees a picture, and nothing comes back.
+
 ## Consequences
 
 - The assistant is EPUB-only. pdfium PDFs expose no content service and no text selection, so the

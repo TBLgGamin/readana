@@ -1,5 +1,6 @@
 package dev.readana.core.data.ai
 
+import dev.readana.core.model.AiFigure
 import dev.readana.core.model.AiThreadKind
 import dev.readana.core.model.Book
 
@@ -53,6 +54,42 @@ internal object AiPrompts {
     }
 
     fun question(question: String?): String = question?.trim()?.ifEmpty { null } ?: DEFAULT_REQUEST
+
+    /**
+     * Tells the model what pictures it has and how to point at them. The markers are resolved by
+     * Readana after the answer arrives, so nothing comes back into the conversation.
+     */
+    fun pictures(figures: List<AiFigure>, mayIllustrate: Boolean): String? {
+        if (figures.isEmpty() && !mayIllustrate) return null
+        return buildString {
+            if (figures.isNotEmpty()) append(figures.instructions())
+            if (mayIllustrate) {
+                if (isNotEmpty()) append("\n\n")
+                append(ILLUSTRATE)
+            }
+        }.trim()
+    }
+
+    private fun List<AiFigure>.instructions(): String = buildString {
+        appendLine("Illustrations from the pages you have been given, attached as images:")
+        this@instructions.forEach { figure ->
+            append("- [").append(figure.id).append(']')
+            figure.caption?.let { append(" — ").append(it) }
+            appendLine()
+        }
+        appendLine()
+        append(
+            "Write a marker such as [figure:1] on a line of its own to show one to the reader. " +
+                "Only use a marker that is listed above."
+        )
+    }
+
+    private const val ILLUSTRATE =
+        "To illustrate something the reader may not be able to picture — a ship, a bird, a " +
+            "building, a garment, a place — write [image: subject] on a line of its own and a " +
+            "picture of it will be looked up and shown to them. Name the thing itself, never the " +
+            "book, a character, or anything that happens in it. Use this sparingly, at most twice " +
+            "in an answer, and only where a picture genuinely helps."
 
     private const val DEFAULT_REQUEST = "Explain this passage."
 

@@ -108,6 +108,8 @@ class AiSettingsViewModel @Inject constructor(
 
     fun setRecapEnabled(enabled: Boolean) = update { it.copy(recapEnabled = enabled) }
 
+    fun setIllustrateFromWeb(enabled: Boolean) = update { it.copy(illustrateFromWeb = enabled) }
+
     fun setRecapAfterDays(days: Int) = update {
         it.copy(recapAfterDays = days.coerceIn(AiSettings.RECAP_DAYS_RANGE))
     }

@@ -11,7 +11,20 @@ interface TextWalker {
 
     /** The element before the starting point, or null at the beginning of the book. */
     suspend fun previous(): String?
+
+    /**
+     * Illustrations passed while walking, in the order they were met — which puts the ones nearest
+     * the reading position first. Only pages the reader has already been through are walked, so a
+     * plate from a later chapter can never turn up here.
+     */
+    fun figuresSeen(): List<BookFigure> = emptyList()
 }
+
+/**
+ * A picture from the book. [load] is deferred because a walk passes far more figures than any
+ * answer needs, and reading them all off disk would cost more than the question does.
+ */
+class BookFigure(val href: String, val caption: String?, val mediaType: String?, val load: suspend () -> ByteArray?)
 
 /**
  * The part of the book handed to the model, and how it was cut.
@@ -23,6 +36,8 @@ data class ReadingContext(
     val text: String,
     /** True when the budget forced the earliest chapters out. */
     val truncatedAtStart: Boolean,
+    /** Illustrations from the walked pages, nearest the reading position first. */
+    val figures: List<BookFigure> = emptyList(),
     val charCount: Int = text.length
 ) {
     val isEmpty: Boolean get() = text.isBlank()
@@ -47,7 +62,11 @@ class ReadingContextBuilder(private val budgetChars: Int) {
         val parts = behind.elements.asReversed() + ahead
         val body = parts.filter { it.isNotBlank() }.joinToString(PARAGRAPH_SEPARATOR)
         val text = if (behind.truncated && body.isNotEmpty()) OMITTED_NOTICE + body else body
-        return ReadingContext(text = text, truncatedAtStart = behind.truncated)
+        return ReadingContext(
+            text = text,
+            truncatedAtStart = behind.truncated,
+            figures = walker.figuresSeen().take(MAX_FIGURES)
+        )
     }
 
     /**
@@ -96,5 +115,8 @@ class ReadingContextBuilder(private val budgetChars: Int) {
 
         /** A selection is never far from the top of the page; this only bounds a failed match. */
         const val MAX_FORWARD_ELEMENTS = 40
+
+        /** Pictures are the most expensive thing a request can carry, so only the nearest few go. */
+        const val MAX_FIGURES = 3
     }
 }

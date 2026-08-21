@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 /**
  * `POST {base}/chat/completions` — the dialect OpenAI defined and OpenAI, Gemini, OpenRouter,
@@ -80,10 +81,14 @@ internal class OpenAiCompatibleClient(private val httpClient: HttpClient, privat
         streamOptions = if (stream) OpenAiStreamOptions() else null,
         messages = buildList {
             val instructions = system.joinToString(BLOCK_SEPARATOR) { it.text }
-            if (instructions.isNotBlank()) add(OpenAiMessage(ROLE_SYSTEM, instructions))
-            messages.forEach { message ->
+            if (instructions.isNotBlank()) {
+                add(OpenAiMessage(ROLE_SYSTEM, MessageContent.openAi(instructions, emptyList())))
+            }
+            messages.forEachIndexed { index, message ->
                 val role = if (message.role == ChatRole.User) ROLE_USER else ROLE_ASSISTANT
-                add(OpenAiMessage(role, message.text))
+                // Pictures ride on the turn being answered, which is always the last one.
+                val attached = if (index == messages.lastIndex) images else emptyList()
+                add(OpenAiMessage(role, MessageContent.openAi(message.text, attached)))
             }
         }
     )
@@ -145,7 +150,7 @@ private data class OpenAiCompletionsRequest(
 private data class OpenAiStreamOptions(@SerialName("include_usage") val includeUsage: Boolean = true)
 
 @Serializable
-private data class OpenAiMessage(val role: String, val content: String)
+private data class OpenAiMessage(val role: String, val content: JsonElement)
 
 @Serializable
 private data class OpenAiChunk(val choices: List<OpenAiChoice> = emptyList(), val usage: OpenAiUsage? = null)
