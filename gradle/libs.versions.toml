@@ -57,7 +57,7 @@ turbine = "1.2.1"
 robolectric = "4.16.1"
 konsist = "0.17.3"
 # Android stubs org.json, so JVM tests that touch Readium locators need the real implementation.
-json = "20250517"
+json = "20260814"
 
 [libraries]
 # Gradle plugins consumed by build-logic (compileOnly)
