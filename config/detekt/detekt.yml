@@ -1,0 +1,71 @@
+# Project overrides applied on top of detekt's default config (buildUponDefaultConfig = true).
+# Run `./gradlew detekt` locally; reports land in build/reports/detekt/.
+# Property names follow detekt 2.x (allowedLines etc., renamed from the 1.x thresholds).
+
+config:
+  validation: true
+  warningsAsErrors: false
+
+comments:
+  UndocumentedPublicClass:
+    active: false
+  UndocumentedPublicFunction:
+    active: false
+
+complexity:
+  LongParameterList:
+    allowedFunctionParameters: 8
+    allowedConstructorParameters: 10
+    ignoreDefaultParameters: true
+    ignoreAnnotated: ['Composable', 'Inject']
+  LongMethod:
+    allowedLines: 80
+    ignoreAnnotated: ['Composable']
+  TooManyFunctions:
+    allowedFunctionsPerClass: 15
+    allowedFunctionsPerInterface: 15
+    allowedFunctionsPerFile: 10
+    allowedFunctionsPerObject: 15
+    ignorePrivate: true
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Z][_A-Za-z0-9]*'
+  MatchingDeclarationName:
+    # Feature navigation files deliberately pair `XxxKey` with an `xxxEntry()` extension.
+    excludes: ['**/*Navigation.kt']
+
+style:
+  MagicNumber:
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignoreEnums: true
+    ignoreNumbers: ['-1', '0', '1', '2', '3', '10', '100', '1000']
+    ignoreAnnotated: ['Composable', 'Preview', 'Test']
+  MaxLineLength:
+    maxLineLength: 120
+  ReturnCount:
+    # Sources and engines use guard-clause early returns over nested conditionals.
+    max: 6
+  UnusedPrivateFunction:
+    ignoreAnnotated: ['Preview']
+  UnusedPrivateProperty:
+    ignoreAnnotated: ['Preview']
+  ForbiddenComment:
+    active: false
+
+Compose:
+  CompositionLocalAllowlist:
+    active: false
+  ModifierMissing:
+    active: true
+  ModifierReused:
+    active: true
+  ModifierWithoutDefault:
+    active: true
+  PreviewPublic:
+    active: true
+  ViewModelForwarding:
+    active: true

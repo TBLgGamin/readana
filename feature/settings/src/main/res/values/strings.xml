@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feature_settings_title">Settings</string>
+    <string name="feature_settings_section_reading">Reading</string>
+    <string name="feature_settings_font_scale">Font size: %1$.1f×</string>
+    <string name="feature_settings_theme">Theme</string>
+    <string name="feature_settings_page_turn_mode">Page turning</string>
+    <string name="feature_settings_keep_screen_on">Keep screen on while reading</string>
+    <string name="feature_settings_volume_keys">Volume keys turn pages</string>
+    <string name="feature_settings_section_sources">Book sources</string>
+    <string name="feature_settings_annas_notice">Anna\'s Archive indexes shadow libraries. Downloading copyrighted works without permission is illegal in most countries; mirrors are also blocked by some ISPs. You are responsible for what you download.</string>
+    <string name="feature_settings_annas_mirrors">Anna\'s Archive mirrors</string>
+    <string name="feature_settings_annas_mirrors_help">One URL per line, tried in order. Leave empty for the built-in defaults.</string>
+    <string name="feature_settings_annas_secret_key">Member secret key (optional)</string>
+    <string name="feature_settings_annas_secret_key_help">Enables the fast-download API. Without it, downloads open in a browser.</string>
+</resources>

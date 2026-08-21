@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and below: back up everything except the (re-creatable) Room database cache. -->
+<full-backup-content>
+    <exclude domain="database" path="readana.db-wal" />
+    <exclude domain="database" path="readana.db-shm" />
+</full-backup-content>

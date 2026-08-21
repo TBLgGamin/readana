@@ -1,0 +1,35 @@
+version: 2
+updates:
+  # Gradle version catalog (gradle/libs.versions.toml) and wrapper.
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Amsterdam
+    open-pull-requests-limit: 10
+    groups:
+      androidx:
+        patterns: ["androidx.*", "com.google.dagger*", "com.google.devtools.ksp*"]
+      kotlin:
+        patterns: ["org.jetbrains.kotlin*", "org.jetbrains.kotlinx*"]
+      readium:
+        patterns: ["org.readium*"]
+      ktor:
+        patterns: ["io.ktor*"]
+      tooling:
+        patterns: ["com.android.tools.build*", "com.diffplug.spotless*", "dev.detekt*", "io.nlopez.compose.rules*"]
+      testing:
+        patterns: ["junit*", "io.mockk*", "app.cash.turbine*", "org.robolectric*", "com.lemonappdev*", "org.w3c*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Amsterdam
+    groups:
+      actions:
+        patterns: ["*"]

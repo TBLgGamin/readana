@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Compose draws everything; the platform theme only removes the window action bar.
+      Theme.DeviceDefault.DayNight (API 29+) follows the system dark setting, avoiding a
+      white flash before the first Compose frame; there is no built-in NoActionBar variant.
+    -->
+    <style name="Theme.Readana" parent="android:Theme.DeviceDefault.DayNight">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+</resources>

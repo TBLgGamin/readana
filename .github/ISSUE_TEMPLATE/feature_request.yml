@@ -1,0 +1,21 @@
+name: Feature request
+description: Propose an improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that is hard or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How should it work? Which screen, which gesture, which setting?
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Library, Discover / sources, Reader, PDF conversion, Downloads, Settings, Build / tooling]

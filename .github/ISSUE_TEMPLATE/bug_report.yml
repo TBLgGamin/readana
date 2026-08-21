@@ -1,0 +1,32 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version / commit
+      placeholder: 0.1.0-debug (abc1234)
+  - type: input
+    id: device
+    attributes:
+      label: Device and OS
+      placeholder: Xiaomi Pad 8, HyperOS 3.1 (Android 16)
+  - type: textarea
+    id: book
+    attributes:
+      label: Book or file involved (if any)
+      description: Format, source, rough size. Do not attach copyrighted files.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: "`adb logcat -s Readana` output or a stack trace."
+      render: text

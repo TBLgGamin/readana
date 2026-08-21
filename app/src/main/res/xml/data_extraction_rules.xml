@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: cloud backup and device-to-device transfer rules. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="database" path="readana.db-wal" />
+        <exclude domain="database" path="readana.db-shm" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="database" path="readana.db-wal" />
+        <exclude domain="database" path="readana.db-shm" />
+    </device-transfer>
+</data-extraction-rules>

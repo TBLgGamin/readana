@@ -1,0 +1,35 @@
+# Local git hooks. Install once with `pre-commit install --hook-type pre-commit --hook-type pre-push`.
+# CI runs the same Gradle tasks, so these are a fast local safety net rather than the source of truth.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+        exclude: \.bat$
+      - id: check-yaml
+      - id: check-toml
+      - id: check-xml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+
+  - repo: local
+    hooks:
+      - id: spotless-apply
+        name: spotless (ktlint) format
+        entry: python scripts/gradlew.py -q spotlessApply
+        language: system
+        files: \.(kt|kts)$
+        pass_filenames: false
+      - id: detekt
+        name: detekt static analysis
+        entry: python scripts/gradlew.py -q detekt
+        language: system
+        files: \.(kt|kts)$
+        pass_filenames: false
+        stages: [pre-push]

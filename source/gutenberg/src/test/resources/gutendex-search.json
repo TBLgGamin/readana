@@ -1,0 +1,41 @@
+{
+  "count": 2,
+  "next": "https://gutendex.com/books/?page=2&search=pride",
+  "previous": null,
+  "results": [
+    {
+      "id": 1342,
+      "title": "Pride and Prejudice",
+      "authors": [
+        { "name": "Austen, Jane", "birth_year": 1775, "death_year": 1817 }
+      ],
+      "summaries": ["\"Pride and Prejudice\" by Jane Austen is a novel written in the early 19th century."],
+      "translators": [],
+      "subjects": ["Courtship -- Fiction", "England -- Fiction"],
+      "bookshelves": ["Best Books Ever Listings"],
+      "languages": ["en"],
+      "copyright": false,
+      "media_type": "Text",
+      "formats": {
+        "text/html": "https://www.gutenberg.org/ebooks/1342.html.images",
+        "application/epub+zip": "https://www.gutenberg.org/ebooks/1342.epub3.images",
+        "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/1342.kf8.images",
+        "image/jpeg": "https://www.gutenberg.org/cache/epub/1342/pg1342.cover.medium.jpg",
+        "text/plain; charset=us-ascii": "https://www.gutenberg.org/ebooks/1342.txt.utf-8"
+      },
+      "download_count": 55123
+    },
+    {
+      "id": 99999,
+      "title": "Audio Only Record",
+      "authors": [{ "name": "Anonymous", "birth_year": null, "death_year": null }],
+      "languages": ["en"],
+      "copyright": false,
+      "media_type": "Sound",
+      "formats": {
+        "audio/mpeg": "https://www.gutenberg.org/files/99999/99999-mp3.zip"
+      },
+      "download_count": 3
+    }
+  ]
+}

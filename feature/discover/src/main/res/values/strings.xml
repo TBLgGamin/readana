@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feature_discover_title">Discover</string>
+    <string name="feature_discover_search_hint">Search title, author or ISBN</string>
+    <string name="feature_discover_search_action">Search</string>
+    <string name="feature_discover_download_action">Download</string>
+    <string name="feature_discover_empty_title">Find your next book</string>
+    <string name="feature_discover_empty_description">Searches run across: %1$s</string>
+    <string name="feature_discover_no_results_title">No results</string>
+    <string name="feature_discover_source_error">%1$s: %2$s</string>
+    <string name="feature_discover_message_ready">Ready to download: %1$s</string>
+    <string name="feature_discover_message_browser">This source needs a browser step: %1$s</string>
+    <string name="feature_discover_message_failed">Download failed: %1$s</string>
+</resources>

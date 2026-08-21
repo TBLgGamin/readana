@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Android Lint configuration shared by every module (see build-logic AndroidLint.kt).
+  Warnings are treated as errors, so anything noisy-but-harmless is downgraded here
+  with a reason. Prefer fixing over suppressing.
+-->
+<lint>
+    <!-- Dependency freshness is Dependabot's job, not a build failure. -->
+    <issue id="GradleDependency" severity="ignore" />
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
+    <issue id="NewerVersionAvailable" severity="ignore" />
+    <!-- API 37 (Android 17) is out but the Xiaomi Pad 8 runs Android 16; bump targetSdk deliberately. -->
+    <issue id="OldTargetApi" severity="ignore" />
+    <!-- Single-language personal app. -->
+    <issue id="MissingTranslation" severity="ignore" />
+    <!-- Third-party lint jars built against older lint APIs shouldn't break the build. -->
+    <issue id="ObsoleteLintCustomCheck" severity="ignore" />
+
+    <!-- Keep these loud. -->
+    <issue id="UnusedResources" severity="error" />
+    <issue id="HardcodedText" severity="error" />
+    <issue id="NewApi" severity="fatal" />
+</lint>
