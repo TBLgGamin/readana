@@ -11,6 +11,7 @@ class AnnasSearchParserTest {
     private val table = checkNotNull(javaClass.getResource("/annas-search-table.html")).readText()
     private val cards = checkNotNull(javaClass.getResource("/annas-search-list.html")).readText()
     private val parked = checkNotNull(javaClass.getResource("/parked-domain.html")).readText()
+    private val live = checkNotNull(javaClass.getResource("/annas-search-live.html")).readText()
 
     @Test
     fun `reads every column of the table layout`() {
@@ -73,6 +74,26 @@ class AnnasSearchParserTest {
             // The record was there; dropping it must not read as "the page was short".
             assertEquals(3, page.recordCount)
         }
+    }
+
+    @Test
+    fun `reads a page captured from the live site`() {
+        val page = AnnasSearchParser.parse(live, "https://annas-archive.gl", AnnasArchiveSource.ID)
+
+        assertEquals(3, page.results.size)
+        val first = page.results[0]
+        assertEquals("fe9270f55e7d9e3ae6291b2144375639", first.recordId)
+        assertEquals("Circe : a novel", first.title)
+        assertEquals(BookFormat.EPUB, first.format)
+        // The table's language column is the bare code, not the card layout's "English [en]".
+        assertEquals("en", first.language)
+        assertEquals((1.9 * 1024 * 1024).toLong(), first.sizeBytes)
+        assertEquals(2018, first.year)
+        assertTrue(
+            first.extras.getValue(AnnasSearchParser.EXTRA_COLLECTIONS).contains("lgli"),
+            "the sources column feeds the free download route"
+        )
+        assertTrue(page.results.all { it.language == "en" })
     }
 
     @Test

@@ -49,6 +49,8 @@ class AnnasArchiveSource(
     private val mirrors: MirrorResolver = MirrorResolver(),
     /** Clears the site's browser check without troubling the user, when the device can. */
     private val verifier: BrowserVerifier = NoBrowserVerifier,
+    /** Weeds out download links on domains this connection cannot resolve. */
+    private val reachability: HostReachability = HostReachability.Dns,
     /** Called with the mirror that answered, so the choice survives a restart. */
     private val onWorkingMirror: suspend (String) -> Unit = {}
 ) : BookSource {
@@ -184,20 +186,37 @@ class AnnasArchiveSource(
         data class Continue(val quota: DownloadQuota?) : Rung
     }
 
+    /**
+     * Asks for the member's download link, and asks again on another server if the first one is on
+     * a domain this connection cannot resolve — ISPs block those before anything else. Asking
+     * repeatedly for the same file is free: the site charges the allowance once per record, and
+     * counts the rest as the same download.
+     */
     private suspend fun fastDownload(base: String, candidate: Candidate, key: String): AppResult<Rung> {
-        val response = client.get("$base/dyn/api/fast_download.json") {
-            parameter("md5", candidate.md5)
-            parameter("key", key)
+        var unreachable: Rung.Ready? = null
+        for (server in AnnasConfig.FAST_DOWNLOAD_SERVERS) {
+            val response = client.get("$base/dyn/api/fast_download.json") {
+                parameter("md5", candidate.md5)
+                parameter("key", key)
+                if (server > 0) parameter("domain_index", server)
+            }
+            response.failIfMirrorBroken()
+            val payload = try {
+                json.decodeFromString<FastDownloadResponse>(response.bodyAsText())
+            } catch (e: SerializationException) {
+                return AppError.Parse("Unexpected fast-download response", e).asFailure()
+            } catch (e: IllegalArgumentException) {
+                return AppError.Parse("Unexpected fast-download response", e).asFailure()
+            }
+
+            val rung = interpret(payload, response.status, candidate)
+            // A rejected key or a spent allowance says the same thing whichever server answers.
+            if (rung !is Rung.Ready) return rung.asSuccess()
+            if (reachability.canReach(rung.request.url)) return rung.asSuccess()
+            unreachable = rung
         }
-        response.failIfMirrorBroken()
-        val payload = try {
-            json.decodeFromString<FastDownloadResponse>(response.bodyAsText())
-        } catch (e: SerializationException) {
-            return AppError.Parse("Unexpected fast-download response", e).asFailure()
-        } catch (e: IllegalArgumentException) {
-            return AppError.Parse("Unexpected fast-download response", e).asFailure()
-        }
-        return interpret(payload, response.status, candidate).asSuccess()
+        // Every server is behind the block; the free routes may still be reachable.
+        return Rung.Continue(unreachable?.request?.quota).asSuccess()
     }
 
     /**

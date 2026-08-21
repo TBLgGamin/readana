@@ -42,6 +42,7 @@ object AnnasSearchParser {
         "(?<![A-Za-z0-9])\\.?(epub|pdf|mobi|azw3|azw|djvu|fb2|cbz|cbr|txt|rtf|doc|docx|lit)(?![A-Za-z0-9])",
         RegexOption.IGNORE_CASE
     )
+    private val BARE_CODE = Regex("[a-z]{2,3}(?:-[a-z]{2,4})?")
     private val SIZE = Regex("(\\d+(?:[.,]\\d+)?)\\s?(KB|MB|GB)", RegexOption.IGNORE_CASE)
     private val YEAR = Regex("\\b(1[5-9]\\d{2}|20\\d{2})\\b")
     private val META_REFRESH = Regex("""http-equiv=["']?refresh""", RegexOption.IGNORE_CASE)
@@ -238,7 +239,12 @@ object AnnasSearchParser {
             ?.substringBeforeLast(',')
     }?.trim()?.takeIf { it.isNotBlank() && !YEAR.matches(it) }
 
+    /**
+     * The card layout writes "English [en]"; the table's own column is the bare code, sometimes a
+     * comma-separated list of them. Take the code either way, and only the first.
+     */
     private fun String.language(): String? = LANGUAGE.find(this)?.groupValues?.get(1)
+        ?: split(',', ';').firstOrNull()?.trim()?.lowercase()?.takeIf { BARE_CODE.matches(it) }
 
     private fun String.extension(): String? = EXTENSION.find(this)?.groupValues?.get(1)?.lowercase()
 

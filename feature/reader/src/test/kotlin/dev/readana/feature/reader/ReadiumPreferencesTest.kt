@@ -62,6 +62,21 @@ class ReadiumPreferencesTest {
     }
 
     @Test
+    fun `paragraph spacing replaces the publisher's indent, and takes their styles with it`() {
+        // Readium ignores both while publisher styles are on, so asking for a gap has to turn
+        // them off — otherwise the setting silently does nothing.
+        val spaced = preferences(paragraphSpacing = 0.6f)
+        assertEquals(0.6, checkNotNull(spaced.paragraphSpacing), TOLERANCE)
+        assertEquals(0.0, spaced.paragraphIndent)
+        assertEquals(false, spaced.publisherStyles)
+
+        val untouched = preferences(paragraphSpacing = 0f)
+        assertEquals(0.0, checkNotNull(untouched.paragraphSpacing), TOLERANCE)
+        assertNull(untouched.paragraphIndent, "nothing to say about indents when there is no gap")
+        assertEquals(true, untouched.publisherStyles)
+    }
+
+    @Test
     fun `a custom line height also switches publisher styles off`() {
         assertEquals(false, preferences(lineHeight = 1.8f).publisherStyles)
     }
@@ -119,8 +134,9 @@ class ReadiumPreferencesTest {
         pageMargins: Float = 1f,
         pageTurn: PageTurnMode = PageTurnMode.Paginated,
         columns: ReaderColumns = ReaderColumns.Auto,
+        paragraphSpacing: Float = 0f,
         systemInDarkTheme: Boolean = false
-    ) = settings(theme, font, fontScale, lineHeight, pageMargins, pageTurn, columns)
+    ) = settings(theme, font, fontScale, lineHeight, pageMargins, pageTurn, columns, paragraphSpacing)
         .toEpubPreferences(systemInDarkTheme)
 
     private fun settings(
@@ -130,12 +146,14 @@ class ReadiumPreferencesTest {
         lineHeight: Float = ReaderSettings().lineHeight,
         pageMargins: Float = 1f,
         pageTurn: PageTurnMode = PageTurnMode.Paginated,
-        columns: ReaderColumns = ReaderColumns.Auto
+        columns: ReaderColumns = ReaderColumns.Auto,
+        paragraphSpacing: Float = 0f
     ) = ReaderSettings(
         fontScale = fontScale,
         fontFamily = font,
         theme = theme,
         lineHeight = lineHeight,
+        paragraphSpacing = paragraphSpacing,
         pageMargins = pageMargins,
         pageTurnMode = pageTurn,
         columns = columns

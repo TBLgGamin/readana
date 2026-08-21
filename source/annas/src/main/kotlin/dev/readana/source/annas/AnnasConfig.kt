@@ -69,6 +69,13 @@ data class AnnasConfig(
         )
 
         /**
+         * Which of the member download servers to ask for, in order. The site rotates the domains
+         * it hands out and an ISP block usually takes one before the others, so a link that cannot
+         * be resolved is worth swapping for the next server rather than failing the download.
+         */
+        val FAST_DOWNLOAD_SERVERS: List<Int> = listOf(0, 1, 2)
+
+        /**
          * Partner servers to ask for a free download, in order. The site's first four numbers are
          * quicker but may put the file behind a wait-list; the later ones never wait. Starting
          * with a no-wait server usually gets a link straight away.

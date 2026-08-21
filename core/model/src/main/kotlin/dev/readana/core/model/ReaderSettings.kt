@@ -6,6 +6,12 @@ data class ReaderSettings(
     val fontFamily: ReaderFont = ReaderFont.Publisher,
     val theme: ReaderTheme = ReaderTheme.System,
     val lineHeight: Float = 1.4f,
+    /**
+     * Blank space between paragraphs, in ems. Publishers usually mark a new paragraph with an
+     * indent and no gap, which is hard going on a backlit screen, so the default adds a gap and
+     * drops the indent. Zero hands the decision back to the publisher's own styling.
+     */
+    val paragraphSpacing: Float = 0.6f,
     val pageMargins: Float = 1.0f,
     val pageTurnMode: PageTurnMode = PageTurnMode.Paginated,
     val columns: ReaderColumns = ReaderColumns.Auto,
@@ -17,6 +23,7 @@ data class ReaderSettings(
         val FONT_SCALE_RANGE = 0.6f..2.5f
         val LINE_HEIGHT_RANGE = 1.0f..2.2f
         val PAGE_MARGIN_RANGE = 0.0f..3.0f
+        val PARAGRAPH_SPACING_RANGE = 0.0f..2.0f
     }
 }
 

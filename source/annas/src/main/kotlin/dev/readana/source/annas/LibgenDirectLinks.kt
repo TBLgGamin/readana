@@ -3,7 +3,9 @@ package dev.readana.source.annas
 import dev.readana.core.common.coroutines.suspendRunCatching
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
 import org.jsoup.Jsoup
 
@@ -33,10 +35,21 @@ internal class LibgenDirectLinks(
             }.getOrNull() ?: return@forEach
 
             // Every Libgen mirror serves the same catalogue, so "not here" is not worth re-asking.
-            return directLink(html, page)?.let { Link(it, page) }
+            val link = directLink(html, page)?.let { Link(it, page) } ?: return null
+            // Its file servers go down on their own schedule, and the link says nothing about
+            // that. One byte settles it, and the link stays good afterwards.
+            return if (serves(link)) link else null
         }
         return null
     }
+
+    private suspend fun serves(link: Link): Boolean = suspendRunCatching {
+        val response = client.get(link.url) {
+            header(HttpHeaders.Range, "bytes=0-0")
+            header(HttpHeaders.Referrer, link.referer)
+        }
+        response.status.isSuccess()
+    }.getOrDefault(false)
 
     private companion object {
         fun directLink(html: String, pageUrl: String): String? = Jsoup.parse(html, pageUrl)

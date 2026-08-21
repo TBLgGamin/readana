@@ -184,7 +184,8 @@ class AnnasGateTest {
     ) = AnnasArchiveSource(
         client = HttpClient(MockEngine(handler)),
         config = { config },
-        verifier = verifier
+        verifier = verifier,
+        reachability = HostReachability.Always
     )
 
     /** The login body, so a test can prove the key is what gets posted. */

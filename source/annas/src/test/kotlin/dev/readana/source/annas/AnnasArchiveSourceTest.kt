@@ -295,6 +295,7 @@ class AnnasArchiveSourceTest {
         client = HttpClient(MockEngine(handler)),
         config = { config },
         mirrors = resolver,
+        reachability = HostReachability.Always,
         onWorkingMirror = onWorkingMirror
     )
 

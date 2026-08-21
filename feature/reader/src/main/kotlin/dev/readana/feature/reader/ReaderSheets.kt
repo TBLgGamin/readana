@@ -178,6 +178,13 @@ internal fun ReaderSettingsSheet(
                 valueRange = ReaderSettings.LINE_HEIGHT_RANGE
             )
 
+            Label(stringResource(R.string.feature_reader_paragraph_spacing))
+            Slider(
+                value = settings.paragraphSpacing,
+                onValueChange = { spacing -> onChange { it.copy(paragraphSpacing = spacing) } },
+                valueRange = ReaderSettings.PARAGRAPH_SPACING_RANGE
+            )
+
             Label(stringResource(R.string.feature_reader_margins))
             Slider(
                 value = settings.pageMargins,

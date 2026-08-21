@@ -40,6 +40,8 @@ object ResultGrouping {
      */
     private fun keyOf(result: SearchResult): String {
         val title = result.title.lowercase()
+            // "Circe : a novel" and "Circe" are the same book; catalogues disagree about subtitles.
+            .substringBefore(':')
             .replace(NOISE, " ")
             .trim()
             .replace(LEADING_ARTICLE, "")

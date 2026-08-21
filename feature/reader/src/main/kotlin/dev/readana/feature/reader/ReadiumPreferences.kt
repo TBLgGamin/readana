@@ -39,8 +39,14 @@ internal fun ReaderSettings.toEpubPreferences(systemInDarkTheme: Boolean): EpubP
         fontSize = fontScale.toDouble(),
         lineHeight = lineHeight.toDouble().coerceAtMost(MAX_LINE_HEIGHT),
         pageMargins = MARGIN_BASE + pageMargins * MARGIN_STEP,
+        // A gap between paragraphs replaces the publisher's indent; one or the other, never both,
+        // or the text ends up looking doubly broken up.
+        paragraphSpacing = paragraphSpacing.toDouble(),
+        paragraphIndent = if (paragraphSpacing > 0f) 0.0 else null,
         // Publisher styles win over our typography settings, so they go once anything is customised.
-        publisherStyles = family == null && lineHeight == ReaderSettings().lineHeight,
+        publisherStyles = family == null &&
+            lineHeight == ReaderSettings().lineHeight &&
+            paragraphSpacing == 0f,
         scroll = pageTurnMode == PageTurnMode.Scrolled,
         textColor = if (theme == ReaderTheme.Black) Color(BLACK_TEXT.toInt()) else null,
         theme = resolvedTheme

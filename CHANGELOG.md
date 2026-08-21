@@ -8,10 +8,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The reader spaces paragraphs apart. Publishers usually mark a new paragraph with an indent and
+  no gap, which is hard going on a backlit screen, so Readana now adds a gap and drops the indent —
+  adjustable, including back to the publisher's own styling, in the reader's settings sheet.
+
 - Search results group the copies of a book together. Shadow libraries index the same work many
   times over, so a page of hits was mostly repeats; now each book appears once, showing the copy
-  the app can actually open, with a "3 versions" badge that opens a picker listing every copy by
-  language, format, size and year. Nothing is hidden — the picker downloads whichever one you tap.
+  the app can actually open. Where there is more than one copy, the download button opens a picker
+  listing every one of them by language, format, size and year rather than guessing, and a badge on
+  the cover says how many there are.
 
 - Holding a book in Discover opens the same details sheet the library uses — cover, title, author,
   format, size, language, year, publisher and source — with no actions on it, since the cover it
@@ -45,6 +50,18 @@ All notable changes to this project are documented here. The format follows
   the old one.
 
 ### Fixed
+
+- Downloads work on connections whose ISP blocks Anna's Archive. The site hands out download links
+  on rotating partner domains, and a blocked one simply stops resolving — the download then spent
+  all five of its attempts on a name that was never going to resolve, and gave up. Readana now
+  checks a link resolves before starting, and asks the site for another server if it does not.
+  Asking again for the same book is free: the daily allowance is charged once per book, not per
+  link. Library Genesis links are checked the same way, with one byte, since its file servers go
+  down independently of the pages that link to them.
+- Anna's Archive results show their language again. The tabular layout writes a bare "en" where the
+  card layout writes "English [en]", and only the second was being read.
+- Copies of a book whose title carries a subtitle group with the rest of them ("Circe : a novel"
+  alongside "Circe").
 
 - A download no longer sits at "Waiting to start…" forever. Work was queued under one name per book
   and kept rather than replaced, so a new attempt was silently dropped whenever an older one was

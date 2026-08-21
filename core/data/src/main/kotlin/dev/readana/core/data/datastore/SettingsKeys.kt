@@ -15,6 +15,7 @@ internal object SettingsKeys {
     val FONT_FAMILY = stringPreferencesKey("reader_font_family")
     val THEME = stringPreferencesKey("reader_theme")
     val LINE_HEIGHT = floatPreferencesKey("reader_line_height")
+    val PARAGRAPH_SPACING = floatPreferencesKey("reader_paragraph_spacing")
     val PAGE_MARGINS = floatPreferencesKey("reader_page_margins")
     val PAGE_TURN_MODE = stringPreferencesKey("reader_page_turn_mode")
     val COLUMNS = stringPreferencesKey("reader_columns")
@@ -48,6 +49,7 @@ internal fun Preferences.toReaderSettings(): ReaderSettings {
         fontFamily = enumOrDefault(this[SettingsKeys.FONT_FAMILY], defaults.fontFamily),
         theme = enumOrDefault(this[SettingsKeys.THEME], defaults.theme),
         lineHeight = this[SettingsKeys.LINE_HEIGHT] ?: defaults.lineHeight,
+        paragraphSpacing = this[SettingsKeys.PARAGRAPH_SPACING] ?: defaults.paragraphSpacing,
         pageMargins = this[SettingsKeys.PAGE_MARGINS] ?: defaults.pageMargins,
         pageTurnMode = enumOrDefault(this[SettingsKeys.PAGE_TURN_MODE], defaults.pageTurnMode),
         columns = enumOrDefault(this[SettingsKeys.COLUMNS], defaults.columns),
@@ -62,6 +64,7 @@ internal fun MutablePreferences.write(settings: ReaderSettings) {
     this[SettingsKeys.FONT_FAMILY] = settings.fontFamily.name
     this[SettingsKeys.THEME] = settings.theme.name
     this[SettingsKeys.LINE_HEIGHT] = settings.lineHeight
+    this[SettingsKeys.PARAGRAPH_SPACING] = settings.paragraphSpacing
     this[SettingsKeys.PAGE_MARGINS] = settings.pageMargins
     this[SettingsKeys.PAGE_TURN_MODE] = settings.pageTurnMode.name
     this[SettingsKeys.COLUMNS] = settings.columns.name

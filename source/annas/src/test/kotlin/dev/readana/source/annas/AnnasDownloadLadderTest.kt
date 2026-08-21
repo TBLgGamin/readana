@@ -51,7 +51,8 @@ class AnnasDownloadLadderTest {
             "https://libgen.li/ads.php?md5=d6e1dc51a50726f00ec438af21952a45",
             request.headers[HttpHeaders.Referrer]
         )
-        assertEquals(listOf("libgen.li"), hosts, "Anna's Archive was not needed at all")
+        // The link page, then one byte to check the file server is actually up.
+        assertEquals(listOf("libgen.li", "libgen.li"), hosts, "Anna's Archive was not needed at all")
     }
 
     @Test
@@ -69,7 +70,27 @@ class AnnasDownloadLadderTest {
         val request = assertNotNull(source.resolveDownload(result()).getOrNull())
 
         assertContains(request.url, "libgen.vg")
-        assertEquals(listOf("libgen.li", "libgen.la", "libgen.vg"), hosts)
+        assertEquals(listOf("libgen.li", "libgen.la", "libgen.vg", "libgen.vg"), hosts)
+    }
+
+    @Test
+    fun `a Library Genesis file server that is down falls through to a partner server`() = runTest {
+        // The link page is fine; the file server behind it is not. Only asking for a byte finds out.
+        val source = source(AnnasConfig(mirrors)) { request ->
+            when {
+                request.url.encodedPath == "/ads.php" ->
+                    respond(libgenPage, HttpStatusCode.OK, htmlHeaders)
+
+                request.url.encodedPath == "/get.php" ->
+                    respondError(HttpStatusCode.ServiceUnavailable)
+
+                else -> respond(slowLink, HttpStatusCode.OK, htmlHeaders)
+            }
+        }
+
+        val request = assertNotNull(source.resolveDownload(result()).getOrNull())
+
+        assertContains(request.url, "momot.example")
     }
 
     @Test
@@ -136,6 +157,63 @@ class AnnasDownloadLadderTest {
     }
 
     @Test
+    fun `a member link on a blocked domain is swapped for another server`() = runTest {
+        // What an ISP block looks like: the site hands out a perfectly good link on a domain this
+        // connection cannot resolve. Asking again for the same file is free, so ask another server.
+        val asked = mutableListOf<String?>()
+        val source = AnnasArchiveSource(
+            client = HttpClient(
+                MockEngine { request ->
+                    asked += request.url.parameters["domain_index"]
+                    val server = request.url.parameters["domain_index"] ?: "0"
+                    val host = if (server == "0") "blocked.test" else "reachable.test"
+                    respond(
+                        """{"download_url":"https://$host/d4/x/${'$'}md5.epub",""" +
+                            """"account_fast_download_info":{"downloads_left":9,"downloads_per_day":25}}""",
+                        HttpStatusCode.OK,
+                        jsonHeaders
+                    )
+                }
+            ),
+            config = { AnnasConfig(mirrors, secretKey = "s3cr3t") },
+            reachability = { url -> !url.contains("blocked.test") }
+        )
+
+        val request = assertNotNull(source.resolveDownload(result()).getOrNull())
+
+        assertContains(request.url, "reachable.test")
+        assertEquals(listOf(null, "1"), asked, "the blocked server is tried once, then the next")
+        assertEquals(9, request.quota?.remaining)
+    }
+
+    @Test
+    fun `when every member server is blocked the free routes still get a turn`() = runTest {
+        val source = AnnasArchiveSource(
+            client = HttpClient(
+                MockEngine { request ->
+                    when {
+                        request.url.encodedPath.endsWith("fast_download.json") -> respond(
+                            """{"download_url":"https://blocked.test/d4/x/y.epub",""" +
+                                """"account_fast_download_info":{"downloads_left":9}}""",
+                            HttpStatusCode.OK,
+                            jsonHeaders
+                        )
+
+                        else -> respond(libgenPage, HttpStatusCode.OK, htmlHeaders)
+                    }
+                }
+            ),
+            config = { AnnasConfig(mirrors, secretKey = "s3cr3t") },
+            reachability = { url -> !url.contains("blocked.test") }
+        )
+
+        val request = assertNotNull(source.resolveDownload(result()).getOrNull())
+
+        assertContains(request.url, "libgen.li")
+        assertEquals(9, request.quota?.remaining, "the allowance is still worth reporting")
+    }
+
+    @Test
     fun `a spent membership allowance takes the free route instead of the browser`() = runTest {
         val source = source(AnnasConfig(mirrors, secretKey = "s3cr3t")) { request ->
             when {
@@ -189,7 +267,8 @@ class AnnasDownloadLadderTest {
 
     private fun source(config: AnnasConfig, handler: MockRequestHandler) = AnnasArchiveSource(
         client = HttpClient(MockEngine(handler)),
-        config = { config }
+        config = { config },
+        reachability = HostReachability.Always
     )
 
     private val htmlHeaders = headersOf(HttpHeaders.ContentType, "text/html")

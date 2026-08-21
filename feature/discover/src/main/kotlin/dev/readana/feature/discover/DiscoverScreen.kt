@@ -363,7 +363,10 @@ private fun ResultGrid(
         items(results, key = { it.key }) { group ->
             ResultCard(
                 group = group,
-                onDownload = { onDownload(group.best) },
+                // With more than one copy to choose from, ask rather than guess.
+                onDownload = {
+                    if (group.hasChoices) onShowEditions(group) else onDownload(group.best)
+                },
                 onShowDetails = { onShowDetails(group.best) },
                 onShowEditions = { onShowEditions(group) }
             )
