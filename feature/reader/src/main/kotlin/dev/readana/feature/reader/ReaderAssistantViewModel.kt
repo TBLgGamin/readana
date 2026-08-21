@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.readana.ai.client.ReadingContext
 import dev.readana.ai.client.ReadingContextBuilder
+import dev.readana.core.common.coroutines.Dispatcher
+import dev.readana.core.common.coroutines.ReadanaDispatchers
 import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
 import dev.readana.core.data.ai.AiAssistant
@@ -21,6 +23,7 @@ import dev.readana.core.model.Book
 import java.time.Duration
 import java.time.Instant
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +31,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.readium.r2.shared.publication.Locator
 
 /** One turn of a conversation, as the sheet shows it. */
@@ -78,7 +82,8 @@ internal class ReaderAssistantViewModel @Inject constructor(
     private val threadsRepository: AiThreadsRepository,
     private val settingsRepository: SettingsRepository,
     private val libraryRepository: LibraryRepository,
-    private val sessionStore: ReaderSessionStore
+    private val sessionStore: ReaderSessionStore,
+    @Dispatcher(ReadanaDispatchers.IO) private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AssistantUiState())
     val uiState: StateFlow<AssistantUiState> = _uiState.asStateFlow()
@@ -270,12 +275,18 @@ internal class ReaderAssistantViewModel @Inject constructor(
         }
     }
 
-    /** Reads the book backwards from the anchor, never past the selected passage. */
-    private suspend fun gather(anchor: Locator?, selectionText: String?): ReadingContext {
+    /**
+     * Reads the book backwards from the anchor, never past the selected passage.
+     *
+     * Walking the publication parses XHTML resources off disk, which must not happen on the main
+     * thread: Explain streams the moment the walk finishes, so a blocked main thread showed a
+     * spinner that never went away. (Ask hid the same stall behind the time spent typing.)
+     */
+    private suspend fun gather(anchor: Locator?, selectionText: String?): ReadingContext = withContext(ioDispatcher) {
         val walker = sessionStore.session?.textWalker?.invoke(anchor)
-            ?: return ReadingContext(text = "", truncatedAtStart = false)
+            ?: return@withContext ReadingContext(text = "", truncatedAtStart = false)
         val budget = settingsRepository.aiSettings.first().contextSize.maxChars
-        return ReadingContextBuilder(budget).build(walker, selectionText)
+        ReadingContextBuilder(budget).build(walker, selectionText)
     }
 
     private suspend fun stream(thread: AiThread, question: String?) {

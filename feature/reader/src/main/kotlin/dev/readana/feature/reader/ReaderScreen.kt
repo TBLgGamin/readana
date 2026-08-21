@@ -268,6 +268,8 @@ private fun ReadingSurface(
             onSeek = onSeek,
             onShowContents = { onShowSheet(ReaderSheet.Contents) },
             onShowSettings = { onShowSheet(ReaderSheet.Settings) },
+            onShowConversations = { onShowSheet(ReaderSheet.Conversations) },
+            conversationsAvailable = assistant.enabled || assistant.threads.isNotEmpty(),
             modifier = Modifier.align(Alignment.BottomCenter)
         )
         AnimatedVisibility(
@@ -290,15 +292,19 @@ private fun ReadingSurface(
         ReaderSheet.Contents -> ReaderContentsSheet(
             toc = state.toc,
             bookmarks = state.bookmarks,
-            conversations = assistant.threads,
             onSelectChapter = onSelectChapter,
             onSelectBookmark = onSelectBookmark,
             onDeleteBookmark = onDeleteBookmark,
-            onOpenConversation = { id ->
+            onDismiss = onDismissSheet
+        )
+
+        ReaderSheet.Conversations -> ReaderConversationsSheet(
+            threads = assistant.threads,
+            onOpen = { id ->
                 onDismissSheet()
                 onOpenConversation(id)
             },
-            onDeleteConversation = onDeleteConversation,
+            onDelete = onDeleteConversation,
             onDismiss = onDismissSheet
         )
 

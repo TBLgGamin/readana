@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The reader's bottom bar has a conversations button next to contents and settings, listing every
+  chat held about the book, newest first, and reopening any of them.
+
 - Selecting text in the reader now offers **Ask** and **Explain** alongside Highlight, and a book
   reopened after a while offers **Where was I?** — a recap of the story so far. All three are built
   so they cannot spoil the book: the assistant is only ever given the text above the reader's
@@ -79,6 +82,10 @@ All notable changes to this project are documented here. The format follows
   the old one.
 
 ### Fixed
+
+- Explain no longer sits on a spinner forever. Reading back through the book to gather the context
+  ran on the main thread, so the answer could not be drawn while it worked; Ask hid the same stall
+  behind the seconds spent typing a question.
 
 - An API key typed into the reading assistant's settings is saved as it is typed rather than only
   when the field loses focus, and a provider can be picked before it is finished. Pasting a key and

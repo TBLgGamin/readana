@@ -61,7 +61,8 @@ class ReaderAssistantViewModelTest {
         threadsRepository = threads,
         settingsRepository = settings,
         libraryRepository = library,
-        sessionStore = sessionStore
+        sessionStore = sessionStore,
+        ioDispatcher = mainDispatcherRule.testDispatcher
     )
 
     @Test

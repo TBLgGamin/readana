@@ -37,7 +37,7 @@ import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.services.search.SearchIterator
 
 /** Which sheet, if any, is covering the page. */
-internal enum class ReaderSheet { None, Contents, Settings, Search }
+internal enum class ReaderSheet { None, Contents, Settings, Search, Conversations }
 
 /** A marked passage as the reader shows it. */
 internal data class HighlightItem(

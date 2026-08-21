@@ -40,6 +40,9 @@ internal fun ReaderBottomBar(
     onSeek: (Float) -> Unit,
     onShowContents: () -> Unit,
     onShowSettings: () -> Unit,
+    onShowConversations: () -> Unit,
+    /** The assistant's button is only there once there is an assistant to talk to. */
+    conversationsAvailable: Boolean,
     modifier: Modifier = Modifier
 ) {
     AnimatedVisibility(
@@ -73,6 +76,16 @@ internal fun ReaderBottomBar(
                                 ReadanaIcons.Library,
                                 contentDescription = stringResource(R.string.feature_reader_contents)
                             )
+                        }
+                        if (conversationsAvailable) {
+                            IconButton(onClick = onShowConversations) {
+                                Icon(
+                                    ReadanaIcons.Conversations,
+                                    contentDescription = stringResource(
+                                        R.string.feature_reader_ai_conversations
+                                    )
+                                )
+                            }
                         }
                         IconButton(onClick = onShowSettings) {
                             Icon(

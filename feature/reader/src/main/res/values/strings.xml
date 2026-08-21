@@ -50,4 +50,6 @@
     <string name="feature_reader_ai_recap_dismiss">Not now</string>
     <string name="feature_reader_ai_conversations">Conversations</string>
     <string name="feature_reader_ai_delete">Delete this conversation</string>
+    <string name="feature_reader_ai_conversations_empty">No conversations yet</string>
+    <string name="feature_reader_ai_conversations_empty_help">Select a passage and choose Ask or Explain, and the conversation will be kept here.</string>
 </resources>

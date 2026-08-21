@@ -2,6 +2,7 @@ package dev.readana.core.designsystem
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -48,4 +49,7 @@ object ReadanaIcons {
     val Assistant: ImageVector = Icons.Filled.AutoAwesome
 
     val Send: ImageVector = Icons.AutoMirrored.Filled.Send
+
+    /** Saved conversations with the assistant. */
+    val Conversations: ImageVector = Icons.AutoMirrored.Filled.Chat
 }

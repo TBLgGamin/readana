@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.readana.core.common.result.AppError
 import dev.readana.core.designsystem.ReadanaIcons
+import dev.readana.core.designsystem.component.EmptyState
 import dev.readana.core.designsystem.component.WavyProgress
 import dev.readana.core.model.AiThreadKind
 import kotlin.math.roundToInt
@@ -287,30 +288,48 @@ internal fun RecapOffer(daysAway: Int, onAccept: () -> Unit, onDismiss: () -> Un
 }
 
 /**
- * The saved conversations for a book. Written as rows of the contents sheet's own list rather than
- * a list of its own, so the sheet keeps one scroll.
+ * Every conversation held about this book, newest first. Its own sheet rather than a section of
+ * the contents, so it is one tap from the reading chrome and scrolls on its own.
  */
-internal fun LazyListScope.conversationItems(
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ReaderConversationsSheet(
     threads: List<ThreadItem>,
     onOpen: (Long) -> Unit,
-    onDelete: (Long) -> Unit
+    onDelete: (Long) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    if (threads.isEmpty()) return
-    item { ConversationsHeader() }
-    items(threads, key = { "ai-" + it.id }) { thread ->
-        ListItem(
-            headlineContent = { Text(thread.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-            modifier = Modifier.clickable { onOpen(thread.id) },
-            leadingContent = { Icon(thread.kind.icon(), contentDescription = null) },
-            trailingContent = {
-                IconButton(onClick = { onDelete(thread.id) }) {
-                    Icon(
-                        ReadanaIcons.Delete,
-                        contentDescription = stringResource(R.string.feature_reader_ai_delete)
-                    )
-                }
+    ModalBottomSheet(onDismissRequest = onDismiss, modifier = modifier) {
+        if (threads.isEmpty()) {
+            EmptyState(
+                icon = ReadanaIcons.Conversations,
+                title = stringResource(R.string.feature_reader_ai_conversations_empty),
+                description = stringResource(R.string.feature_reader_ai_conversations_empty_help)
+            )
+            return@ModalBottomSheet
+        }
+        LazyColumn {
+            item { ConversationsHeader() }
+            items(threads, key = { it.id }) { thread ->
+                ListItem(
+                    headlineContent = {
+                        Text(thread.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    },
+                    modifier = Modifier.clickable { onOpen(thread.id) },
+                    supportingContent = { Text(stringResource(thread.kind.titleRes())) },
+                    leadingContent = { Icon(thread.kind.icon(), contentDescription = null) },
+                    trailingContent = {
+                        IconButton(onClick = { onDelete(thread.id) }) {
+                            Icon(
+                                ReadanaIcons.Delete,
+                                contentDescription = stringResource(R.string.feature_reader_ai_delete)
+                            )
+                        }
+                    }
+                )
             }
-        )
+        }
     }
 }
 
