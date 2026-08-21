@@ -14,4 +14,7 @@ dependencies {
     api(libs.androidx.compose.runtime)
     api(libs.androidx.compose.ui)
     api(libs.androidx.compose.ui.tooling.preview)
+
+    // Covers are files that the importer extracted, so Coil's core is enough (no network fetcher).
+    implementation(libs.coil.compose)
 }

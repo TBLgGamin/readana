@@ -2,5 +2,34 @@
 <resources>
     <string name="feature_library_title">Library</string>
     <string name="feature_library_empty_title">Your library is empty</string>
-    <string name="feature_library_empty_description">Books you download or import will appear here.</string>
+    <string name="feature_library_empty_description">Add EPUB or PDF files with the button below, or download books from Discover.</string>
+    <string name="feature_library_import">Add books</string>
+    <string name="feature_library_importing">Importing…</string>
+    <string name="feature_library_search_placeholder">Search title or author</string>
+    <string name="feature_library_search_clear">Clear search</string>
+    <string name="feature_library_sort">Sort</string>
+    <string name="feature_library_sort_recent">Recently read</string>
+    <string name="feature_library_sort_title">Title</string>
+    <string name="feature_library_sort_author">Author</string>
+    <string name="feature_library_no_results_title">No matching books</string>
+    <string name="feature_library_no_results_description">Nothing in your library matches that search.</string>
+    <string name="feature_library_import_success">Added “%1$s”</string>
+    <string name="feature_library_import_duplicate">“%1$s” is already in your library</string>
+    <string name="feature_library_import_failed">Import failed: %1$s</string>
+    <string name="feature_library_deleted">Deleted “%1$s”</string>
+    <string name="feature_library_delete_failed">Could not delete: %1$s</string>
+    <string name="feature_library_details_format">Format</string>
+    <string name="feature_library_details_size">Size</string>
+    <string name="feature_library_details_added">Added</string>
+    <string name="feature_library_details_language">Language</string>
+    <string name="feature_library_details_location">File</string>
+    <string name="feature_library_details_progress">Progress</string>
+    <string name="feature_library_details_progress_value">%1$d%% read</string>
+    <string name="feature_library_details_open">Read</string>
+    <string name="feature_library_details_delete">Delete</string>
+    <string name="feature_library_details_unknown">Unknown</string>
+    <string name="feature_library_delete_dialog_title">Delete “%1$s”?</string>
+    <string name="feature_library_delete_dialog_message">This removes the book from your library and deletes its file.</string>
+    <string name="feature_library_delete_dialog_confirm">Delete</string>
+    <string name="feature_library_delete_dialog_cancel">Cancel</string>
 </resources>

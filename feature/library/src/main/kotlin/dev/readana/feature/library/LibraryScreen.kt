@@ -1,6 +1,9 @@
 package dev.readana.feature.library
 
-import androidx.compose.foundation.clickable
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,14 +15,28 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -28,7 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.readana.core.designsystem.ReadanaIcons
-import dev.readana.core.designsystem.component.BookCoverPlaceholder
+import dev.readana.core.designsystem.component.BookCover
 import dev.readana.core.designsystem.component.EmptyState
 import dev.readana.core.designsystem.component.LoadingState
 import dev.readana.core.designsystem.theme.ReadanaTheme
@@ -37,6 +54,12 @@ import dev.readana.core.model.BookFormat
 import dev.readana.core.model.ReadingProgress
 import java.time.Instant
 
+/** MIME types the system file picker offers when importing. */
+private val ImportMimeTypes = arrayOf("application/epub+zip", "application/pdf")
+
+private val CoverMinSize = 150.dp
+private val GridSpacing = 16.dp
+
 @Composable
 internal fun LibraryRoute(
     onOpenBook: (bookId: String) -> Unit,
@@ -44,7 +67,26 @@ internal fun LibraryRoute(
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    LibraryScreen(uiState = uiState, onOpenBook = onOpenBook, modifier = modifier)
+    // Files are copied straight away, so the one-shot read grant the picker returns is enough.
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            viewModel.importFiles(uris.map(Uri::toString))
+        }
+    }
+    LibraryScreen(
+        uiState = uiState,
+        onOpenBook = onOpenBook,
+        onImport = { importLauncher.launch(ImportMimeTypes) },
+        onQueryChange = viewModel::onQueryChange,
+        onSortChange = viewModel::onSortChange,
+        onShowDetails = viewModel::setDetails,
+        onRequestDelete = viewModel::setPendingDelete,
+        onConfirmDelete = viewModel::confirmDelete,
+        onDismissMessage = viewModel::consumeMessage,
+        modifier = modifier
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,50 +94,200 @@ internal fun LibraryRoute(
 internal fun LibraryScreen(
     uiState: LibraryUiState,
     onOpenBook: (bookId: String) -> Unit,
+    onImport: () -> Unit,
+    onQueryChange: (String) -> Unit,
+    onSortChange: (LibrarySort) -> Unit,
+    onShowDetails: (Book?) -> Unit,
+    onRequestDelete: (Book?) -> Unit,
+    onConfirmDelete: () -> Unit,
+    onDismissMessage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val messageText = uiState.message?.let { messageText(it) }
+    val currentOnMessageShown by rememberUpdatedState(onDismissMessage)
+    LaunchedEffect(messageText) {
+        if (messageText != null) {
+            snackbarHostState.showSnackbar(messageText)
+            currentOnMessageShown()
+        }
+    }
+
     Scaffold(
         modifier = modifier,
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.feature_library_title)) }) }
-    ) { padding ->
-        when (uiState) {
-            LibraryUiState.Loading -> LoadingState(Modifier.padding(padding))
-
-            LibraryUiState.Empty -> EmptyState(
-                icon = ReadanaIcons.Library,
-                title = stringResource(R.string.feature_library_empty_title),
-                description = stringResource(R.string.feature_library_empty_description),
-                modifier = Modifier.padding(padding)
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.feature_library_title)) },
+                actions = {
+                    if (!uiState.libraryIsEmpty) {
+                        SortMenu(sort = uiState.sort, onSortChange = onSortChange)
+                    }
+                }
             )
-
-            is LibraryUiState.Loaded -> BookGrid(
-                books = uiState.books,
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onImport) {
+                Icon(
+                    ReadanaIcons.Add,
+                    contentDescription = stringResource(R.string.feature_library_import)
+                )
+            }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+        ) {
+            if (!uiState.libraryIsEmpty) {
+                SearchField(query = uiState.query, onQueryChange = onQueryChange)
+            }
+            if (uiState.activeImports > 0) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+                Text(
+                    text = stringResource(R.string.feature_library_importing),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = GridSpacing, vertical = 4.dp)
+                )
+            }
+            LibraryContent(
+                uiState = uiState,
                 onOpenBook = onOpenBook,
-                modifier = Modifier.padding(padding)
+                onShowDetails = onShowDetails
+            )
+        }
+    }
+
+    uiState.detailsBook?.let { book ->
+        BookDetailsSheet(
+            book = book,
+            onOpen = {
+                onShowDetails(null)
+                onOpenBook(book.id)
+            },
+            onDelete = { onRequestDelete(book) },
+            onDismiss = { onShowDetails(null) }
+        )
+    }
+    uiState.pendingDelete?.let { book ->
+        DeleteBookDialog(
+            book = book,
+            onConfirm = onConfirmDelete,
+            onDismiss = { onRequestDelete(null) }
+        )
+    }
+}
+
+@Composable
+private fun LibraryContent(
+    uiState: LibraryUiState,
+    onOpenBook: (bookId: String) -> Unit,
+    onShowDetails: (Book?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    when {
+        uiState.isLoading -> LoadingState(modifier)
+
+        uiState.libraryIsEmpty -> EmptyState(
+            icon = ReadanaIcons.Library,
+            title = stringResource(R.string.feature_library_empty_title),
+            description = stringResource(R.string.feature_library_empty_description),
+            modifier = modifier
+        )
+
+        uiState.books.isEmpty() -> EmptyState(
+            icon = ReadanaIcons.Discover,
+            title = stringResource(R.string.feature_library_no_results_title),
+            description = stringResource(R.string.feature_library_no_results_description),
+            modifier = modifier
+        )
+
+        else -> BookGrid(
+            books = uiState.books,
+            onOpenBook = onOpenBook,
+            onShowDetails = onShowDetails,
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
+private fun SearchField(query: String, onQueryChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = GridSpacing, vertical = 8.dp),
+        placeholder = { Text(stringResource(R.string.feature_library_search_placeholder)) },
+        leadingIcon = { Icon(ReadanaIcons.Discover, contentDescription = null) },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(
+                        ReadanaIcons.Close,
+                        contentDescription = stringResource(R.string.feature_library_search_clear)
+                    )
+                }
+            }
+        },
+        singleLine = true
+    )
+}
+
+@Composable
+private fun SortMenu(sort: LibrarySort, onSortChange: (LibrarySort) -> Unit, modifier: Modifier = Modifier) {
+    var expanded by remember { mutableStateOf(false) }
+    IconButton(onClick = { expanded = true }, modifier = modifier) {
+        Icon(ReadanaIcons.Sort, contentDescription = stringResource(R.string.feature_library_sort))
+    }
+    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        LibrarySort.entries.forEach { option ->
+            DropdownMenuItem(
+                text = { Text(stringResource(option.labelRes())) },
+                leadingIcon = { RadioButton(selected = option == sort, onClick = null) },
+                onClick = {
+                    onSortChange(option)
+                    expanded = false
+                }
             )
         }
     }
 }
 
 @Composable
-private fun BookGrid(books: List<Book>, onOpenBook: (bookId: String) -> Unit, modifier: Modifier = Modifier) {
+private fun BookGrid(
+    books: List<Book>,
+    onOpenBook: (bookId: String) -> Unit,
+    onShowDetails: (Book?) -> Unit,
+    modifier: Modifier = Modifier
+) {
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 150.dp),
+        columns = GridCells.Adaptive(minSize = CoverMinSize),
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(GridSpacing),
+        horizontalArrangement = Arrangement.spacedBy(GridSpacing),
+        verticalArrangement = Arrangement.spacedBy(GridSpacing)
     ) {
         items(books, key = { it.id }) { book ->
-            BookCard(book = book, onClick = { onOpenBook(book.id) })
+            BookCard(
+                book = book,
+                onClick = { onOpenBook(book.id) },
+                onLongClick = { onShowDetails(book) }
+            )
         }
     }
 }
 
 @Composable
-private fun BookCard(book: Book, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.clickable(onClick = onClick)) {
-        BookCoverPlaceholder(title = book.title, modifier = Modifier.fillMaxWidth())
+private fun BookCard(book: Book, onClick: () -> Unit, onLongClick: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)) {
+        BookCover(
+            title = book.title,
+            coverUri = book.coverUri,
+            modifier = Modifier.fillMaxWidth()
+        )
         Spacer(Modifier.height(8.dp))
         Text(
             text = book.title,
@@ -121,19 +313,52 @@ private fun BookCard(book: Book, onClick: () -> Unit, modifier: Modifier = Modif
     }
 }
 
+private fun LibrarySort.labelRes(): Int = when (this) {
+    LibrarySort.Recent -> R.string.feature_library_sort_recent
+    LibrarySort.Title -> R.string.feature_library_sort_title
+    LibrarySort.Author -> R.string.feature_library_sort_author
+}
+
+@Composable
+private fun messageText(message: LibraryMessage): String = when (message) {
+    is LibraryMessage.Imported -> stringResource(R.string.feature_library_import_success, message.title)
+
+    is LibraryMessage.Duplicate -> stringResource(R.string.feature_library_import_duplicate, message.title)
+
+    is LibraryMessage.ImportFailed -> stringResource(
+        R.string.feature_library_import_failed,
+        message.error.message
+    )
+
+    is LibraryMessage.Deleted -> stringResource(R.string.feature_library_deleted, message.title)
+
+    is LibraryMessage.DeleteFailed -> stringResource(
+        R.string.feature_library_delete_failed,
+        message.error.message
+    )
+}
+
 @Preview(showBackground = true, widthDp = 800, heightDp = 600)
 @Composable
 private fun LibraryScreenPreview() {
     ReadanaTheme {
         LibraryScreen(
-            uiState = LibraryUiState.Loaded(
-                listOf(
+            uiState = LibraryUiState(
+                isLoading = false,
+                books = listOf(
                     previewBook("1", "Pride and Prejudice", "Jane Austen", progress = 0.42f),
                     previewBook("2", "Moby-Dick; or, The Whale", "Herman Melville"),
                     previewBook("3", "Frankenstein", "Mary Shelley", progress = 0.9f)
                 )
             ),
-            onOpenBook = {}
+            onOpenBook = {},
+            onImport = {},
+            onQueryChange = {},
+            onSortChange = {},
+            onShowDetails = {},
+            onRequestDelete = {},
+            onConfirmDelete = {},
+            onDismissMessage = {}
         )
     }
 }
@@ -141,18 +366,30 @@ private fun LibraryScreenPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun LibraryScreenEmptyPreview() {
-    ReadanaTheme { LibraryScreen(uiState = LibraryUiState.Empty, onOpenBook = {}) }
+    ReadanaTheme {
+        LibraryScreen(
+            uiState = LibraryUiState(isLoading = false, libraryIsEmpty = true),
+            onOpenBook = {},
+            onImport = {},
+            onQueryChange = {},
+            onSortChange = {},
+            onShowDetails = {},
+            onRequestDelete = {},
+            onConfirmDelete = {},
+            onDismissMessage = {}
+        )
+    }
 }
 
-private fun previewBook(id: String, title: String, author: String, progress: Float? = null) = Book(
+internal fun previewBook(id: String, title: String, author: String, progress: Float? = null) = Book(
     id = id,
     title = title,
     authors = listOf(author),
     language = "en",
     format = BookFormat.EPUB,
-    fileUri = "content://preview/$id",
+    fileUri = "file:///storage/emulated/0/Books/$id.epub",
     coverUri = null,
-    sizeBytes = null,
+    sizeBytes = 1_248_576,
     addedAt = Instant.EPOCH,
     lastOpenedAt = null,
     progress = progress?.let { ReadingProgress("{}", it) },

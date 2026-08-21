@@ -22,13 +22,15 @@ class SettingsViewModel @Inject constructor(
     private val sources: BookSourceRegistry
 ) : ViewModel() {
     val uiState: StateFlow<SettingsUiState> =
-        combine(settingsRepository.readerSettings, settingsRepository.sourceSettings) {
-                reader,
-                sourceSettings
-            ->
+        combine(
+            settingsRepository.readerSettings,
+            settingsRepository.sourceSettings,
+            settingsRepository.libraryFolderUri
+        ) { reader, sourceSettings, libraryFolderUri ->
             SettingsUiState.Loaded(
                 reader = reader,
                 sources = sourceSettings,
+                libraryFolderUri = libraryFolderUri,
                 sourceToggles = sources.all.map { source ->
                     SourceToggle(
                         id = source.id.value,
@@ -58,6 +60,11 @@ class SettingsViewModel @Inject constructor(
 
     fun setVolumeKeysTurnPages(enabled: Boolean) = updateReader {
         it.copy(volumeKeysTurnPages = enabled)
+    }
+
+    /** Persisted SAF tree URI of the library folder; null puts new books back in app storage. */
+    fun setLibraryFolder(uri: String?) {
+        viewModelScope.launch { settingsRepository.setLibraryFolderUri(uri) }
     }
 
     fun setSourceEnabled(sourceId: String, enabled: Boolean) = updateSources {
@@ -91,6 +98,10 @@ data class SourceToggle(val id: String, val name: String, val enabled: Boolean)
 sealed interface SettingsUiState {
     data object Loading : SettingsUiState
 
-    data class Loaded(val reader: ReaderSettings, val sources: SourceSettings, val sourceToggles: List<SourceToggle>) :
-        SettingsUiState
+    data class Loaded(
+        val reader: ReaderSettings,
+        val sources: SourceSettings,
+        val sourceToggles: List<SourceToggle>,
+        val libraryFolderUri: String? = null
+    ) : SettingsUiState
 }

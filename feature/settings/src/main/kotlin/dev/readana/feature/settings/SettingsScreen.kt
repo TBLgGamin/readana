@@ -1,5 +1,9 @@
 package dev.readana.feature.settings
 
+import android.content.Context
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,10 +12,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -25,9 +31,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.readana.core.designsystem.component.LoadingState
@@ -35,6 +43,9 @@ import dev.readana.core.model.PageTurnMode
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.ReaderTheme
 import dev.readana.core.model.SourceSettings
+
+private const val PERSISTABLE_FLAGS =
+    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
 
 @Composable
 internal fun SettingsRoute(modifier: Modifier = Modifier, viewModel: SettingsViewModel = hiltViewModel()) {
@@ -46,6 +57,7 @@ internal fun SettingsRoute(modifier: Modifier = Modifier, viewModel: SettingsVie
         onPageTurnModeChange = viewModel::setPageTurnMode,
         onKeepScreenOnChange = viewModel::setKeepScreenOn,
         onVolumeKeysChange = viewModel::setVolumeKeysTurnPages,
+        onLibraryFolderChange = viewModel::setLibraryFolder,
         onSourceEnabledChange = viewModel::setSourceEnabled,
         onAnnasMirrorsChange = viewModel::setAnnasMirrors,
         onAnnasSecretKeyChange = viewModel::setAnnasSecretKey,
@@ -62,6 +74,7 @@ internal fun SettingsScreen(
     onPageTurnModeChange: (PageTurnMode) -> Unit,
     onKeepScreenOnChange: (Boolean) -> Unit,
     onVolumeKeysChange: (Boolean) -> Unit,
+    onLibraryFolderChange: (String?) -> Unit,
     onSourceEnabledChange: (sourceId: String, enabled: Boolean) -> Unit,
     onAnnasMirrorsChange: (String) -> Unit,
     onAnnasSecretKeyChange: (String) -> Unit,
@@ -89,6 +102,11 @@ internal fun SettingsScreen(
                     onPageTurnModeChange = onPageTurnModeChange,
                     onKeepScreenOnChange = onKeepScreenOnChange,
                     onVolumeKeysChange = onVolumeKeysChange
+                )
+                HorizontalDivider()
+                StorageSection(
+                    libraryFolderUri = uiState.libraryFolderUri,
+                    onLibraryFolderChange = onLibraryFolderChange
                 )
                 HorizontalDivider()
                 SourcesSection(
@@ -149,6 +167,67 @@ private fun ReaderSection(
             checked = settings.volumeKeysTurnPages,
             onCheckedChange = onVolumeKeysChange
         )
+    }
+}
+
+/**
+ * Where imported books are written (ADR 0007). A picked folder needs a persisted permission so it
+ * survives restarts; clearing it releases that permission again.
+ */
+@Composable
+private fun StorageSection(
+    libraryFolderUri: String?,
+    onLibraryFolderChange: (String?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val folderLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(uri, PERSISTABLE_FLAGS)
+            onLibraryFolderChange(uri.toString())
+        }
+    }
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle(stringResource(R.string.feature_settings_section_storage))
+        Text(stringResource(R.string.feature_settings_library_folder))
+        Text(
+            text = libraryFolderUri?.let { folderLabel(it) }
+                ?: stringResource(R.string.feature_settings_library_folder_default),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { folderLauncher.launch(null) }) {
+                Text(stringResource(R.string.feature_settings_library_folder_pick))
+            }
+            if (libraryFolderUri != null) {
+                OutlinedButton(
+                    onClick = {
+                        releaseFolder(context, libraryFolderUri)
+                        onLibraryFolderChange(null)
+                    }
+                ) {
+                    Text(stringResource(R.string.feature_settings_library_folder_clear))
+                }
+            }
+        }
+        Text(
+            text = stringResource(R.string.feature_settings_library_folder_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** Shows `primary:Books` rather than the whole opaque tree URI. */
+private fun folderLabel(treeUri: String): String = treeUri.toUri().lastPathSegment ?: treeUri
+
+private fun releaseFolder(context: Context, treeUri: String) {
+    runCatching {
+        context.contentResolver.releasePersistableUriPermission(treeUri.toUri(), PERSISTABLE_FLAGS)
     }
 }
 

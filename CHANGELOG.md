@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Library screen: import books from the system file picker, sort by recently read, title or author,
+  search by title and author, a book details sheet, and delete with confirmation.
+- Books opened with "Open with Readana" from another app are imported automatically.
+- Covers extracted at import are rendered with Coil; books without one keep the title card.
+- Settings: optional SAF library folder, so books can live outside app storage.
 - Book import pipeline: copies EPUB/PDF files into app storage or the chosen SAF library folder,
   extracts title, authors, language and cover through Readium, skips files already in the library
   and deletes files together with their entry.

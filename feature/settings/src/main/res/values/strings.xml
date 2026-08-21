@@ -7,6 +7,12 @@
     <string name="feature_settings_page_turn_mode">Page turning</string>
     <string name="feature_settings_keep_screen_on">Keep screen on while reading</string>
     <string name="feature_settings_volume_keys">Volume keys turn pages</string>
+    <string name="feature_settings_section_storage">Storage</string>
+    <string name="feature_settings_library_folder">Library folder</string>
+    <string name="feature_settings_library_folder_default">App storage (private)</string>
+    <string name="feature_settings_library_folder_pick">Choose folder</string>
+    <string name="feature_settings_library_folder_clear">Use app storage</string>
+    <string name="feature_settings_library_folder_note">Books in app storage are deleted when Readana is uninstalled. Choosing a folder keeps new books outside the app; books already imported stay where they are.</string>
     <string name="feature_settings_section_sources">Book sources</string>
     <string name="feature_settings_annas_notice">Anna\'s Archive indexes shadow libraries. Downloading copyrighted works without permission is illegal in most countries; mirrors are also blocked by some ISPs. You are responsible for what you download.</string>
     <string name="feature_settings_annas_mirrors">Anna\'s Archive mirrors</string>
