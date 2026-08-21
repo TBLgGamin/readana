@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
+import dev.readana.core.data.readium.ReadiumPublicationOpener
 import dev.readana.core.data.repository.LibraryRepository
 import dev.readana.core.model.Book
 import javax.inject.Inject

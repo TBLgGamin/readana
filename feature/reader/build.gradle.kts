@@ -7,10 +7,8 @@ android {
 }
 
 dependencies {
-    // Readium Kotlin Toolkit: parsing (streamer) now, navigator UI in milestone M2.
+    // Publications are opened by core/data; this module owns the navigator (reading) side.
     implementation(libs.readium.shared)
-    implementation(libs.readium.streamer)
     implementation(libs.readium.navigator)
-    implementation(libs.readium.adapter.pdfium)
     implementation(libs.androidx.fragment.ktx)
 }

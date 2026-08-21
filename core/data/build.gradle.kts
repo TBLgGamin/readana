@@ -15,7 +15,13 @@ dependencies {
     implementation(projects.source.gutenberg)
     implementation(projects.source.annas)
 
+    // Readium parses publications for the importer (metadata + cover) and for the reader.
+    api(libs.readium.shared)
+    implementation(libs.readium.streamer)
+    implementation(libs.readium.adapter.pdfium)
+
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.documentfile)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.okhttp)

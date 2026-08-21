@@ -1,4 +1,4 @@
-package dev.readana.feature.reader
+package dev.readana.core.data.readium
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -18,8 +18,8 @@ import org.readium.r2.streamer.PublicationOpener
 import org.readium.r2.streamer.parser.DefaultPublicationParser
 
 /**
- * Opens EPUB/PDF files into Readium [Publication]s. The navigator (the actual reading view)
- * builds on top of this in milestone M2.
+ * Opens EPUB/PDF files into Readium [Publication]s. Shared by the importer (metadata and cover
+ * extraction) and by the reader, which builds its navigator on top of the same publication.
  */
 @Singleton
 class ReadiumPublicationOpener @Inject constructor(@ApplicationContext private val context: Context) {
