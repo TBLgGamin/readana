@@ -56,6 +56,8 @@ mockk = "1.14.11"
 turbine = "1.2.1"
 robolectric = "4.16.1"
 konsist = "0.17.3"
+# Android stubs org.json, so JVM tests that touch Readium locators need the real implementation.
+json = "20250517"
 
 [libraries]
 # Gradle plugins consumed by build-logic (compileOnly)
@@ -69,6 +71,7 @@ hilt-gradlePlugin = { group = "com.google.dagger", name = "hilt-android-gradle-p
 # AndroidX core
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "androidxActivity" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidxCore" }
+androidx-fragment-compose = { group = "androidx.fragment", name = "fragment-compose", version.ref = "androidxFragment" }
 androidx-fragment-ktx = { group = "androidx.fragment", name = "fragment-ktx", version.ref = "androidxFragment" }
 androidx-documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "androidxDocumentFile" }
 androidx-lifecycle-runtimeCompose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "androidxLifecycle" }
@@ -151,6 +154,7 @@ mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 konsist = { group = "com.lemonappdev", name = "konsist", version.ref = "konsist" }
+json = { group = "org.json", name = "json", version.ref = "json" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExt" }
 androidx-test-core = { group = "androidx.test", name = "core-ktx", version.ref = "androidxTestCore" }
 

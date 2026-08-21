@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Container the Readium navigator fragment is added to. -->
+    <item name="feature_reader_navigator_container" type="id" />
+</resources>
