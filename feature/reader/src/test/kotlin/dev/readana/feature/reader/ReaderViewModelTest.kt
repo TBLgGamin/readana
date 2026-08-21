@@ -505,6 +505,7 @@ private class FakeReaderSessionFactory : ReaderSessionFactory {
             isSearchable = true,
             hasText = true,
             textWalker = { null },
+            loadFigure = { null },
             isFixedLayout = isFixedLayout,
             search = { FakeSearchIterator(searchPages) },
             onClose = { closed = true }

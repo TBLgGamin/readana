@@ -86,10 +86,15 @@ internal object AiPrompts {
 
     private const val ILLUSTRATE =
         "To illustrate something the reader may not be able to picture — a ship, a bird, a " +
-            "building, a garment, a place — write [image: subject] on a line of its own and a " +
-            "picture of it will be looked up and shown to them. Name the thing itself, never the " +
-            "book, a character, or anything that happens in it. Use this sparingly, at most twice " +
-            "in an answer, and only where a picture genuinely helps."
+            "building, a garment, a plant, a place, a figure from myth or history — write " +
+            "[image: subject] on a line of its own and a picture of it will be looked up and " +
+            "shown to them.\n" +
+            "The subject is looked up as an encyclopaedia article, so name the thing exactly as " +
+            "an article would be titled: [image: Hestia], not [image: Greek goddess of the " +
+            "hearth]; [image: HMS Victory], not [image: Nelson's flagship]. Add a bracketed " +
+            "qualifier when the bare name is ambiguous, as in [image: Mercury (mythology)]. " +
+            "Never name the book, a character in it, or anything that happens in it. Use this " +
+            "sparingly, at most twice in an answer, and only where a picture genuinely helps."
 
     private const val DEFAULT_REQUEST = "Explain this passage."
 

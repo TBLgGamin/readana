@@ -345,8 +345,20 @@ internal class ReaderAssistantViewModel @Inject constructor(
                     illustrate(event.text)
                 }
 
-                is AssistantEvent.Failed -> _uiState.update {
-                    it.copy(streaming = null, phase = AssistantPhase.Idle, error = event.error)
+                is AssistantEvent.Failed -> {
+                    // Keep whatever was written: a half answer plus the reason beats a half answer.
+                    val partial = event.partialText.takeIf { text -> text.isNotBlank() }
+                    _uiState.update { state ->
+                        state.copy(
+                            messages = state.messages + listOfNotNull(
+                                partial?.let { AssistantMessage(fromReader = false, text = it) }
+                            ),
+                            streaming = null,
+                            phase = AssistantPhase.Idle,
+                            error = event.error
+                        )
+                    }
+                    partial?.let { illustrate(it) }
                 }
             }
         }
@@ -383,12 +395,10 @@ internal class ReaderAssistantViewModel @Inject constructor(
         val session = sessionStore.session ?: return emptyList()
         return withContext(ioDispatcher) {
             thread.figures.mapNotNull { figure ->
-                val bytes = session.loadFigure(figure.href) ?: return@mapNotNull null
-                ImageAttachment(
-                    id = figure.id,
-                    mediaType = figure.mediaType ?: DEFAULT_IMAGE_TYPE,
-                    bytes = bytes
-                )
+                val raw = session.loadFigure(figure.href) ?: return@mapNotNull null
+                // Print-sized plates are shrunk before sending; three raw ones are megabytes.
+                val bytes = FigureImages.prepare(raw) ?: return@mapNotNull null
+                ImageAttachment(id = figure.id, mediaType = FigureImages.MEDIA_TYPE, bytes = bytes)
             }
         }
     }
@@ -490,7 +500,6 @@ internal class ReaderAssistantViewModel @Inject constructor(
         const val MIN_PROGRESS_FOR_RECAP = 0.02f
 
         const val FIGURE_PREFIX = "figure:"
-        const val DEFAULT_IMAGE_TYPE = "image/jpeg"
 
         /** One answer may ask for a couple of pictures; it may not ask for a gallery. */
         const val MAX_LOOKED_UP = 2

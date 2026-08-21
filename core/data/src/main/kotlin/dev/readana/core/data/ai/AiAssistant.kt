@@ -39,7 +39,12 @@ sealed interface AssistantEvent {
 
     data class Done(val text: String) : AssistantEvent
 
-    data class Failed(val error: AppError) : AssistantEvent
+    /**
+     * [partialText] is whatever had been written before it went wrong. Providers do fail
+     * mid-answer — an overloaded model sends an error event after a sentence or two — and quietly
+     * keeping the half-answer made that look like the assistant simply stopping for no reason.
+     */
+    data class Failed(val error: AppError, val partialText: String = "") : AssistantEvent
 }
 
 /**

@@ -21,35 +21,65 @@ class WikipediaPictureSearchTest {
     private val requests = mutableListOf<HttpRequestData>()
 
     @Test
-    fun `finds a picture and where it came from`() = runTest {
-        val search = search { respond(RESULT, HttpStatusCode.OK, jsonHeaders) }
+    fun `an exact article title wins, without a search`() = runTest {
+        val search = search { respond(BY_TITLE, HttpStatusCode.OK, jsonHeaders) }
 
         val found = search.find("HMS Victory")
 
         assertEquals("https://upload.wikimedia.org/victory.jpg", found?.imageUrl)
         assertEquals("https://en.wikipedia.org/wiki/HMS_Victory", found?.pageUrl)
         assertEquals("HMS Victory", found?.title)
+        assertEquals(1, requests.size)
+        assertEquals("HMS Victory", requests.single().url.parameters["titles"])
+    }
+
+    @Test
+    fun `a subject with no article of its own falls back to the search index`() = runTest {
+        val search = search { request ->
+            if (request.url.parameters["titles"] != null) {
+                respond(MISSING, HttpStatusCode.OK, jsonHeaders)
+            } else {
+                respond(RESULT, HttpStatusCode.OK, jsonHeaders)
+            }
+        }
+
+        val found = search.find("HMS Victory")
+
+        // Best-ranked match with a picture, not merely the first one the API happened to list.
+        assertEquals("https://upload.wikimedia.org/victory.jpg", found?.imageUrl)
+        assertEquals(2, requests.size)
+    }
+
+    @Test
+    fun `a result that has nothing to do with the subject is discarded`() = runTest {
+        val search = search { request ->
+            if (request.url.parameters["titles"] != null) {
+                respond(MISSING, HttpStatusCode.OK, jsonHeaders)
+            } else {
+                respond(UNRELATED, HttpStatusCode.OK, jsonHeaders)
+            }
+        }
+
+        assertNull(search.find("Hestia"))
     }
 
     @Test
     fun `identifies itself, as Wikimedia requires`() = runTest {
-        search { respond(RESULT, HttpStatusCode.OK, jsonHeaders) }.find("HMS Victory")
+        search { respond(BY_TITLE, HttpStatusCode.OK, jsonHeaders) }.find("HMS Victory")
 
-        val sent = requests.single()
-        assertTrue(sent.headers[HttpHeaders.UserAgent].orEmpty().startsWith("Readana/"))
-        assertEquals("HMS Victory", sent.url.parameters["gsrsearch"])
+        assertTrue(requests.single().headers[HttpHeaders.UserAgent].orEmpty().startsWith("Readana/"))
     }
 
     @Test
     fun `a result with no picture is not offered`() = runTest {
         val search = search { respond(NO_IMAGE, HttpStatusCode.OK, jsonHeaders) }
 
-        assertNull(search.find("something obscure"))
+        assertNull(search.find("Obscure"))
     }
 
     @Test
     fun `a blank subject is not looked up at all`() = runTest {
-        val search = search { respond(RESULT, HttpStatusCode.OK, jsonHeaders) }
+        val search = search { respond(BY_TITLE, HttpStatusCode.OK, jsonHeaders) }
 
         assertNull(search.find("   "))
         assertTrue(requests.isEmpty())
@@ -74,6 +104,20 @@ class WikipediaPictureSearchTest {
 
     private companion object {
         val jsonHeaders = headersOf(HttpHeaders.ContentType, "application/json")
+
+        const val BY_TITLE = """
+            {"query":{"pages":[
+              {"title":"HMS Victory","thumbnail":{"source":"https://upload.wikimedia.org/victory.jpg"}}
+            ]}}
+        """
+
+        const val MISSING = """{"query":{"pages":[{"title":"HMS Victory","missing":true}]}}"""
+
+        const val UNRELATED = """
+            {"query":{"pages":[
+              {"title":"Agni","index":1,"thumbnail":{"source":"https://upload.wikimedia.org/agni.jpg"}}
+            ]}}
+        """
 
         // Wikipedia answers out of order; "index" is the ranking, and the best match wins.
         val RESULT = """

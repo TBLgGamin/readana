@@ -92,6 +92,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- An answer that fails part-way through says so, keeping what was written, instead of stopping
+  mid-sentence with no explanation. A provider that is overloaded ends the stream with an error
+  after a sentence or two, and that error was being swallowed whenever any text had arrived.
+
 - Explain no longer sits on a spinner forever. Reading back through the book to gather the context
   ran on the main thread, so the answer could not be drawn while it worked; Ask hid the same stall
   behind the seconds spent typing a question.
