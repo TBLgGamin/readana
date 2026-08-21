@@ -47,6 +47,7 @@ import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.BookCover
 import dev.readana.core.designsystem.component.EmptyState
 import dev.readana.core.designsystem.component.LoadingState
+import dev.readana.core.designsystem.component.SteadyProgress
 import dev.readana.core.designsystem.component.WavyProgress
 import dev.readana.core.designsystem.theme.ReadanaTheme
 import dev.readana.core.model.Book
@@ -367,7 +368,8 @@ private fun BookCard(book: Book, onClick: () -> Unit, onLongClick: () -> Unit, m
             overflow = TextOverflow.Ellipsis
         )
         book.progress?.let { progress ->
-            WavyProgress(
+            // Steady, not wavy: this is how far you have read, not something happening now.
+            SteadyProgress(
                 progress = { progress.fraction },
                 modifier = Modifier
                     .fillMaxWidth()

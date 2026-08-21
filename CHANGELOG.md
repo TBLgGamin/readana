@@ -22,7 +22,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- Every progress bar in the app is Material 3 Expressive's wavy indicator.
+- Progress bars are Material 3 Expressive's. The wavy one is kept for work happening right now —
+  downloading, importing, converting, searching, loading a page — while how far you have read a
+  book is the flat determinate bar, whose stop indicator doubles as a marker for the end. A
+  squiggle under every cover read as activity that was not there.
 - Library titles stay on one line, so the progress bars across a row line up instead of one card
   sitting lower than its neighbours.
 
