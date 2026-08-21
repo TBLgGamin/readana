@@ -4,12 +4,11 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentFactory
 import dagger.hilt.android.scopes.ActivityRetainedScoped
 import javax.inject.Inject
-import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.services.search.SearchIterator
 
 /** One entry of a publication's table of contents, flattened with its nesting depth. */
-internal data class TocEntry(val title: String, val depth: Int, val link: Link)
+internal data class TocEntry(val title: String, val depth: Int, val locator: Locator?)
 
 /**
  * An open publication together with everything the navigator needs to render it. Created once per

@@ -34,7 +34,8 @@ internal interface ReaderSessionFactory {
 }
 
 internal class ReadiumReaderSessionFactory @Inject constructor(
-    private val publicationOpener: ReadiumPublicationOpener
+    private val publicationOpener: ReadiumPublicationOpener,
+    private val selectionRelay: ReaderSelectionRelay
 ) : ReaderSessionFactory {
     override suspend fun create(
         book: Book,
@@ -62,7 +63,10 @@ internal class ReadiumReaderSessionFactory @Inject constructor(
     ): ReaderSession {
         val factory = EpubNavigatorFactory(publication).createFragmentFactory(
             initialLocator = initialLocator,
-            initialPreferences = settings.toEpubPreferences(systemInDarkTheme)
+            initialPreferences = settings.toEpubPreferences(systemInDarkTheme),
+            configuration = EpubNavigatorFragment.Configuration {
+                selectionActionModeCallback = ReaderSelectionActionMode(selectionRelay)
+            }
         )
         return session(book, publication, EpubNavigatorFragment::class.java, factory)
     }
@@ -91,18 +95,24 @@ internal class ReadiumReaderSessionFactory @Inject constructor(
         title = publication.metadata.title ?: book.title,
         navigatorClass = navigatorClass,
         fragmentFactory = factory,
-        toc = publication.tableOfContents.flatten(depth = 0),
+        toc = publication.tableOfContents.flatten(publication, depth = 0),
         positions = publication.positions(),
         isSearchable = publication.isSearchable,
         search = { query -> publication.search(query) },
         onClose = { publication.close() }
     )
 
-    private fun List<Link>.flatten(depth: Int): List<TocEntry> = flatMap { link ->
+    private fun List<Link>.flatten(publication: Publication, depth: Int): List<TocEntry> = flatMap { link ->
         val entry = link.title?.trim()?.takeIf { it.isNotEmpty() }?.let { title ->
-            listOf(TocEntry(title = title, depth = depth, link = link))
+            listOf(
+                TocEntry(
+                    title = title,
+                    depth = depth,
+                    locator = publication.locatorFromLink(link)
+                )
+            )
         } ?: emptyList()
-        entry + link.children.flatten(depth + 1)
+        entry + link.children.flatten(publication, depth + 1)
     }
 }
 

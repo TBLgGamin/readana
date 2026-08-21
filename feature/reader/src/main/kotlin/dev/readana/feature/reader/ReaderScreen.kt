@@ -31,6 +31,7 @@ import dev.readana.core.common.input.VolumeKeyRelay
 import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.EmptyState
 import dev.readana.core.designsystem.component.LoadingState
+import dev.readana.core.model.HighlightTint
 import dev.readana.core.model.ReaderSettings
 import org.readium.r2.navigator.Navigator
 import org.readium.r2.navigator.OverflowableNavigator
@@ -62,7 +63,7 @@ internal fun ReaderRoute(
         onShowSheet = viewModel::showSheet,
         onDismissSheet = { viewModel.showSheet(ReaderSheet.None) },
         onSelectChapter = { item ->
-            viewModel.tocLink(item.index)?.let { navigator?.go(it) }
+            viewModel.locatorFor(ReaderTarget.Chapter(item.index))?.let { navigator?.go(it) }
             viewModel.showSheet(ReaderSheet.None)
         },
         onSettingsChange = viewModel::updateSettings,
@@ -71,15 +72,30 @@ internal fun ReaderRoute(
             viewModel.locatorFor(ReaderTarget.Bookmark(bookmark.id))?.let { navigator?.go(it) }
             viewModel.showSheet(ReaderSheet.None)
         },
-        onDeleteBookmark = viewModel::deleteBookmark,
-        onSearchQueryChange = viewModel::onSearchQueryChange,
+        onDeleteBookmark = { id -> viewModel.delete(ReaderTarget.Bookmark(id)) },
         onSearch = viewModel::runSearch,
         onLoadMoreResults = viewModel::loadMoreResults,
         onSelectSearchHit = { hit ->
             viewModel.locatorFor(ReaderTarget.Hit(hit.index))?.let { navigator?.go(it) }
             viewModel.showSheet(ReaderSheet.None)
         },
+        onEditHighlight = viewModel::editHighlight,
+        onUpdateHighlight = viewModel::updateHighlight,
+        onDeleteHighlight = { id -> viewModel.delete(ReaderTarget.Highlight(id)) },
         modifier = modifier
+    )
+
+    HighlightDecorations(
+        navigator = navigator,
+        highlights = ready?.highlights.orEmpty(),
+        locateHighlight = { id -> viewModel.locatorFor(ReaderTarget.Highlight(id)) },
+        onActivate = viewModel::editHighlight
+    )
+
+    SelectionActions(
+        relay = viewModel.selectionRelay,
+        navigator = navigator,
+        onHighlight = viewModel::addHighlight
     )
 
     VolumeKeyPaging(
@@ -104,10 +120,12 @@ internal fun ReaderScreen(
     onToggleBookmark: () -> Unit,
     onSelectBookmark: (BookmarkItem) -> Unit,
     onDeleteBookmark: (Long) -> Unit,
-    onSearchQueryChange: (String) -> Unit,
-    onSearch: () -> Unit,
+    onSearch: (String) -> Unit,
     onLoadMoreResults: () -> Unit,
     onSelectSearchHit: (SearchHit) -> Unit,
+    onEditHighlight: (Long?) -> Unit,
+    onUpdateHighlight: (Long, HighlightTint, String?) -> Unit,
+    onDeleteHighlight: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -138,10 +156,12 @@ internal fun ReaderScreen(
                 onToggleBookmark = onToggleBookmark,
                 onSelectBookmark = onSelectBookmark,
                 onDeleteBookmark = onDeleteBookmark,
-                onSearchQueryChange = onSearchQueryChange,
                 onSearch = onSearch,
                 onLoadMoreResults = onLoadMoreResults,
-                onSelectSearchHit = onSelectSearchHit
+                onSelectSearchHit = onSelectSearchHit,
+                onEditHighlight = onEditHighlight,
+                onUpdateHighlight = onUpdateHighlight,
+                onDeleteHighlight = onDeleteHighlight
             )
         }
     }
@@ -162,10 +182,12 @@ private fun ReadingSurface(
     onToggleBookmark: () -> Unit,
     onSelectBookmark: (BookmarkItem) -> Unit,
     onDeleteBookmark: (Long) -> Unit,
-    onSearchQueryChange: (String) -> Unit,
-    onSearch: () -> Unit,
+    onSearch: (String) -> Unit,
     onLoadMoreResults: () -> Unit,
     onSelectSearchHit: (SearchHit) -> Unit,
+    onEditHighlight: (Long?) -> Unit,
+    onUpdateHighlight: (Long, HighlightTint, String?) -> Unit,
+    onDeleteHighlight: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     KeepScreenOnEffect(state.settings.keepScreenOn)
@@ -220,11 +242,19 @@ private fun ReadingSurface(
 
         ReaderSheet.Search -> ReaderSearchSheet(
             state = state.search,
-            onQueryChange = onSearchQueryChange,
             onSearch = onSearch,
             onLoadMore = onLoadMoreResults,
             onSelect = onSelectSearchHit,
             onDismiss = onDismissSheet
+        )
+    }
+
+    state.editingHighlight?.let { highlight ->
+        HighlightEditorDialog(
+            highlight = highlight,
+            onSave = onUpdateHighlight,
+            onDelete = onDeleteHighlight,
+            onDismiss = { onEditHighlight(null) }
         )
     }
 }

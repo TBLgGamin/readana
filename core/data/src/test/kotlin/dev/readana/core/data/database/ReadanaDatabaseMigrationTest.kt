@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 import org.junit.Rule
 import org.junit.runner.RunWith
 
-/** Bookmarks were added in version 2; existing libraries must survive the upgrade. */
+/** Bookmarks (v2) and highlights (v3) were added later; existing libraries must survive. */
 @RunWith(AndroidJUnit4::class)
 class ReadanaDatabaseMigrationTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
@@ -28,7 +28,7 @@ class ReadanaDatabaseMigrationTest {
     )
 
     @Test
-    fun `upgrading to version 2 keeps the books and adds bookmarks`() {
+    fun `upgrading to the newest version keeps the books and adds the annotation tables`() {
         helper.createDatabase(version = 1).use { connection ->
             connection.execSQL(
                 """
@@ -41,14 +41,16 @@ class ReadanaDatabaseMigrationTest {
             )
         }
 
-        helper.runMigrationsAndValidate(version = 2).use { connection ->
+        helper.runMigrationsAndValidate(version = 3).use { connection ->
             connection.prepare("SELECT title FROM books").use { statement ->
                 assertTrue(statement.step())
                 assertEquals("Moby Dick", statement.getText(0))
             }
-            connection.prepare("SELECT COUNT(*) FROM bookmarks").use { statement ->
-                assertTrue(statement.step())
-                assertEquals(0, statement.getLong(0).toInt())
+            listOf("bookmarks", "highlights").forEach { table ->
+                connection.prepare("SELECT COUNT(*) FROM $table").use { statement ->
+                    assertTrue(statement.step())
+                    assertEquals(0, statement.getLong(0).toInt())
+                }
             }
         }
     }

@@ -7,11 +7,14 @@ import dev.readana.core.common.result.AppResult
 import dev.readana.core.common.result.asFailure
 import dev.readana.core.common.result.asSuccess
 import dev.readana.core.data.repository.BookmarksRepository
+import dev.readana.core.data.repository.HighlightsRepository
 import dev.readana.core.data.repository.LibraryRepository
 import dev.readana.core.data.repository.SettingsRepository
 import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
 import dev.readana.core.model.Bookmark
+import dev.readana.core.model.Highlight
+import dev.readana.core.model.HighlightTint
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.ReaderTheme
 import dev.readana.core.model.ReadingProgress
@@ -49,6 +52,7 @@ class ReaderViewModelTest {
 
     private val library = FakeLibraryRepository()
     private val bookmarks = FakeBookmarksRepository()
+    private val highlights = FakeHighlightsRepository()
     private val settings = FakeSettingsRepository()
     private val sessionStore = ReaderSessionStore()
     private val sessionFactory = FakeReaderSessionFactory()
@@ -56,10 +60,12 @@ class ReaderViewModelTest {
     private fun viewModel(applicationScope: CoroutineScope) = ReaderViewModel(
         libraryRepository = library,
         bookmarksRepository = bookmarks,
+        highlightsRepository = highlights,
         settingsRepository = settings,
         sessionFactory = sessionFactory,
         sessionStore = sessionStore,
         volumeKeyRelay = VolumeKeyRelay(),
+        selectionRelay = ReaderSelectionRelay(),
         applicationScope = applicationScope
     )
 
@@ -235,7 +241,7 @@ class ReaderViewModelTest {
         advanceUntilIdle()
         val stored = assertIs<ReaderUiState.Ready>(viewModel.uiState.value).bookmarks.single()
 
-        viewModel.deleteBookmark(stored.id)
+        viewModel.delete(ReaderTarget.Bookmark(stored.id))
         advanceUntilIdle()
 
         assertTrue(assertIs<ReaderUiState.Ready>(viewModel.uiState.value).bookmarks.isEmpty())
@@ -252,8 +258,7 @@ class ReaderViewModelTest {
         viewModel.open("1", systemInDarkTheme = false)
         advanceUntilIdle()
 
-        viewModel.onSearchQueryChange("whale")
-        viewModel.runSearch()
+        viewModel.runSearch("whale")
         advanceUntilIdle()
 
         val first = assertIs<ReaderUiState.Ready>(viewModel.uiState.value).search
@@ -274,17 +279,61 @@ class ReaderViewModelTest {
         val viewModel = viewModel(backgroundScope)
         viewModel.open("1", systemInDarkTheme = false)
         advanceUntilIdle()
-        viewModel.onSearchQueryChange("whale")
-        viewModel.runSearch()
+        viewModel.runSearch("whale")
         advanceUntilIdle()
 
-        viewModel.onSearchQueryChange("   ")
-        viewModel.runSearch()
+        viewModel.runSearch("   ")
         advanceUntilIdle()
 
         val search = assertIs<ReaderUiState.Ready>(viewModel.uiState.value).search
         assertTrue(search.hits.isEmpty())
         assertFalse(search.hasSearched)
+    }
+
+    @Test
+    fun `highlights the selection and can annotate, recolour and delete it`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            library.upsert(book())
+            val viewModel = viewModel(backgroundScope)
+            viewModel.open("1", systemInDarkTheme = false)
+            advanceUntilIdle()
+
+            viewModel.addHighlight(locator(progression = 0.3), "call me Ishmael", openNote = true)
+            advanceUntilIdle()
+
+            val added = assertIs<ReaderUiState.Ready>(viewModel.uiState.value)
+            val stored = added.highlights.single()
+            assertEquals("call me Ishmael", stored.text)
+            assertEquals(HighlightTint.Yellow, stored.tint)
+            assertEquals(stored.id, assertNotNull(added.editingHighlight).id)
+
+            viewModel.updateHighlight(stored.id, HighlightTint.Green, "why this matters")
+            advanceUntilIdle()
+
+            val edited = assertIs<ReaderUiState.Ready>(viewModel.uiState.value)
+            assertEquals("why this matters", edited.highlights.single().note)
+            assertEquals(HighlightTint.Green, edited.highlights.single().tint)
+            assertNull(edited.editingHighlight)
+
+            viewModel.delete(ReaderTarget.Highlight(stored.id))
+            advanceUntilIdle()
+
+            assertTrue(assertIs<ReaderUiState.Ready>(viewModel.uiState.value).highlights.isEmpty())
+        }
+
+    @Test
+    fun `resolves where a highlight sits`() = runTest(mainDispatcherRule.testDispatcher) {
+        library.upsert(book())
+        val viewModel = viewModel(backgroundScope)
+        viewModel.open("1", systemInDarkTheme = false)
+        advanceUntilIdle()
+        viewModel.addHighlight(locator(progression = 0.3), "text", openNote = false)
+        advanceUntilIdle()
+        val stored = assertIs<ReaderUiState.Ready>(viewModel.uiState.value).highlights.single()
+
+        val locator = viewModel.locatorFor(ReaderTarget.Highlight(stored.id))
+
+        assertEquals("chapter1.xhtml", assertNotNull(locator).href.toString())
     }
 
     private fun book(progress: ReadingProgress? = null) = Book(
@@ -345,6 +394,26 @@ private class FakeBookmarksRepository : BookmarksRepository {
         val stored = bookmark.copy(id = nextId++)
         state.update { it + stored }
         return stored
+    }
+
+    override suspend fun remove(id: Long) = state.update { saved -> saved.filterNot { it.id == id } }
+}
+
+private class FakeHighlightsRepository : HighlightsRepository {
+    private val state = MutableStateFlow<List<Highlight>>(emptyList())
+    private var nextId = 1L
+
+    override fun observeForBook(bookId: String): Flow<List<Highlight>> =
+        state.map { saved -> saved.filter { it.bookId == bookId } }
+
+    override suspend fun add(highlight: Highlight, progression: Double?): Highlight {
+        val stored = highlight.copy(id = nextId++)
+        state.update { it + stored }
+        return stored
+    }
+
+    override suspend fun update(highlight: Highlight) = state.update { saved ->
+        saved.map { if (it.id == highlight.id) highlight else it }
     }
 
     override suspend fun remove(id: Long) = state.update { saved -> saved.filterNot { it.id == id } }

@@ -8,10 +8,14 @@ import dev.readana.core.common.input.VolumeKeyRelay
 import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
 import dev.readana.core.data.repository.BookmarksRepository
+import dev.readana.core.data.repository.HighlightsRepository
 import dev.readana.core.data.repository.LibraryRepository
 import dev.readana.core.data.repository.SettingsRepository
 import dev.readana.core.model.Book
 import dev.readana.core.model.Bookmark
+import dev.readana.core.model.Highlight
+import dev.readana.core.model.HighlightStyle
+import dev.readana.core.model.HighlightTint
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.ReadingProgress
 import java.time.Instant
@@ -29,12 +33,20 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.json.JSONException
 import org.json.JSONObject
-import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.services.search.SearchIterator
 
 /** Which sheet, if any, is covering the page. */
 internal enum class ReaderSheet { None, Contents, Settings, Search }
+
+/** A marked passage as the reader shows it. */
+internal data class HighlightItem(
+    val id: Long,
+    val text: String,
+    val note: String?,
+    val tint: HighlightTint,
+    val style: HighlightStyle
+)
 
 /** A saved place, as the sheet shows it. */
 internal data class BookmarkItem(val id: Long, val title: String?, val progression: Double?)
@@ -79,7 +91,10 @@ internal sealed interface ReaderUiState {
         val bookmarks: List<BookmarkItem> = emptyList(),
         val currentIsBookmarked: Boolean = false,
         val isSearchable: Boolean = false,
-        val search: SearchState = SearchState()
+        val search: SearchState = SearchState(),
+        val highlights: List<HighlightItem> = emptyList(),
+        /** The highlight whose note is being edited, if any. */
+        val editingHighlight: HighlightItem? = null
     ) : ReaderUiState
 }
 
@@ -89,6 +104,11 @@ internal data class TocItem(val index: Int, val title: String, val depth: Int)
 /** Somewhere the reader can jump to, named without Readium types. */
 internal sealed interface ReaderTarget {
     data class Bookmark(val id: Long) : ReaderTarget
+
+    /** A table-of-contents row, by its index in [ReaderUiState.Ready.toc]. */
+    data class Chapter(val index: Int) : ReaderTarget
+
+    data class Highlight(val id: Long) : ReaderTarget
 
     data class Hit(val index: Int) : ReaderTarget
 
@@ -100,11 +120,14 @@ internal sealed interface ReaderTarget {
 internal class ReaderViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
     private val bookmarksRepository: BookmarksRepository,
+    private val highlightsRepository: HighlightsRepository,
     private val settingsRepository: SettingsRepository,
     private val sessionFactory: ReaderSessionFactory,
     private val sessionStore: ReaderSessionStore,
     /** Exposed so the reading surface can claim the volume keys while it is on screen. */
     val volumeKeyRelay: VolumeKeyRelay,
+    /** Exposed so the reading surface can fill in what the text-selection menu does. */
+    val selectionRelay: ReaderSelectionRelay,
     @ApplicationScope private val applicationScope: CoroutineScope
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<ReaderUiState>(ReaderUiState.Loading)
@@ -119,6 +142,8 @@ internal class ReaderViewModel @Inject constructor(
     private var searchJob: Job? = null
     private var searchIterator: SearchIterator? = null
     private var searchHits: List<Locator> = emptyList()
+    private var highlightsJob: Job? = null
+    private var highlights: List<Highlight> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -189,26 +214,79 @@ internal class ReaderViewModel @Inject constructor(
         }
     }
 
-    fun deleteBookmark(id: Long) {
-        viewModelScope.launch { bookmarksRepository.remove(id) }
+    /**
+     * Marks [locator] with the text the reader selected. When [openNote] is true the note editor
+     * opens on the new highlight.
+     */
+    fun addHighlight(locator: Locator, text: String, openNote: Boolean) {
+        val bookId = openedBookId ?: return
+        viewModelScope.launch {
+            val stored = highlightsRepository.add(
+                highlight = Highlight(
+                    id = Highlight.UNSAVED_ID,
+                    bookId = bookId,
+                    locatorJson = locator.toJSON().toString(),
+                    text = text,
+                    tint = HighlightTint.Yellow,
+                    style = HighlightStyle.Highlight,
+                    note = null,
+                    createdAt = Instant.now()
+                ),
+                progression = locator.locations.totalProgression
+            )
+            if (openNote) {
+                updateReady { it.copy(editingHighlight = stored.toItem()) }
+            }
+        }
     }
 
-    fun onSearchQueryChange(query: String) = updateReady {
-        it.copy(search = it.search.copy(query = query))
+    /** Opens the editor for the highlight with [id], or closes it when passed null. */
+    fun editHighlight(id: Long?) = updateReady { state ->
+        state.copy(editingHighlight = id?.let { highlights.firstOrNull { it.id == id }?.toItem() })
     }
 
-    /** Runs the query in the state, replacing any previous results. */
-    fun runSearch() {
-        val query = readyState()?.search?.query?.trim().orEmpty()
+    fun updateHighlight(id: Long, tint: HighlightTint, note: String?) {
+        val existing = highlights.firstOrNull { it.id == id } ?: return
+        viewModelScope.launch {
+            highlightsRepository.update(
+                existing.copy(tint = tint, note = note?.trim()?.ifEmpty { null })
+            )
+            updateReady { it.copy(editingHighlight = null) }
+        }
+    }
+
+    /** Removes a bookmark or a highlight. Other targets are not deletable. */
+    fun delete(target: ReaderTarget) {
+        viewModelScope.launch {
+            when (target) {
+                is ReaderTarget.Bookmark -> bookmarksRepository.remove(target.id)
+
+                is ReaderTarget.Highlight -> {
+                    highlightsRepository.remove(target.id)
+                    updateReady { it.copy(editingHighlight = null) }
+                }
+
+                is ReaderTarget.Chapter, is ReaderTarget.Hit, is ReaderTarget.Progress -> Unit
+            }
+        }
+    }
+
+    /** Runs [rawQuery] against the open book, replacing any previous results. */
+    fun runSearch(rawQuery: String) {
+        val query = rawQuery.trim()
         searchJob?.cancel()
         searchHits = emptyList()
         searchIterator = null
         if (query.isEmpty()) {
-            updateReady { it.copy(search = it.search.copy(hits = emptyList(), hasSearched = false)) }
+            updateReady {
+                it.copy(search = SearchState())
+            }
             return
         }
         updateReady {
-            it.copy(search = it.search.copy(hits = emptyList(), isSearching = true, hasSearched = true))
+            it.copy(
+                search = SearchState(query = query, isSearching = true, hasSearched = true)
+            )
         }
         searchJob = viewModelScope.launch {
             searchIterator = session?.search?.invoke(query)
@@ -222,13 +300,15 @@ internal class ReaderViewModel @Inject constructor(
         searchJob = viewModelScope.launch { loadNextHits() }
     }
 
-    /** The link the table-of-contents row at [index] points at. */
-    fun tocLink(index: Int): Link? = session?.toc?.getOrNull(index)?.link
-
     /** Resolves where the reader should jump for [target], or null when it cannot be found. */
     fun locatorFor(target: ReaderTarget): Locator? = when (target) {
         is ReaderTarget.Bookmark -> bookmarks.firstOrNull { it.id == target.id }
             ?.let { parseLocator(it.locatorJson) }
+
+        is ReaderTarget.Highlight -> highlights.firstOrNull { it.id == target.id }
+            ?.let { parseLocator(it.locatorJson) }
+
+        is ReaderTarget.Chapter -> session?.toc?.getOrNull(target.index)?.locator
 
         is ReaderTarget.Hit -> searchHits.getOrNull(target.index)
 
@@ -263,6 +343,7 @@ internal class ReaderViewModel @Inject constructor(
     fun release() {
         progressJob?.cancel()
         bookmarksJob?.cancel()
+        highlightsJob?.cancel()
         searchJob?.cancel()
         searchIterator = null
         val bookId = openedBookId
@@ -293,6 +374,13 @@ internal class ReaderViewModel @Inject constructor(
                         } == true
                     )
                 }
+            }
+        }
+        highlightsJob?.cancel()
+        highlightsJob = viewModelScope.launch {
+            highlightsRepository.observeForBook(book.id).collect { saved ->
+                highlights = saved
+                updateReady { state -> state.copy(highlights = saved.map { it.toItem() }) }
             }
         }
         _uiState.value = ReaderUiState.Ready(
@@ -343,7 +431,13 @@ internal class ReaderViewModel @Inject constructor(
         return abs(savedProgression - currentProgression) < PROGRESSION_EPSILON
     }
 
-    private fun readyState(): ReaderUiState.Ready? = _uiState.value as? ReaderUiState.Ready
+    private fun Highlight.toItem() = HighlightItem(
+        id = id,
+        text = text,
+        note = note,
+        tint = tint,
+        style = style
+    )
 
     private fun scheduleProgressSave(locator: Locator) {
         val bookId = openedBookId ?: return

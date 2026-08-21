@@ -19,6 +19,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
@@ -35,23 +39,24 @@ import dev.readana.core.designsystem.component.EmptyState
 @Composable
 internal fun ReaderSearchSheet(
     state: SearchState,
-    onQueryChange: (String) -> Unit,
-    onSearch: () -> Unit,
+    onSearch: (String) -> Unit,
     onLoadMore: () -> Unit,
     onSelect: (SearchHit) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // The draft is local so typing does not re-run the search on every keystroke.
+    var draft by rememberSaveable { mutableStateOf(state.query) }
     ModalBottomSheet(onDismissRequest = onDismiss, modifier = modifier) {
         OutlinedTextField(
-            value = state.query,
-            onValueChange = onQueryChange,
+            value = draft,
+            onValueChange = { draft = it },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = 8.dp),
             placeholder = { Text(stringResource(R.string.feature_reader_search_hint)) },
             trailingIcon = {
-                IconButton(onClick = onSearch) {
+                IconButton(onClick = { onSearch(draft) }) {
                     Icon(
                         ReadanaIcons.Discover,
                         contentDescription = stringResource(R.string.feature_reader_search)
@@ -60,7 +65,7 @@ internal fun ReaderSearchSheet(
             },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { onSearch() })
+            keyboardActions = KeyboardActions(onSearch = { onSearch(draft) })
         )
         if (state.isSearching) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
