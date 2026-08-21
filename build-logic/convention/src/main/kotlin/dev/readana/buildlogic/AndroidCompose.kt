@@ -7,6 +7,7 @@ import org.gradle.kotlin.dsl.apply
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.dependencies
 import org.jetbrains.kotlin.compose.compiler.gradle.ComposeCompilerGradlePluginExtension
+import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
 
 /** Enables Jetpack Compose on an Android module and wires the BOM + tooling dependencies. */
 internal fun Project.configureAndroidCompose(commonExtension: CommonExtension) {
@@ -16,6 +17,15 @@ internal fun Project.configureAndroidCompose(commonExtension: CommonExtension) {
         buildFeatures.apply {
             compose = true
         }
+    }
+
+    // The whole UI is Material 3 Expressive; opting in once here keeps the annotation out of
+    // every screen. Expressive APIs are still experimental in material3 1.4, so the Compose BOM
+    // must be bumped deliberately.
+    extensions.configure<KotlinAndroidProjectExtension> {
+        compilerOptions.freeCompilerArgs.addAll(
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi"
+        )
     }
 
     dependencies {

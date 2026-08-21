@@ -24,6 +24,10 @@ androidxCore = "1.19.0"
 androidxFragment = "1.9.0"
 androidxLifecycle = "2.11.0"
 androidxComposeBom = "2026.08.00"
+# Material 3 Expressive (MaterialExpressiveTheme, MotionScheme, LoadingIndicator, ButtonGroup) is
+# still internal in the 1.4.0 stable that the BOM pins, so material3 is overridden ahead of the BOM.
+# material3-adaptive-navigation-suite ships in lockstep and must move with it.
+androidxMaterial3 = "1.5.0-alpha26"
 androidxNavigation3 = "1.1.6"
 androidxHilt = "1.4.0"
 androidxDataStore = "1.2.1"
@@ -74,12 +78,12 @@ androidx-lifecycle-viewModelNavigation3 = { group = "androidx.lifecycle", name =
 # Compose (versions come from the BOM)
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "androidxComposeBom" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
-androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "androidxMaterial3" }
 androidx-compose-material3-adaptive = { group = "androidx.compose.material3.adaptive", name = "adaptive" }
 androidx-compose-material3-adaptive-layout = { group = "androidx.compose.material3.adaptive", name = "adaptive-layout" }
 androidx-compose-material3-adaptive-navigation = { group = "androidx.compose.material3.adaptive", name = "adaptive-navigation" }
 androidx-compose-material3-adaptive-navigation3 = { group = "androidx.compose.material3.adaptive", name = "adaptive-navigation3" }
-androidx-compose-material3-adaptive-navigationSuite = { group = "androidx.compose.material3", name = "material3-adaptive-navigation-suite" }
+androidx-compose-material3-adaptive-navigationSuite = { group = "androidx.compose.material3", name = "material3-adaptive-navigation-suite", version.ref = "androidxMaterial3" }
 androidx-compose-material-iconsExtended = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-compose-runtime = { group = "androidx.compose.runtime", name = "runtime" }
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }

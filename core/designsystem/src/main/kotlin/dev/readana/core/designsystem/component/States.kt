@@ -8,8 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,11 +22,11 @@ import androidx.compose.ui.unit.dp
 import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.theme.ReadanaTheme
 
-/** Centered spinner for screens whose first data has not arrived yet. */
+/** Centered expressive loading indicator for screens whose first data has not arrived yet. */
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
+        LoadingIndicator()
     }
 }
 

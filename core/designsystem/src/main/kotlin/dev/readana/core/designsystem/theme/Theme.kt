@@ -2,7 +2,8 @@ package dev.readana.core.designsystem.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -39,8 +40,9 @@ private val DarkColorScheme = darkColorScheme(
 val ReadanaTypography = Typography()
 
 /**
- * App-wide Material 3 theme. Uses Material You dynamic colour on Android 12+ (the Pad 8 runs
- * Android 16) and a warm paper-like palette elsewhere.
+ * App-wide Material 3 Expressive theme: expressive motion for every transition, Material You
+ * dynamic colour on Android 12+ (the Pad 8 runs Android 16) and a warm paper-like palette
+ * elsewhere. Every screen in the app themes through this and uses stock Material 3 components.
  */
 @Composable
 fun ReadanaTheme(
@@ -58,5 +60,10 @@ fun ReadanaTheme(
 
         else -> LightColorScheme
     }
-    MaterialTheme(colorScheme = colorScheme, typography = ReadanaTypography, content = content)
+    MaterialExpressiveTheme(
+        colorScheme = colorScheme,
+        motionScheme = MotionScheme.expressive(),
+        typography = ReadanaTypography,
+        content = content
+    )
 }
