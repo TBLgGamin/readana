@@ -35,6 +35,7 @@
     <string name="feature_library_downloads_collapse">Collapse downloads</string>
     <string name="feature_library_downloads_expand">Expand downloads</string>
     <string name="feature_library_download_queued">Waiting to start…</string>
+    <string name="feature_library_download_retrying">Trying again — %1$s</string>
     <string name="feature_library_download_progress">%1$s of %2$s MB</string>
     <string name="feature_library_download_progress_unknown">%1$s MB</string>
     <string name="feature_library_download_converting">Converting to EPUB…</string>

@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Holding a book in Discover opens the same details sheet the library uses — cover, title, author,
+  format, size, language, year, publisher and source — with no actions on it, since the cover it
+  was opened from already carries the download button. A plain tap opens it too.
+- The popular shelf has the same download button as a search result. A popular book carries no file
+  of its own, so tapping it searches the enabled sources and queues the best match, naming what it
+  queued so a wrong edition is obvious.
+
 ### Changed
 
 - Tapping download queues the book straight away. Working out where a file actually comes from can
@@ -19,6 +28,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A download no longer sits at "Waiting to start…" forever. Work was queued under one name per book
+  and kept rather than replaced, so a new attempt was silently dropped whenever an older one was
+  still waiting out a retry backoff — and dismissing a failed download left that older work behind.
+  The queue also distinguishes waiting to begin from trying again, and says why, and a download
+  worker that falls over now marks the row failed instead of leaving it looking unstarted.
+- Covers load faster: the grid no longer subcomposes a cell per cover, and the user agent every
+  request needs is worked out at startup rather than by the first batch of covers.
 - Discover says when a source is answering a browser check, instead of showing a progress bar that
   looks stuck, and a source that could not get past one offers to open the page so you can. Coming
   back re-runs the search.

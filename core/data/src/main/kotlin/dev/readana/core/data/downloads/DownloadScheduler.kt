@@ -33,9 +33,11 @@ class WorkManagerDownloadScheduler @Inject constructor(@ApplicationContext priva
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_SECONDS, TimeUnit.SECONDS)
             .addTag(TAG)
             .build()
-        // KEEP only blocks while the same record is still enqueued or running, which is exactly the
-        // duplicate rule we want; finished work can be queued again by a retry.
-        WorkManager.getInstance(context).enqueueUniqueWork(uniqueName, ExistingWorkPolicy.KEEP, request)
+        // REPLACE, not KEEP: the queue already refuses a record it is downloading, so anything
+        // that reaches here is meant to run. KEEP would silently drop it whenever older work for
+        // the same record was still sitting in a retry backoff, leaving the new row waiting for a
+        // worker that never came.
+        WorkManager.getInstance(context).enqueueUniqueWork(uniqueName, ExistingWorkPolicy.REPLACE, request)
     }
 
     override fun cancel(uniqueName: String) {

@@ -28,6 +28,23 @@ class DownloadWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         val id = jobId ?: return Result.failure()
+        // Nothing below may leave the row sitting at "queued" with no worker behind it: that is
+        // indistinguishable from a download that has not started yet, and waits forever.
+        return try {
+            download(id)
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            Timber.e(e, "Download %s fell over", id)
+            downloadsRepository.setStatus(
+                id,
+                DownloadStatus.Failed,
+                DownloadErrorKind.Unexpected,
+                e.message ?: e::class.simpleName.orEmpty()
+            )
+            Result.failure()
+        }
+    }
+
+    private suspend fun download(id: String): Result {
         val title = downloadsRepository.getJob(id)?.title.orEmpty()
         runForeground(title, 0, null)
 
@@ -51,7 +68,14 @@ class DownloadWorker @AssistedInject constructor(
                     )
                     Result.failure()
                 } else {
-                    downloadsRepository.setStatus(id, DownloadStatus.Queued)
+                    // Back to queued, but with the reason kept: waiting out a backoff looks exactly
+                    // like never having started unless the queue can say which one it is.
+                    downloadsRepository.setStatus(
+                        id,
+                        DownloadStatus.Queued,
+                        DownloadErrorKind.Network,
+                        "Attempt ${runAttemptCount + 1} of $MAX_ATTEMPTS did not get through"
+                    )
                     Result.retry()
                 }
         }
@@ -77,7 +101,9 @@ class DownloadWorker @AssistedInject constructor(
     private suspend fun runForeground(title: String, bytes: Long, total: Long?) {
         try {
             setForeground(foregroundInfo(title, bytes, total))
-        } catch (e: IllegalStateException) {
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            // Anything here is survivable: the transfer runs either way, and taking the download
+            // down with it would strand the row.
             Timber.d(e, "Continuing without a foreground service")
         }
     }

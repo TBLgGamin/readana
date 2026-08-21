@@ -5,7 +5,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -105,6 +107,10 @@ internal fun DiscoverRoute(
         onSelectTrending = viewModel::searchFor,
         onDismissMessage = viewModel::consumeMessage,
         onVerify = viewModel::verifyInBrowser,
+        onDownloadTrending = { book ->
+            askForNotifications()
+            viewModel.download(book)
+        },
         modifier = modifier
     )
 }
@@ -160,8 +166,11 @@ internal fun DiscoverScreen(
     onSelectTrending: (TrendingBook) -> Unit,
     onDismissMessage: () -> Unit,
     onVerify: (SourceError) -> Unit,
+    onDownloadTrending: (TrendingBook) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Long-pressing a cover opens what the source knows about it, the way the library does.
+    var details by remember { mutableStateOf<SearchResult?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val messageText = uiState.message?.let { messageText(it) }
     val currentOnMessageShown by rememberUpdatedState(onDismissMessage)
@@ -217,9 +226,15 @@ internal fun DiscoverScreen(
             DiscoverContent(
                 uiState = uiState,
                 onDownload = onDownload,
-                onSelectTrending = onSelectTrending
+                onSelectTrending = onSelectTrending,
+                onDownloadTrending = onDownloadTrending,
+                onShowDetails = { details = it }
             )
         }
+    }
+
+    details?.let { result ->
+        ResultDetailsSheet(result = result, onDismiss = { details = null })
     }
 }
 
@@ -228,6 +243,8 @@ private fun DiscoverContent(
     uiState: DiscoverUiState,
     onDownload: (SearchResult) -> Unit,
     onSelectTrending: (TrendingBook) -> Unit,
+    onDownloadTrending: (TrendingBook) -> Unit,
+    onShowDetails: (SearchResult) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val waitingForFirstResults = uiState.isSearching && uiState.results.isEmpty()
@@ -240,6 +257,7 @@ private fun DiscoverContent(
         !uiState.hasSearched && uiState.trending.isNotEmpty() -> TrendingGrid(
             books = uiState.trending,
             onSelect = onSelectTrending,
+            onDownload = onDownloadTrending,
             modifier = modifier
         )
 
@@ -259,13 +277,39 @@ private fun DiscoverContent(
             modifier = modifier
         )
 
-        else -> ResultGrid(results = uiState.results, onDownload = onDownload, modifier = modifier)
+        else -> ResultGrid(
+            results = uiState.results,
+            onDownload = onDownload,
+            onShowDetails = onShowDetails,
+            modifier = modifier
+        )
     }
+}
+
+/**
+ * Opening a book's details: hold it, as in the library. A plain tap does the same, because a cover
+ * that answers nothing at all reads as broken.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun Modifier.bookDetailsGesture(onShowDetails: () -> Unit): Modifier {
+    val label = stringResource(R.string.feature_discover_details_action)
+    return combinedClickable(
+        onClickLabel = label,
+        onLongClickLabel = label,
+        onClick = onShowDetails,
+        onLongClick = onShowDetails
+    )
 }
 
 /** Search hits as a two-up cover grid. */
 @Composable
-private fun ResultGrid(results: List<SearchResult>, onDownload: (SearchResult) -> Unit, modifier: Modifier = Modifier) {
+private fun ResultGrid(
+    results: List<SearchResult>,
+    onDownload: (SearchResult) -> Unit,
+    onShowDetails: (SearchResult) -> Unit,
+    modifier: Modifier = Modifier
+) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(GRID_COLUMNS),
         modifier = modifier.fillMaxSize(),
@@ -274,19 +318,30 @@ private fun ResultGrid(results: List<SearchResult>, onDownload: (SearchResult) -
         verticalArrangement = Arrangement.spacedBy(GridSpacing)
     ) {
         items(results, key = { "${it.sourceId}:${it.recordId}" }) { result ->
-            ResultCard(result = result, onDownload = { onDownload(result) })
+            ResultCard(
+                result = result,
+                onDownload = { onDownload(result) },
+                onShowDetails = { onShowDetails(result) }
+            )
         }
     }
 }
 
 @Composable
-private fun ResultCard(result: SearchResult, onDownload: () -> Unit, modifier: Modifier = Modifier) {
+private fun ResultCard(
+    result: SearchResult,
+    onDownload: () -> Unit,
+    onShowDetails: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Column(modifier = modifier) {
         Box {
             BookCover(
                 title = result.title,
                 coverUri = result.coverUrl,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bookDetailsGesture(onShowDetails)
             )
             // Over the cover so a long title never pushes the action out of reach.
             FilledIconButton(
@@ -318,7 +373,12 @@ private fun ResultCard(result: SearchResult, onDownload: () -> Unit, modifier: M
 
 /** What to browse before searching: covers you can tap to search for. */
 @Composable
-private fun TrendingGrid(books: List<TrendingBook>, onSelect: (TrendingBook) -> Unit, modifier: Modifier = Modifier) {
+private fun TrendingGrid(
+    books: List<TrendingBook>,
+    onSelect: (TrendingBook) -> Unit,
+    onDownload: (TrendingBook) -> Unit,
+    modifier: Modifier = Modifier
+) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(GRID_COLUMNS),
         modifier = modifier.fillMaxSize(),
@@ -334,12 +394,26 @@ private fun TrendingGrid(books: List<TrendingBook>, onSelect: (TrendingBook) -> 
             )
         }
         items(books, key = { it.searchQuery }) { book ->
-            Column(modifier = Modifier.clickable { onSelect(book) }) {
-                BookCover(
-                    title = book.title,
-                    coverUri = book.coverUrl,
-                    modifier = Modifier.fillMaxWidth()
-                )
+            Column {
+                Box {
+                    BookCover(
+                        title = book.title,
+                        coverUri = book.coverUrl,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(book) }
+                    )
+                    // The same reach as a search hit: fetch it without searching first.
+                    FilledIconButton(
+                        onClick = { onDownload(book) },
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp)
+                    ) {
+                        Icon(
+                            ReadanaIcons.Download,
+                            contentDescription = stringResource(R.string.feature_discover_download_action)
+                        )
+                    }
+                }
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = book.title,
@@ -367,6 +441,11 @@ private fun messageText(message: DiscoverMessage): String = when (message) {
 
     is DiscoverMessage.AlreadyInLibrary -> stringResource(
         R.string.feature_discover_message_in_library,
+        message.title
+    )
+
+    is DiscoverMessage.NothingFound -> stringResource(
+        R.string.feature_discover_message_not_found,
         message.title
     )
 
@@ -420,7 +499,8 @@ private fun DiscoverScreenPreview() {
             onDownload = {},
             onSelectTrending = {},
             onDismissMessage = {},
-            onVerify = {}
+            onVerify = {},
+            onDownloadTrending = {}
         )
     }
 }
@@ -442,7 +522,8 @@ private fun DiscoverTrendingPreview() {
             onDownload = {},
             onSelectTrending = {},
             onDismissMessage = {},
-            onVerify = {}
+            onVerify = {},
+            onDownloadTrending = {}
         )
     }
 }

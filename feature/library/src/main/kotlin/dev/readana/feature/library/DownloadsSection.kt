@@ -196,9 +196,15 @@ private fun DismissButton(jobId: String, onDismiss: (String) -> Unit) {
 private val DownloadJob.needsBrowser: Boolean
     get() = errorKind == DownloadErrorKind.RequiresBrowser || errorKind == DownloadErrorKind.QuotaExhausted
 
+/** A queued job that already carries a reason is waiting out a backoff, not waiting to begin. */
+@Composable
+private fun DownloadJob.queuedLine(): String = errorMessage
+    ?.let { stringResource(R.string.feature_library_download_retrying, it) }
+    ?: stringResource(R.string.feature_library_download_queued)
+
 @Composable
 private fun DownloadJob.statusLine(): String = when (status) {
-    DownloadStatus.Queued -> stringResource(R.string.feature_library_download_queued)
+    DownloadStatus.Queued -> queuedLine()
 
     DownloadStatus.Downloading -> totalBytes?.let { total ->
         stringResource(

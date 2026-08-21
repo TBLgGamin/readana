@@ -19,4 +19,13 @@
     <string name="feature_discover_message_failed">Download failed: %1$s</string>
     <string name="feature_discover_verifying">Checking with the source&#8230; this is usually quick.</string>
     <string name="feature_discover_verify_in_browser">Open in browser to continue</string>
+    <string name="feature_discover_message_not_found">No source has “%1$s”</string>
+    <string name="feature_discover_details_unknown">Unknown</string>
+    <string name="feature_discover_details_format">Format</string>
+    <string name="feature_discover_details_size">Size</string>
+    <string name="feature_discover_details_language">Language</string>
+    <string name="feature_discover_details_year">Year</string>
+    <string name="feature_discover_details_publisher">Publisher</string>
+    <string name="feature_discover_details_source">Source</string>
+    <string name="feature_discover_details_action">Show details</string>
 </resources>

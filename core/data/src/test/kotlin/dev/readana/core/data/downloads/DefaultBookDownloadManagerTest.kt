@@ -123,6 +123,18 @@ class DefaultBookDownloadManagerTest {
     }
 
     @Test
+    fun `dismissing a failed download clears the work behind it`() = runTest {
+        // A failed job can still have work waiting on a retry backoff. Left behind, that work owns
+        // the record's unique name, and the next attempt at the same book never gets a worker.
+        downloads.upsert(downloadEntity(recordId = "md5abc", status = DownloadStatus.Failed))
+        val manager = manager()
+
+        manager.dismiss("job-1")
+
+        assertEquals(listOf("download:annas-archive:md5abc"), scheduler.cancelled)
+    }
+
+    @Test
     fun `a source the app no longer has is refused before anything is queued`() = runTest {
         val manager = manager(source = FakeSource(fastDownload().asSuccess()), registerSource = false)
 

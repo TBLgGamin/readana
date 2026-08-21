@@ -210,7 +210,9 @@ class DefaultBookDownloadManager @Inject constructor(
 
     override suspend fun dismiss(jobId: String) {
         val job = downloadsRepository.getJob(jobId) ?: return
-        if (job.isActive) scheduler.cancel(uniqueName(job.sourceId, job.recordId))
+        // Always, even for a job that already failed: it may still have work waiting on a retry
+        // backoff, and leaving that behind would block the next attempt at the same book.
+        scheduler.cancel(uniqueName(job.sourceId, job.recordId))
         downloader.discardPart(jobId)
         downloadsRepository.remove(jobId)
     }

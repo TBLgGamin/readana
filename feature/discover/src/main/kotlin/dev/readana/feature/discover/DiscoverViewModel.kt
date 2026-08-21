@@ -125,26 +125,53 @@ class DiscoverViewModel @Inject constructor(
     }
 
     /**
-     * Queues the transfer. Sources that need a browser step (a spent membership quota, a wait-list)
-     * report a [DiscoverEffect.OpenBrowser] instead of a queue entry.
+     * Downloads a book from the popular shelf, which carries no file of its own: the sources are
+     * searched for it first and the best match is queued. The message names what was queued, so a
+     * wrong edition is obvious rather than silent.
      */
-    fun download(result: SearchResult) {
+    fun download(book: TrendingBook) {
         viewModelScope.launch {
-            when (val outcome = downloadManager.enqueue(result)) {
-                is EnqueueOutcome.Enqueued -> show(
-                    DiscoverMessage.Queued(result.title, outcome.fastDownloadsLeft)
-                )
-
-                is EnqueueOutcome.AlreadyInLibrary -> show(
-                    DiscoverMessage.AlreadyInLibrary(outcome.book.title)
-                )
-
-                is EnqueueOutcome.AlreadyQueued -> show(
-                    DiscoverMessage.AlreadyQueued(outcome.job.title)
-                )
-
-                is EnqueueOutcome.Failed -> show(DiscoverMessage.Failed(outcome.error))
+            _uiState.update { it.copy(isSearching = true) }
+            val match = firstMatch(book.searchQuery)
+            _uiState.update { it.copy(isSearching = false) }
+            if (match == null) {
+                show(DiscoverMessage.NothingFound(book.title))
+                return@launch
             }
+            enqueue(match)
+        }
+    }
+
+    private suspend fun firstMatch(query: String): SearchResult? {
+        val enabledSources = sources.enabled(settingsRepository.sourceSettings.first())
+        val outcomes = coroutineScope {
+            enabledSources.map { source -> async { source.search(SearchQuery(query)) } }.awaitAll()
+        }
+        return outcomes.firstNotNullOfOrNull { outcome ->
+            (outcome as? AppResult.Success)?.value?.results?.firstOrNull()
+        }
+    }
+
+    /** Queues a search hit; what it takes to actually fetch it is the download job's problem. */
+    fun download(result: SearchResult) {
+        viewModelScope.launch { enqueue(result) }
+    }
+
+    private suspend fun enqueue(result: SearchResult) {
+        when (val outcome = downloadManager.enqueue(result)) {
+            is EnqueueOutcome.Enqueued -> show(
+                DiscoverMessage.Queued(result.title, outcome.fastDownloadsLeft)
+            )
+
+            is EnqueueOutcome.AlreadyInLibrary -> show(
+                DiscoverMessage.AlreadyInLibrary(outcome.book.title)
+            )
+
+            is EnqueueOutcome.AlreadyQueued -> show(
+                DiscoverMessage.AlreadyQueued(outcome.job.title)
+            )
+
+            is EnqueueOutcome.Failed -> show(DiscoverMessage.Failed(outcome.error))
         }
     }
 
@@ -203,6 +230,9 @@ sealed interface DiscoverMessage {
     data class AlreadyInLibrary(val title: String) : DiscoverMessage
 
     data class AlreadyQueued(val title: String) : DiscoverMessage
+
+    /** A popular-shelf book no enabled source could find. */
+    data class NothingFound(val title: String) : DiscoverMessage
 
     data class Failed(val error: AppError) : DiscoverMessage
 }

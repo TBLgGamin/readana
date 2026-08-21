@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -15,7 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import coil3.compose.SubcomposeAsyncImage
+import coil3.compose.AsyncImage
 import dev.readana.core.designsystem.theme.ReadanaTheme
 
 private const val COVER_ASPECT_RATIO = 2f / 3f
@@ -31,18 +35,29 @@ fun BookCover(title: String, coverUri: String?, modifier: Modifier = Modifier) {
         BookCoverPlaceholder(title = title, modifier = modifier)
         return
     }
-    SubcomposeAsyncImage(
-        model = coverUri,
-        // The title is always rendered next to the cover, so announcing it twice adds nothing.
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
+    // AsyncImage rather than its Subcompose sibling: subcomposing every cell of a scrolling grid
+    // costs a measurable amount of frame time, and the only thing it bought here was a composable
+    // error slot, which a flag and a Box give for free.
+    var failed by remember(coverUri) { mutableStateOf(false) }
+    Box(
         modifier = modifier
             .aspectRatio(COVER_ASPECT_RATIO)
             .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-        loading = {},
-        error = { BookCoverPlaceholder(title = title) }
-    )
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        if (failed) {
+            BookCoverPlaceholder(title = title, modifier = Modifier.matchParentSize())
+        } else {
+            AsyncImage(
+                model = coverUri,
+                // The title is always rendered next to the cover, so announcing it twice adds nothing.
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                onError = { failed = true },
+                modifier = Modifier.matchParentSize()
+            )
+        }
+    }
 }
 
 /**

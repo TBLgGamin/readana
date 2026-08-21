@@ -12,9 +12,13 @@ import coil3.memory.MemoryCache
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import dagger.hilt.android.HiltAndroidApp
+import dev.readana.core.data.browser.BrowserIdentity
 import io.ktor.client.HttpClient
 import javax.inject.Inject
 import javax.inject.Provider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import timber.log.Timber
 
 /**
@@ -32,6 +36,9 @@ class ReadanaApplication :
     /** Lazily resolved: Coil may ask for a loader before or after Hilt has finished injecting. */
     @Inject
     lateinit var httpClient: Provider<HttpClient>
+
+    @Inject
+    lateinit var browserIdentity: Provider<BrowserIdentity>
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -64,6 +71,9 @@ class ReadanaApplication :
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
+        // Reading the WebView's user agent starts the WebView provider, which takes a moment. Every
+        // request needs it, so pay for it here rather than making the first batch of covers wait.
+        CoroutineScope(Dispatchers.Default).launch { browserIdentity.get().userAgent }
     }
 
     private companion object {
