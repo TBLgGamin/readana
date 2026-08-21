@@ -16,6 +16,12 @@ sealed interface AppError {
     /** The operation needs credentials or a membership the user has not configured. */
     data class Unauthorized(override val message: String) : AppError
 
+    /**
+     * The site insists on a "checking your browser" gate that the app could not clear on its own,
+     * so someone has to open [url] in a browser. Carrying the URL is what lets the UI offer that.
+     */
+    data class BrowserCheck(override val message: String, val url: String) : AppError
+
     data class NotFound(override val message: String) : AppError
 
     /** Valid input that this app deliberately does not handle (e.g. an unsupported file format). */

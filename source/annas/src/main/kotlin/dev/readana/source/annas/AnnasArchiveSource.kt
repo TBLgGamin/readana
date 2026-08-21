@@ -7,14 +7,18 @@ import dev.readana.core.common.result.asSuccess
 import dev.readana.core.model.BookFormat
 import dev.readana.source.api.BookSource
 import dev.readana.source.api.BrowserLogin
+import dev.readana.source.api.BrowserVerifier
 import dev.readana.source.api.DownloadQuota
 import dev.readana.source.api.DownloadRequest
 import dev.readana.source.api.FileNames
+import dev.readana.source.api.NoBrowserVerifier
 import dev.readana.source.api.SearchPage
 import dev.readana.source.api.SearchQuery
 import dev.readana.source.api.SearchResult
 import dev.readana.source.api.SourceId
+import dev.readana.source.api.VerifyOutcome
 import io.ktor.client.HttpClient
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.client.statement.HttpResponse
@@ -39,6 +43,8 @@ class AnnasArchiveSource(
     private val client: HttpClient,
     private val config: suspend () -> AnnasConfig,
     private val mirrors: MirrorResolver = MirrorResolver(),
+    /** Clears the site's browser check without troubling the user, when the device can. */
+    private val verifier: BrowserVerifier = NoBrowserVerifier,
     /** Called with the mirror that answered, so the choice survives a restart. */
     private val onWorkingMirror: suspend (String) -> Unit = {}
 ) : BookSource {
@@ -49,6 +55,9 @@ class AnnasArchiveSource(
     override val enabledByDefault: Boolean = false
 
     private val json = Json { ignoreUnknownKeys = true }
+    private val session = AnnasSession(client)
+
+    private fun String?.orNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
 
     override suspend fun search(query: SearchQuery): AppResult<SearchPage> {
         val settings = config()
@@ -57,25 +66,21 @@ class AnnasArchiveSource(
             preferred = settings.preferredMirror,
             onWorkingMirror = onWorkingMirror
         ) { base ->
-            val response = client.get("$base/search") {
-                parameter("q", query.text)
-                // The table layout puts every field in a fixed column, which survives the site's
-                // frequent restyling of the card layout.
-                parameter("display", "table")
-                // Repeatable: the site filters on the set, and we can only open these two anyway.
-                query.formats.forEach { parameter("ext", it.extension) }
-                query.language?.let { parameter("lang", it) }
-                if (query.page > 1) parameter("page", query.page)
+            val html = when (
+                val page = gatedGet(base, "/search", settings.secretKey.orNull()) {
+                    parameter("q", query.text)
+                    // The table layout puts every field in a fixed column, which survives the site's
+                    // frequent restyling of the card layout.
+                    parameter("display", "table")
+                    // Repeatable: the site filters on the set, and we can only open these two anyway.
+                    query.formats.forEach { parameter("ext", it.extension) }
+                    query.language?.let { parameter("lang", it) }
+                    if (query.page > 1) parameter("page", query.page)
+                }
+            ) {
+                is AppResult.Failure -> return@withMirror page
+                is AppResult.Success -> page.value
             }
-            response.failIfMirrorBroken()
-            if (!response.status.isSuccess()) {
-                return@withMirror AppError.Http(
-                    response.status.value,
-                    blockedMessage(response.status) ?: "HTTP ${response.status.value}"
-                ).asFailure()
-            }
-
-            val html = response.bodyAsText()
             if (AnnasSearchParser.isRedirectInterstitial(html)) {
                 throw MirrorUnavailableException("mirror only serves a redirect page")
             }
@@ -84,14 +89,14 @@ class AnnasArchiveSource(
                     "response does not look like Anna's Archive (parked domain or block page)"
                 )
             }
-            val page = AnnasSearchParser.parse(html, base, id)
-            val results = page.results.filter { it.format == null || it.format in query.formats }
+            val parsed = AnnasSearchParser.parse(html, base, id)
+            val results = parsed.results.filter { it.format == null || it.format in query.formats }
             SearchPage(
                 results = results,
                 page = query.page,
                 // A page the site filled to the brim probably has another behind it. Counting
                 // records rather than results keeps that true when formats we cannot open are cut.
-                hasMore = page.recordCount >= AnnasSearchParser.RESULTS_PER_PAGE
+                hasMore = parsed.recordCount >= AnnasSearchParser.RESULTS_PER_PAGE
             ).asSuccess()
         }
     }
@@ -126,6 +131,70 @@ class AnnasArchiveSource(
             interpret(payload, response.status, base, md5, key, format, fileName, result.sizeBytes)
         }
     }
+
+    /**
+     * Fetches an Anna's Archive page, getting past the browser check on the way if the site asks
+     * for one.
+     *
+     * A member is waved past it: signing in with the key sets a session cookie the site trusts, so
+     * that is tried first and costs one extra request per mirror per session. Everyone else needs
+     * the check answered by something that runs JavaScript, which is what [verifier] is for; the
+     * cookie it earns is shared with this client, so the retry goes through. When there is nothing
+     * to verify with, the caller gets the URL to hand to a browser the user can see.
+     */
+    private suspend fun gatedGet(
+        base: String,
+        path: String,
+        key: String?,
+        params: HttpRequestBuilder.() -> Unit = {}
+    ): AppResult<String> {
+        val url = "$base$path"
+        var response = client.get(url, params)
+        var body = response.bodyAsText()
+
+        if (response.isChallenge(body)) {
+            if (key != null && !session.isSignedIn(base) && session.signIn(base, key)) {
+                response = client.get(url, params)
+                body = response.bodyAsText()
+            }
+        }
+        if (response.isChallenge(body)) {
+            // A membership that has lapsed still signs in, so stop trusting the session and let
+            // the next attempt try again from scratch.
+            session.forget(base)
+            when (verifier.verify(url)) {
+                is VerifyOutcome.Verified -> {
+                    response = client.get(url, params)
+                    body = response.bodyAsText()
+                }
+
+                is VerifyOutcome.Failed, VerifyOutcome.Unavailable -> return browserCheck(url)
+            }
+        }
+        if (response.isChallenge(body)) return browserCheck(url)
+
+        response.failIfMirrorBroken()
+        if (!response.status.isSuccess()) {
+            return AppError.Http(
+                response.status.value,
+                blockedMessage(response.status) ?: "HTTP ${response.status.value}"
+            ).asFailure()
+        }
+        return body.asSuccess()
+    }
+
+    private fun browserCheck(url: String): AppResult<String> = AppError.BrowserCheck(
+        "Anna's Archive wants a browser check before it will answer",
+        url
+    ).asFailure()
+
+    private fun HttpResponse.isChallenge(body: String): Boolean = DdosGuard.isChallenge(
+        status = status.value,
+        header = { headers[it] },
+        // Redirects are followed, so this is where the answer actually came from.
+        url = call.request.url.toString(),
+        body = body
+    )
 
     /**
      * The record page, for the in-app browser to run a slow partner download. When a key is

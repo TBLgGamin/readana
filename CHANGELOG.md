@@ -8,6 +8,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Anna's Archive searches get past the site's browser check instead of failing on it. Without a
+  recent check the site bounces every request to a JavaScript challenge, which no plain HTTP client
+  can answer — that was behind the assorted 400s and 403s. Readana now answers it in a WebView you
+  never see, usually in a second or two, and repeats the request with the cookie it earns. If the
+  device has no WebView, or the check will not settle, the error offers to open it in a browser
+  instead of failing outright.
+- A membership key now helps with searching too. Posting it to the account page signs in, and the
+  site waves signed-in members past the browser check entirely — so a member never waits for one.
+  The key is posted once per mirror per session, and a lapsed membership quietly falls back to the
+  same check everyone else gets.
+
 - Anna's Archive mirrors are the three the site currently authorises (`.gl`, `.pk`, `.gd`); `.org`,
   `.se` and `.li` are gone because they no longer resolve or only serve a redirect page. The mirror
   that answers is remembered across restarts, and one that just failed is tried last for five

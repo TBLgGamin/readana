@@ -332,11 +332,20 @@ class BookDownloader @Inject constructor(
 
 internal fun AppError.toErrorKind(): DownloadErrorKind = when (this) {
     is AppError.Network -> DownloadErrorKind.Network
+
     is AppError.Http -> DownloadErrorKind.Http
+
     is AppError.Unauthorized -> DownloadErrorKind.Unauthorized
+
+    // Only a browser can clear the check, and the queue already offers to open one.
+    is AppError.BrowserCheck -> DownloadErrorKind.RequiresBrowser
+
     is AppError.NotFound -> DownloadErrorKind.Http
+
     is AppError.Parse -> DownloadErrorKind.Unexpected
+
     is AppError.Unsupported -> DownloadErrorKind.Unexpected
+
     is AppError.Unexpected -> DownloadErrorKind.Unexpected
 }
 

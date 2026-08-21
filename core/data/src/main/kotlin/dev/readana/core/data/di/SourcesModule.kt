@@ -9,6 +9,7 @@ import dev.readana.core.data.repository.SettingsRepository
 import dev.readana.source.annas.AnnasArchiveSource
 import dev.readana.source.annas.AnnasConfig
 import dev.readana.source.api.BookSource
+import dev.readana.source.api.BrowserVerifier
 import dev.readana.source.trending.OpenLibraryTrending
 import dev.readana.source.trending.TrendingBooks
 import io.ktor.client.HttpClient
@@ -33,20 +34,22 @@ object SourcesModule {
     @Provides
     @IntoSet
     @Singleton
-    fun providesAnnasArchive(client: HttpClient, settings: SettingsRepository): BookSource = AnnasArchiveSource(
-        client = client,
-        config = {
-            val stored = settings.sourceSettings.first()
-            AnnasConfig(
-                mirrors = stored.annasMirrors.ifEmpty { AnnasConfig.DEFAULT_MIRRORS },
-                secretKey = stored.annasSecretKey,
-                preferredMirror = stored.annasPreferredMirror
-            )
-        },
-        // Mirrors rotate and get blocked; remembering the one that answered saves the next search
-        // from walking the list again after a restart.
-        onWorkingMirror = { mirror ->
-            settings.updateSourceSettings { it.copy(annasPreferredMirror = mirror) }
-        }
-    )
+    fun providesAnnasArchive(client: HttpClient, settings: SettingsRepository, verifier: BrowserVerifier): BookSource =
+        AnnasArchiveSource(
+            client = client,
+            config = {
+                val stored = settings.sourceSettings.first()
+                AnnasConfig(
+                    mirrors = stored.annasMirrors.ifEmpty { AnnasConfig.DEFAULT_MIRRORS },
+                    secretKey = stored.annasSecretKey,
+                    preferredMirror = stored.annasPreferredMirror
+                )
+            },
+            verifier = verifier,
+            // Mirrors rotate and get blocked; remembering the one that answered saves the next search
+            // from walking the list again after a restart.
+            onWorkingMirror = { mirror ->
+                settings.updateSourceSettings { it.copy(annasPreferredMirror = mirror) }
+            }
+        )
 }
