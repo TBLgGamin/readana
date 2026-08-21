@@ -10,6 +10,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandler
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.respondError
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
@@ -147,8 +148,9 @@ class AnnasArchiveSourceTest {
     }
 
     @Test
-    fun `without a secret key downloads are handed to the browser`() = runTest {
-        val source = source(config = AnnasConfig(mirrors)) { error("no request expected") }
+    fun `with nothing else serving the file, the browser gets the record page`() = runTest {
+        // Neither Library Genesis nor a partner server has it.
+        val source = source(config = AnnasConfig(mirrors)) { respondError(HttpStatusCode.NotFound) }
 
         val request = assertNotNull(source.resolveDownload(result()).getOrNull())
 
@@ -159,14 +161,19 @@ class AnnasArchiveSourceTest {
     }
 
     @Test
-    fun `a spent quota falls back to the browser and offers a key login`() = runTest {
-        val source = source(config = AnnasConfig(mirrors, secretKey = "s3cr3t")) {
-            respond(
-                """{"download_url":null,"account_fast_download_info":""" +
-                    """{"downloads_left":0,"downloads_per_day":100}}""",
-                HttpStatusCode.OK,
-                headersOf(HttpHeaders.ContentType, "application/json")
-            )
+    fun `a member sent to the browser can sign in there with the key`() = runTest {
+        val source = source(config = AnnasConfig(mirrors, secretKey = "s3cr3t")) { request ->
+            if (request.url.encodedPath.endsWith("fast_download.json")) {
+                respond(
+                    """{"download_url":null,"account_fast_download_info":""" +
+                        """{"downloads_left":0,"downloads_per_day":100}}""",
+                    HttpStatusCode.OK,
+                    headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            } else {
+                // Nothing free serves it either, so the browser is all that is left.
+                respondError(HttpStatusCode.NotFound)
+            }
         }
 
         val request = assertNotNull(source.resolveDownload(result()).getOrNull())
@@ -175,7 +182,6 @@ class AnnasArchiveSourceTest {
         assertEquals("https://one.test/md5/0123456789abcdef0123456789abcdef", request.url)
         assertEquals(0, request.quota?.remaining)
         assertEquals(100, request.quota?.perDay)
-        assertEquals(true, request.quota?.isExhausted)
         // Anna's has no password: posting the membership key to /account/ is the whole login.
         assertEquals("https://one.test/account/", request.browserLogin?.url)
         assertEquals("key=s3cr3t", request.browserLogin?.formBody)

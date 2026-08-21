@@ -1,0 +1,14 @@
+<!--
+  Fixture: the free partner download page while the wait-list is running. The page counts down in
+  JavaScript and then reloads itself, which is what the source imitates.
+-->
+<html><head><title>Download - Anna’s Archive</title></head><body>
+<div class="main-inner">
+  <p>Your download will be ready in <span class="js-partner-countdown">20</span> seconds.</p>
+  <p><a href="/md5/d6e1dc51a50726f00ec438af21952a45">Back to the record</a></p>
+  <script>
+    let waitSeconds = 20;
+    setTimeout(function () { window.location.assign(window.location.href); }, waitSeconds * 1000);
+  </script>
+</div>
+</body></html>

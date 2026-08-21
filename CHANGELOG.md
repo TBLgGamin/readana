@@ -8,6 +8,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Downloading without a membership works on its own now. Anna's Archive is a catalogue: most of
+  what it lists is held by Library Genesis, which serves the same file by md5 with no browser check
+  and no wait, so that is tried first and a free download starts immediately. If the file is not
+  there, Readana asks Anna's own free partner servers — preferring the ones that never queue, and
+  sitting through a short wait-list when that is all there is. The in-app browser is now the last
+  resort rather than the only route.
+- A membership whose daily allowance is spent no longer dead-ends at the browser: the download
+  falls through to the free routes above, and Settings still shows what is left.
+
 - Anna's Archive searches get past the site's browser check instead of failing on it. Without a
   recent check the site bounces every request to a JavaScript challenge, which no plain HTTP client
   can answer — that was behind the assorted 400s and 403s. Readana now answers it in a WebView you

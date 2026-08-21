@@ -4,6 +4,7 @@ import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
 import dev.readana.core.common.result.asFailure
 import dev.readana.core.common.result.asSuccess
+import dev.readana.core.common.result.getOrNull
 import dev.readana.core.model.BookFormat
 import dev.readana.source.api.BookSource
 import dev.readana.source.api.BrowserLogin
@@ -23,8 +24,11 @@ import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.delay
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
@@ -56,6 +60,7 @@ class AnnasArchiveSource(
 
     private val json = Json { ignoreUnknownKeys = true }
     private val session = AnnasSession(client)
+    private val libgen = LibgenDirectLinks(client)
 
     private fun String?.orNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
 
@@ -101,34 +106,183 @@ class AnnasArchiveSource(
         }
     }
 
+    /**
+     * Finds a way to fetch the file, best first.
+     *
+     * 1. A member's fast download, when a key is configured. Straight to the file, no wait.
+     * 2. Library Genesis, which holds most of what the site indexes and serves it by md5 with no
+     *    browser check at all — this is what makes a free download start immediately.
+     * 3. The site's own free partner servers, which sometimes hold the file behind a short wait.
+     * 4. The record page in a browser the user can see, for anything the other three could not do.
+     *
+     * A membership whose daily allowance is spent falls through to the free rungs rather than
+     * straight to the browser: slower is still better than manual.
+     */
     override suspend fun resolveDownload(result: SearchResult): AppResult<DownloadRequest> {
         val settings = config()
-        val md5 = result.extras[AnnasSearchParser.EXTRA_MD5] ?: result.recordId
-        val format = result.format ?: BookFormat.EPUB
-        val fileName = FileNames.suggest(result.title, result.authors, format)
-        val key = settings.secretKey?.trim()?.takeIf { it.isNotEmpty() }
+        val candidate = Candidate(
+            md5 = result.extras[AnnasSearchParser.EXTRA_MD5] ?: result.recordId,
+            format = result.format ?: BookFormat.EPUB,
+            expectedSize = result.sizeBytes,
+            collections = result.extras[AnnasSearchParser.EXTRA_COLLECTIONS],
+            fileName = FileNames.suggest(
+                result.title,
+                result.authors,
+                result.format ?: BookFormat.EPUB
+            )
+        )
+        val key = settings.secretKey.orNull()
+        var quota: DownloadQuota? = null
 
-        return mirrors.withMirror(
+        if (key != null) {
+            val outcome = onSomeMirror(settings) { base -> fastDownload(base, candidate, key) }
+            when (val rung = outcome.getOrNull()) {
+                is Rung.Ready -> return rung.request.asSuccess()
+
+                is Rung.Stop -> return rung.error.asFailure()
+
+                is Rung.Continue -> quota = rung.quota
+
+                // Every mirror failed to answer at all; the free rungs may still work.
+                null -> Unit
+            }
+        }
+
+        if (candidate.mightBeOnLibgen) {
+            libgen.resolve(candidate.md5)?.let { link ->
+                return candidate.request(
+                    url = link.url,
+                    quota = quota,
+                    headers = mapOf(HttpHeaders.Referrer to link.referer)
+                ).asSuccess()
+            }
+        }
+
+        val slow = onSomeMirror(settings) { base -> slowDownload(base, candidate, key, quota) }
+        if (slow is AppResult.Success) return slow
+
+        val base = mirrors.preferredMirror ?: settings.preferredMirror ?: settings.normalizedMirrors.first()
+        return browserFallback(base, candidate, key, quota).asSuccess()
+    }
+
+    private suspend fun <T> onSomeMirror(settings: AnnasConfig, block: suspend (String) -> AppResult<T>): AppResult<T> =
+        mirrors.withMirror(
             mirrors = settings.normalizedMirrors,
             preferred = settings.preferredMirror,
-            onWorkingMirror = onWorkingMirror
-        ) { base ->
-            if (key == null) {
-                return@withMirror browserFallback(base, md5, format, fileName, key = null).asSuccess()
+            onWorkingMirror = onWorkingMirror,
+            block = block
+        )
+
+    /** What one rung of the ladder concluded. */
+    private sealed interface Rung {
+        data class Ready(val request: DownloadRequest) : Rung
+
+        /** No point trying anything else: the answer would be the same. */
+        data class Stop(val error: AppError) : Rung
+
+        /** This rung cannot serve it; the quota is carried on so the UI can still report it. */
+        data class Continue(val quota: DownloadQuota?) : Rung
+    }
+
+    private suspend fun fastDownload(base: String, candidate: Candidate, key: String): AppResult<Rung> {
+        val response = client.get("$base/dyn/api/fast_download.json") {
+            parameter("md5", candidate.md5)
+            parameter("key", key)
+        }
+        response.failIfMirrorBroken()
+        val payload = try {
+            json.decodeFromString<FastDownloadResponse>(response.bodyAsText())
+        } catch (e: SerializationException) {
+            return AppError.Parse("Unexpected fast-download response", e).asFailure()
+        } catch (e: IllegalArgumentException) {
+            return AppError.Parse("Unexpected fast-download response", e).asFailure()
+        }
+        return interpret(payload, response.status, candidate).asSuccess()
+    }
+
+    /**
+     * Asks the free partner servers, no-wait ones first. A short wait is worth sitting through
+     * because the page then serves the link itself; a long one is not, so the next server gets a
+     * turn and the browser is left as the last resort.
+     */
+    private suspend fun slowDownload(
+        base: String,
+        candidate: Candidate,
+        key: String?,
+        quota: DownloadQuota?
+    ): AppResult<DownloadRequest> {
+        var budget = AnnasConfig.MAX_WAIT_SECONDS
+        var lastError: AppError? = null
+
+        val link = AnnasConfig.SLOW_DOWNLOAD_SERVERS.firstNotNullOfOrNull { server ->
+            val attempt = partnerLink(base, candidate, key, server, budget)
+            lastError = attempt.error ?: lastError
+            budget -= attempt.waited
+            attempt.url
+        }
+        return link?.let { candidate.request(it, quota).asSuccess() }
+            ?: (lastError ?: AppError.Unexpected("No free download server had this file")).asFailure()
+    }
+
+    /** What one partner server had to say. [waited] comes off the shared patience budget. */
+    private data class Attempt(val url: String?, val waited: Int = 0, val error: AppError? = null)
+
+    private suspend fun partnerLink(
+        base: String,
+        candidate: Candidate,
+        key: String?,
+        server: Int,
+        budget: Int
+    ): Attempt {
+        val path = "/slow_download/${candidate.md5}/0/$server"
+        val page = gatedGet(base, path, key)
+        if (page is AppResult.Failure) return Attempt(url = null, error = page.error)
+
+        val url = "$base$path"
+        return when (val outcome = SlowDownloadParser.parse(page.getOrNull().orEmpty(), url, candidate.md5)) {
+            is SlowDownloadParser.Outcome.Link -> Attempt(outcome.url)
+
+            is SlowDownloadParser.Outcome.Wait -> when {
+                outcome.seconds > budget -> Attempt(url = null)
+
+                else -> {
+                    // The page counts down and then reloads itself; this does the same.
+                    delay((outcome.seconds + 1).seconds)
+                    val reloaded = gatedGet(base, path, key).getOrNull().orEmpty()
+                    val settled = SlowDownloadParser.parse(reloaded, url, candidate.md5)
+                    Attempt(
+                        url = (settled as? SlowDownloadParser.Outcome.Link)?.url,
+                        waited = outcome.seconds
+                    )
+                }
             }
-            val response = client.get("$base/dyn/api/fast_download.json") {
-                parameter("md5", md5)
-                parameter("key", key)
-            }
-            response.failIfMirrorBroken()
-            val payload = try {
-                json.decodeFromString<FastDownloadResponse>(response.bodyAsText())
-            } catch (e: SerializationException) {
-                return@withMirror AppError.Parse("Unexpected fast-download response", e).asFailure()
-            } catch (e: IllegalArgumentException) {
-                return@withMirror AppError.Parse("Unexpected fast-download response", e).asFailure()
-            }
-            interpret(payload, response.status, base, md5, key, format, fileName, result.sizeBytes)
+
+            SlowDownloadParser.Outcome.Unrecognised -> Attempt(url = null)
+        }
+    }
+
+    private data class Candidate(
+        val md5: String,
+        val format: BookFormat,
+        val fileName: String,
+        val expectedSize: Long?,
+        val collections: String?
+    ) {
+        /** Unknown means "worth asking"; a record the site says is only elsewhere is not. */
+        val mightBeOnLibgen: Boolean
+            get() = collections == null || LIBGEN_COLLECTIONS.any { collections.contains(it) }
+
+        fun request(url: String, quota: DownloadQuota?, headers: Map<String, String> = emptyMap()) = DownloadRequest(
+            url = url,
+            format = format,
+            suggestedFileName = fileName,
+            headers = headers,
+            expectedSizeBytes = expectedSize,
+            quota = quota
+        )
+
+        private companion object {
+            val LIBGEN_COLLECTIONS = listOf("lgli", "lgrs", "libgen")
         }
     }
 
@@ -200,62 +354,33 @@ class AnnasArchiveSource(
      * The record page, for the in-app browser to run a slow partner download. When a key is
      * configured the browser can sign in with it first: the key is the account.
      */
-    private fun browserFallback(
-        base: String,
-        md5: String,
-        format: BookFormat,
-        fileName: String,
-        key: String?,
-        quota: DownloadQuota? = null
-    ) = DownloadRequest(
-        url = "$base/md5/$md5",
-        format = format,
-        suggestedFileName = fileName,
-        requiresBrowser = true,
-        quota = quota,
-        browserLogin = key?.let { BrowserLogin("$base/account/", "key=$it") }
-    )
+    private fun browserFallback(base: String, candidate: Candidate, key: String?, quota: DownloadQuota? = null) =
+        DownloadRequest(
+            url = "$base/md5/${candidate.md5}",
+            format = candidate.format,
+            suggestedFileName = candidate.fileName,
+            requiresBrowser = true,
+            quota = quota,
+            browserLogin = key?.let { BrowserLogin("$base/account/", "key=$it") }
+        )
 
-    @Suppress("LongParameterList")
-    private fun interpret(
-        payload: FastDownloadResponse,
-        status: HttpStatusCode,
-        base: String,
-        md5: String,
-        key: String,
-        format: BookFormat,
-        fileName: String,
-        expectedSize: Long?
-    ): AppResult<DownloadRequest> {
+    private fun interpret(payload: FastDownloadResponse, status: HttpStatusCode, candidate: Candidate): Rung {
         val quota = payload.accountInfo?.let {
             DownloadQuota(remaining = it.downloadsLeft, perDay = it.downloadsPerDay)
         }
-        payload.downloadUrl?.let { url ->
-            return DownloadRequest(
-                url,
-                format,
-                fileName,
-                expectedSizeBytes = expectedSize,
-                quota = quota
-            ).asSuccess()
-        }
-        refusal(status, payload)?.let { return it.asFailure() }
+        payload.downloadUrl?.let { url -> return Rung.Ready(candidate.request(url, quota)) }
+        refusal(status, payload)?.let { return Rung.Stop(it) }
 
-        // The membership is fine, today's fast downloads are simply spent: offer the browser.
+        // The membership is fine, today's fast downloads are simply spent: take the free route.
         if (payload.isQuotaSpent(status, quota)) {
-            return browserFallback(
-                base,
-                md5,
-                format,
-                fileName,
-                key,
-                quota ?: DownloadQuota(remaining = 0, perDay = null)
-            ).asSuccess()
+            return Rung.Continue(quota ?: DownloadQuota(remaining = 0, perDay = null))
         }
-        return when {
-            !status.isSuccess() -> AppError.Http(status.value, payload.error ?: "HTTP ${status.value}")
-            else -> AppError.Unexpected(payload.error ?: "Fast download unavailable")
-        }.asFailure()
+        return Rung.Stop(
+            when {
+                !status.isSuccess() -> AppError.Http(status.value, payload.error ?: "HTTP ${status.value}")
+                else -> AppError.Unexpected(payload.error ?: "Fast download unavailable")
+            }
+        )
     }
 
     /**

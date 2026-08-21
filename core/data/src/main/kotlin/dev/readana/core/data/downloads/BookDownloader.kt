@@ -153,19 +153,19 @@ class BookDownloader @Inject constructor(
     }
 
     private suspend fun interpret(entity: DownloadEntity, request: DownloadRequest): Resolution {
-        if (request.quota?.isExhausted == true) {
-            downloadsRepository.updateResolution(entity.id, url = null, browserUrl = request.url)
-            return Resolution.Failed(
-                DownloadErrorKind.QuotaExhausted,
-                "No fast downloads left today"
-            )
-        }
+        // A spent allowance still carries a URL when the source found a free route to the file;
+        // only a request that insists on a browser has nowhere else to go. When that happens to a
+        // member whose allowance is spent, say so — it is the more useful half of the story.
         if (request.requiresBrowser) {
             downloadsRepository.updateResolution(entity.id, url = null, browserUrl = request.url)
-            return Resolution.Failed(
-                DownloadErrorKind.RequiresBrowser,
-                "This download needs the in-app browser"
-            )
+            return if (request.quota?.isExhausted == true) {
+                Resolution.Failed(DownloadErrorKind.QuotaExhausted, "No fast downloads left today")
+            } else {
+                Resolution.Failed(
+                    DownloadErrorKind.RequiresBrowser,
+                    "This download needs the in-app browser"
+                )
+            }
         }
         downloadsRepository.updateResolution(entity.id, request.url, total = request.expectedSizeBytes)
         return Resolution.Ready(request.url, request.headers)

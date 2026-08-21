@@ -55,5 +55,27 @@ data class AnnasConfig(
             "https://annas-archive.pk",
             "https://annas-archive.gd"
         )
+
+        /**
+         * Library Genesis holds most of what Anna's Archive indexes and serves it by md5 with no
+         * browser check, so it is where a free download is tried first. The hosts share one
+         * catalogue; the list is only there for when one of them is down.
+         */
+        val LIBGEN_HOSTS: List<String> = listOf(
+            "https://libgen.li",
+            "https://libgen.la",
+            "https://libgen.vg",
+            "https://libgen.bz"
+        )
+
+        /**
+         * Partner servers to ask for a free download, in order. The site's first four numbers are
+         * quicker but may put the file behind a wait-list; the later ones never wait. Starting
+         * with a no-wait server usually gets a link straight away.
+         */
+        val SLOW_DOWNLOAD_SERVERS: List<Int> = listOf(4, 5, 0, 1)
+
+        /** How long a free download may be made to wait in total before the browser takes over. */
+        const val MAX_WAIT_SECONDS = 60
     }
 }

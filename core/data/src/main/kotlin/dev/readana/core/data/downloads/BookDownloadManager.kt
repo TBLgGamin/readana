@@ -124,7 +124,9 @@ class DefaultBookDownloadManager @Inject constructor(
         }
         request.quota?.let { rememberQuota(it.remaining, it.perDay) }
 
-        if (request.requiresBrowser || request.quota?.isExhausted == true) {
+        // A spent allowance is not a dead end any more: the source falls back to a free route and
+        // only asks for the browser when there is nothing left to try.
+        if (request.requiresBrowser) {
             return EnqueueOutcome.RequiresBrowser(
                 result = result,
                 url = request.url,
@@ -194,7 +196,7 @@ class DefaultBookDownloadManager @Inject constructor(
         }
         request.quota?.let { rememberQuota(it.remaining, it.perDay) }
 
-        if (!request.requiresBrowser && request.quota?.isExhausted != true) {
+        if (!request.requiresBrowser) {
             downloadsRepository.updateResolution(entity.id, request.url, total = request.expectedSizeBytes)
             requeue(entity.id, entity.sourceId, entity.recordId)
             return RetryOutcome.Requeued
