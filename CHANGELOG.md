@@ -35,6 +35,9 @@ All notable changes to this project are documented here. The format follows
 - Settings is now five collapsible groups, one open at a time, each showing what its settings
   currently add up to ("Sepia · 1.0× text · Auto") so most answers need no tap. Theme, page-turn and
   column choices are proper labels instead of raw enum names.
+- Converted EPUBs separate paragraphs with a blank line instead of a first-line indent, which is
+  much easier to follow on a backlit screen. Books converted before this need a re-convert from
+  their details sheet to pick up the new styling.
 - The book details sheet drops its "Read" button: tapping the cover in the grid already opens the
   book, and the sheet is reached by long-pressing that same cover.
 - Discover shows results as a two-column cover grid, with the download button on the cover.

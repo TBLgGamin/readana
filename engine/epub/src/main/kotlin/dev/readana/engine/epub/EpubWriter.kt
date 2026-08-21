@@ -186,9 +186,12 @@ class EpubWriter {
             |h1 { font-size: 1.6em; text-align: center; }
             |h2 { font-size: 1.3em; }
             |h3 { font-size: 1.1em; }
-            |p { margin: 0; text-indent: 1.2em; text-align: justify; }
-            |h1 + p, h2 + p, h3 + p { text-indent: 0; }
+            |/* Blank line between paragraphs rather than a first-line indent: the two conventions
+            |   are alternatives, and on a backlit screen the gap is much easier to follow. */
+            |p { margin: 0 0 0.9em; text-indent: 0; text-align: justify; }
+            |p:last-child { margin-bottom: 0; }
             |img { max-width: 100%; height: auto; }
+            |figure { margin: 1em 0; text-align: center; }
             """.trimMargin()
     }
 }
