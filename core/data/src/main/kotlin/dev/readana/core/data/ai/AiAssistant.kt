@@ -129,7 +129,20 @@ class DefaultAiAssistant @Inject constructor(
             val request = requestFor(thread, history, userText, images, settings.illustrateFromWeb)
             val answer = StringBuilder()
             val stop = StringBuilder()
-            val failure = collectAnswer(client, request, answer, stop)
+            var failure = collectAnswer(client, request, answer, stop)
+
+            // A small or older model refuses a ceiling above what it can produce. Rather than make
+            // every reader discover their model's limit by hand, ask again within a safe one.
+            if (failure.isBudgetRefusal() && answer.isEmpty()) {
+                Timber.d("Provider refused a %d-token ceiling; retrying smaller", request.maxOutputTokens)
+                stop.clear()
+                failure = collectAnswer(
+                    client = client,
+                    request = request.copy(maxOutputTokens = MODEST_MAX_TOKENS),
+                    answer = answer,
+                    stop = stop
+                )
+            }
 
             finish(thread, answer.toString(), failure)
             // An answer with nothing in it is a failure whatever the provider calls it: a model
@@ -200,6 +213,13 @@ class DefaultAiAssistant @Inject constructor(
         AppError.Network(io.message ?: "The connection dropped.", io)
     }
 
+    /** A 400 that names the output ceiling; every dialect words it differently. */
+    private fun AppError?.isBudgetRefusal(): Boolean {
+        val http = this as? AppError.Http ?: return false
+        if (http.statusCode != BAD_REQUEST) return false
+        return BUDGET_COMPLAINTS.any { http.message.contains(it, ignoreCase = true) }
+    }
+
     private fun emptyAnswerError(answer: StringBuilder, stopReason: String): AppError? {
         if (answer.isNotBlank()) return null
         Timber.w("The provider answered with nothing; stop reason %s", stopReason.ifEmpty { "?" })
@@ -268,9 +288,15 @@ class DefaultAiAssistant @Inject constructor(
         const val RECAP_TITLE = "Where was I?"
         const val TITLE_CHARS = 80
 
-        // Generous, because models with adaptive thinking spend this budget on thinking too: at
-        // 700 an answer that thought hard arrived empty.
-        const val ANSWER_MAX_TOKENS = 3_000
-        const val RECAP_MAX_TOKENS = 2_500
+        // Deliberately far above what any answer needs. Unused budget costs nothing — providers
+        // bill what is written — while too small a ceiling is charged for in full and returns
+        // nothing, because a model with adaptive thinking spends the same budget on thinking.
+        const val ANSWER_MAX_TOKENS = 32_000
+        const val RECAP_MAX_TOKENS = 32_000
+
+        /** Within the reach of an older model, or one running on the reader's own machine. */
+        const val MODEST_MAX_TOKENS = 4_096
+        const val BAD_REQUEST = 400
+        val BUDGET_COMPLAINTS = listOf("max_tokens", "max_completion_tokens", "max output")
     }
 }

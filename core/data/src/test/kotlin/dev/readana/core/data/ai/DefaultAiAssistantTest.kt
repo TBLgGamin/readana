@@ -136,6 +136,19 @@ class DefaultAiAssistantTest {
     }
 
     @Test
+    fun `a model that refuses the ceiling is asked again within a smaller one`() = runTest {
+        val fussy = FussyCeilingLlmClient()
+        client = fussy
+        val thread = startThread()
+
+        val events = assistant().reply(thread, question = "Why?").toList()
+
+        assertEquals("An answer.", assertIs<AssistantEvent.Done>(events.last()).text)
+        assertEquals(2, fussy.ceilings.size)
+        assertTrue(fussy.ceilings.first() > fussy.ceilings.last())
+    }
+
+    @Test
     fun `a failed request reports the provider's error`() = runTest {
         client = FailingLlmClient(AppError.Unauthorized("bad key"))
         val thread = startThread()
@@ -239,6 +252,24 @@ private class RecordingLlmClient : LlmClient {
     override fun stream(request: LlmRequest): Flow<LlmEvent> {
         requests += request
         return flowOf(LlmEvent.Delta("ok"), LlmEvent.Done())
+    }
+
+    override suspend fun listModels(): AppResult<List<LlmModel>> = emptyList<LlmModel>().asSuccess()
+
+    override suspend fun ping(): AppResult<Long> = 1L.asSuccess()
+}
+
+/** Rejects a large output ceiling the way a small or older model does. */
+private class FussyCeilingLlmClient : LlmClient {
+    val ceilings = mutableListOf<Int>()
+
+    override fun stream(request: LlmRequest): Flow<LlmEvent> {
+        ceilings += request.maxOutputTokens
+        return if (ceilings.size == 1) {
+            flow { throw LlmException(AppError.Http(400, "max_tokens: 32000 > 8192, the maximum")) }
+        } else {
+            flowOf(LlmEvent.Delta("An answer."), LlmEvent.Done(stopReason = "end_turn"))
+        }
     }
 
     override suspend fun listModels(): AppResult<List<LlmModel>> = emptyList<LlmModel>().asSuccess()
