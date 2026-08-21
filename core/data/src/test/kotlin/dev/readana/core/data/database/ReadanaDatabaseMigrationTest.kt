@@ -15,8 +15,8 @@ import org.junit.Rule
 import org.junit.runner.RunWith
 
 /**
- * Bookmarks (v2), highlights (v3) and downloads (v4) were added later; existing libraries must
- * survive.
+ * Bookmarks (v2), highlights (v3), downloads (v4) and assistant conversations (v6) were added
+ * later; existing libraries must survive.
  */
 @RunWith(AndroidJUnit4::class)
 class ReadanaDatabaseMigrationTest {
@@ -44,12 +44,12 @@ class ReadanaDatabaseMigrationTest {
             )
         }
 
-        helper.runMigrationsAndValidate(version = 4).use { connection ->
+        helper.runMigrationsAndValidate(version = 6).use { connection ->
             connection.prepare("SELECT title FROM books").use { statement ->
                 assertTrue(statement.step())
                 assertEquals("Moby Dick", statement.getText(0))
             }
-            listOf("bookmarks", "highlights", "downloads").forEach { table ->
+            listOf("bookmarks", "highlights", "downloads", "ai_threads", "ai_messages").forEach { table ->
                 connection.prepare("SELECT COUNT(*) FROM $table").use { statement ->
                     assertTrue(statement.step())
                     assertEquals(0, statement.getLong(0).toInt())

@@ -1,0 +1,14 @@
+: keep-alive
+
+data: {"id":"c1","choices":[{"index":0,"delta":{"role":"assistant","content":""}}]}
+
+data: {"id":"c1","choices":[{"index":0,"delta":{"content":"Ishmael "}}]}
+
+data: {"id":"c1","choices":[{"index":0,"delta":{"content":"is the narrator."}}]}
+
+data: {"id":"c1","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: {"id":"c1","choices":[],"usage":{"prompt_tokens":1200,"completion_tokens":42,"prompt_tokens_details":{"cached_tokens":1024}}}
+
+data: [DONE]
+

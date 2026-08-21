@@ -18,6 +18,8 @@ dependencies {
     api(projects.source.trending)
     // PDF → EPUB conversion; the dependency runs data → engine, never the other way.
     api(projects.engine.pdf2epub)
+    // The reading assistant's transport; pure Kotlin, knows nothing about this layer.
+    api(projects.ai.client)
 
     // Readium parses publications for the importer (metadata + cover) and for the reader.
     api(libs.readium.shared)

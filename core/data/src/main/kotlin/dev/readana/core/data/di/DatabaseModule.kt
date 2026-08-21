@@ -7,6 +7,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import dev.readana.core.data.database.AiThreadDao
 import dev.readana.core.data.database.BookDao
 import dev.readana.core.data.database.BookmarkDao
 import dev.readana.core.data.database.DownloadDao
@@ -33,4 +34,7 @@ object DatabaseModule {
 
     @Provides
     fun providesDownloadDao(database: ReadanaDatabase): DownloadDao = database.downloadDao()
+
+    @Provides
+    fun providesAiThreadDao(database: ReadanaDatabase): AiThreadDao = database.aiThreadDao()
 }

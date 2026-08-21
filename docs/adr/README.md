@@ -18,3 +18,4 @@ Short, dated records of the decisions that shape the project. Add a new file
 | [0011](0011-single-row-conversion-model.md) | One library entry per converted book | accepted |
 | [0012](0012-conversion-golden-corpus.md) | Conversion corpus and golden snapshots | accepted |
 | [0013](0013-browser-equivalent-access.md) | Browser-equivalent access for shadow-library sources | accepted |
+| [0014](0014-provider-agnostic-reading-assistant.md) | Provider-agnostic reading assistant that cannot spoil the book | accepted |

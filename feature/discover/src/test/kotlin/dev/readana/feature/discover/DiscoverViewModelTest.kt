@@ -11,6 +11,7 @@ import dev.readana.core.data.downloads.EnqueueOutcome
 import dev.readana.core.data.downloads.RetryOutcome
 import dev.readana.core.data.repository.BookSourceRegistry
 import dev.readana.core.data.repository.SettingsRepository
+import dev.readana.core.model.AiSettings
 import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
 import dev.readana.core.model.ConversionSettings
@@ -291,6 +292,7 @@ private class FakeBookDownloadManager : BookDownloadManager {
 }
 
 private class FakeSettingsRepository : SettingsRepository {
+    private val ai = MutableStateFlow(AiSettings())
     private val reader = MutableStateFlow(ReaderSettings())
     private val sources = MutableStateFlow(SourceSettings())
     private val folder = MutableStateFlow<String?>(null)
@@ -308,6 +310,10 @@ private class FakeSettingsRepository : SettingsRepository {
     override val conversionSettings: Flow<ConversionSettings> = MutableStateFlow(ConversionSettings())
 
     override suspend fun updateConversionSettings(transform: (ConversionSettings) -> ConversionSettings) = Unit
+
+    override val aiSettings: Flow<AiSettings> = ai
+
+    override suspend fun updateAiSettings(transform: (AiSettings) -> AiSettings) = ai.update(transform)
 
     override val libraryFolderUri: Flow<String?> = folder
 

@@ -53,12 +53,13 @@ class ArchitectureTest {
     }
 
     @Test
-    fun `sources and engines stay independent of the data layer`() {
+    fun `sources, engines and the AI client stay independent of the data layer`() {
         Konsist.scopeFromProject()
             .files
             .filter { file ->
                 file.normalizedPath.contains("/source/") ||
-                    file.normalizedPath.contains("/engine/")
+                    file.normalizedPath.contains("/engine/") ||
+                    file.normalizedPath.contains("/ai/client/src/")
             }
             .assertFalse { file ->
                 file.imports.any { it.name.startsWith("dev.readana.core.data") }
@@ -78,7 +79,8 @@ class ArchitectureTest {
             "source/annas",
             "source/trending",
             "engine/epub",
-            "engine/reflow"
+            "engine/reflow",
+            "ai/client"
         )
     }
 }

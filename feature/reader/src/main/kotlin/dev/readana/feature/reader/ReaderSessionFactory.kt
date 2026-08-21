@@ -16,6 +16,7 @@ import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.pdf.PdfNavigatorFactory
 import org.readium.r2.navigator.pdf.PdfNavigatorFragment
+import org.readium.r2.shared.publication.Layout
 import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
@@ -61,14 +62,23 @@ internal class ReadiumReaderSessionFactory @Inject constructor(
         settings: ReaderSettings,
         systemInDarkTheme: Boolean
     ): ReaderSession {
+        val isFixedLayout = publication.metadata.layout == Layout.FIXED
         val factory = EpubNavigatorFactory(publication).createFragmentFactory(
             initialLocator = initialLocator,
-            initialPreferences = settings.toEpubPreferences(systemInDarkTheme),
+            initialPreferences = settings
+                .forLayout(isFixedLayout)
+                .toEpubPreferences(systemInDarkTheme),
             configuration = EpubNavigatorFragment.Configuration {
                 selectionActionModeCallback = ReaderSelectionActionMode(selectionRelay)
             }
         )
-        return session(book, publication, EpubNavigatorFragment::class.java, factory)
+        return session(
+            book,
+            publication,
+            EpubNavigatorFragment::class.java,
+            factory,
+            isFixedLayout = isFixedLayout
+        )
     }
 
     private suspend fun pdfSession(
@@ -89,7 +99,8 @@ internal class ReadiumReaderSessionFactory @Inject constructor(
         book: Book,
         publication: Publication,
         navigatorClass: Class<out androidx.fragment.app.Fragment>,
-        factory: androidx.fragment.app.FragmentFactory
+        factory: androidx.fragment.app.FragmentFactory,
+        isFixedLayout: Boolean = false
     ) = ReaderSession(
         bookId = book.id,
         title = publication.metadata.title ?: book.title,
@@ -98,6 +109,9 @@ internal class ReadiumReaderSessionFactory @Inject constructor(
         toc = publication.tableOfContents.flatten(publication, depth = 0),
         positions = publication.positions(),
         isSearchable = publication.isSearchable,
+        hasText = publication.hasText(),
+        textWalker = { anchor -> publication.textWalkerAt(anchor) },
+        isFixedLayout = isFixedLayout,
         search = { query -> publication.search(query) },
         onClose = { publication.close() }
     )

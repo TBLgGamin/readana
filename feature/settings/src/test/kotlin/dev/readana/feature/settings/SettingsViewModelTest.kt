@@ -3,6 +3,7 @@ package dev.readana.feature.settings
 import app.cash.turbine.test
 import dev.readana.core.data.repository.BookSourceRegistry
 import dev.readana.core.data.repository.SettingsRepository
+import dev.readana.core.model.AiSettings
 import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.HeadingSensitivity
 import dev.readana.core.model.ReaderSettings
@@ -69,6 +70,7 @@ class SettingsViewModelTest {
 }
 
 private class FakeSettingsRepository : SettingsRepository {
+    private val ai = MutableStateFlow(AiSettings())
     private val reader = MutableStateFlow(ReaderSettings())
     private val sources = MutableStateFlow(SourceSettings())
     private val conversion = MutableStateFlow(ConversionSettings())
@@ -86,6 +88,10 @@ private class FakeSettingsRepository : SettingsRepository {
 
     override suspend fun updateConversionSettings(transform: (ConversionSettings) -> ConversionSettings) =
         conversion.update(transform)
+
+    override val aiSettings: Flow<AiSettings> = ai
+
+    override suspend fun updateAiSettings(transform: (AiSettings) -> AiSettings) = ai.update(transform)
 
     override val libraryFolderUri: Flow<String?> = libraryFolder
 

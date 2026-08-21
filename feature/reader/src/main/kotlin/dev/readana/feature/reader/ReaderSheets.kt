@@ -44,14 +44,17 @@ private val IndentPerLevel = 16.dp
 internal fun ReaderContentsSheet(
     toc: List<TocItem>,
     bookmarks: List<BookmarkItem>,
+    conversations: List<ThreadItem>,
     onSelectChapter: (TocItem) -> Unit,
     onSelectBookmark: (BookmarkItem) -> Unit,
     onDeleteBookmark: (Long) -> Unit,
+    onOpenConversation: (Long) -> Unit,
+    onDeleteConversation: (Long) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, modifier = modifier) {
-        if (toc.isEmpty() && bookmarks.isEmpty()) {
+        if (toc.isEmpty() && bookmarks.isEmpty() && conversations.isEmpty()) {
             EmptyState(
                 icon = ReadanaIcons.Library,
                 title = stringResource(R.string.feature_reader_contents_empty)
@@ -59,6 +62,11 @@ internal fun ReaderContentsSheet(
             return@ModalBottomSheet
         }
         LazyColumn {
+            conversationItems(
+                threads = conversations,
+                onOpen = onOpenConversation,
+                onDelete = onDeleteConversation
+            )
             if (bookmarks.isNotEmpty()) {
                 item { SheetHeading(stringResource(R.string.feature_reader_bookmarks)) }
                 items(bookmarks, key = { it.id }) { bookmark ->
@@ -132,6 +140,7 @@ private fun BookmarkRow(
 @Composable
 internal fun ReaderSettingsSheet(
     settings: ReaderSettings,
+    isFixedLayout: Boolean,
     onChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
@@ -193,11 +202,19 @@ internal fun ReaderSettingsSheet(
             )
 
             Label(stringResource(R.string.feature_reader_page_turn))
-            ChipRow(
-                options = PageTurnMode.entries,
-                selected = settings.pageTurnMode,
-                onSelect = { mode -> onChange { it.copy(pageTurnMode = mode) } }
-            )
+            if (isFixedLayout) {
+                Text(
+                    text = stringResource(R.string.feature_reader_fixed_layout_pages),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                ChipRow(
+                    options = PageTurnMode.entries,
+                    selected = settings.pageTurnMode,
+                    onSelect = { mode -> onChange { it.copy(pageTurnMode = mode) } }
+                )
+            }
 
             Label(stringResource(R.string.feature_reader_columns))
             ChipRow(

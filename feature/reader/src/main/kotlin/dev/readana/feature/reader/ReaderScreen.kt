@@ -35,6 +35,7 @@ import dev.readana.core.model.HighlightTint
 import dev.readana.core.model.ReaderSettings
 import org.readium.r2.navigator.Navigator
 import org.readium.r2.navigator.OverflowableNavigator
+import org.readium.r2.navigator.VisualNavigator
 import org.readium.r2.shared.publication.Locator
 
 /** Reader chrome floats over the page, so it is only mostly opaque. */
@@ -45,13 +46,17 @@ internal fun ReaderRoute(
     bookId: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: ReaderViewModel = hiltViewModel()
+    viewModel: ReaderViewModel = hiltViewModel(),
+    assistantViewModel: ReaderAssistantViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val assistant by assistantViewModel.uiState.collectAsStateWithLifecycle()
     val systemInDarkTheme = isSystemInDarkTheme()
     LaunchedEffect(bookId) { viewModel.open(bookId, systemInDarkTheme) }
     var navigator by remember { mutableStateOf<Navigator?>(null) }
     val ready = uiState as? ReaderUiState.Ready
+    val hasText = ready?.hasText == true
+    LaunchedEffect(bookId, hasText) { assistantViewModel.attach(bookId, hasText) }
 
     ReaderScreen(
         uiState = uiState,
@@ -62,6 +67,21 @@ internal fun ReaderRoute(
         onSeek = { fraction -> viewModel.locatorFor(ReaderTarget.Progress(fraction))?.let { navigator?.go(it) } },
         onShowSheet = viewModel::showSheet,
         onDismissSheet = { viewModel.showSheet(ReaderSheet.None) },
+        assistant = assistant,
+        onOpenConversation = assistantViewModel::openThread,
+        onDeleteConversation = assistantViewModel::deleteThread,
+        onRecapAccept = {
+            assistantViewModel.requestRecap(
+                // The top of the page: a recap stops there, so it cannot mention what is below.
+                anchor = { (navigator as? VisualNavigator)?.firstVisibleElementLocator() },
+                progression = ready?.progression,
+                chapterTitle = ready?.chapterTitle
+            )
+        },
+        onRecapDismiss = assistantViewModel::dismissRecapOffer,
+        onAssistantSend = assistantViewModel::send,
+        onAssistantRetry = assistantViewModel::retry,
+        onAssistantDismiss = assistantViewModel::dismiss,
         onSelectChapter = { item ->
             viewModel.locatorFor(ReaderTarget.Chapter(item.index))?.let { navigator?.go(it) }
             viewModel.showSheet(ReaderSheet.None)
@@ -95,7 +115,14 @@ internal fun ReaderRoute(
     SelectionActions(
         relay = viewModel.selectionRelay,
         navigator = navigator,
-        onHighlight = viewModel::addHighlight
+        assistantEnabled = assistant.enabled,
+        onHighlight = viewModel::addHighlight,
+        onAsk = { selection ->
+            assistantViewModel.ask(selection, ready?.progression, ready?.chapterTitle)
+        },
+        onExplain = { selection ->
+            assistantViewModel.explain(selection, ready?.progression, ready?.chapterTitle)
+        }
     )
 
     VolumeKeyPaging(
@@ -115,6 +142,14 @@ internal fun ReaderScreen(
     onSeek: (Float) -> Unit,
     onShowSheet: (ReaderSheet) -> Unit,
     onDismissSheet: () -> Unit,
+    assistant: AssistantUiState,
+    onOpenConversation: (Long) -> Unit,
+    onDeleteConversation: (Long) -> Unit,
+    onRecapAccept: () -> Unit,
+    onRecapDismiss: () -> Unit,
+    onAssistantSend: (String) -> Unit,
+    onAssistantRetry: () -> Unit,
+    onAssistantDismiss: () -> Unit,
     onSelectChapter: (TocItem) -> Unit,
     onSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
     onToggleBookmark: () -> Unit,
@@ -151,6 +186,14 @@ internal fun ReaderScreen(
                 onSeek = onSeek,
                 onShowSheet = onShowSheet,
                 onDismissSheet = onDismissSheet,
+                assistant = assistant,
+                onOpenConversation = onOpenConversation,
+                onDeleteConversation = onDeleteConversation,
+                onRecapAccept = onRecapAccept,
+                onRecapDismiss = onRecapDismiss,
+                onAssistantSend = onAssistantSend,
+                onAssistantRetry = onAssistantRetry,
+                onAssistantDismiss = onAssistantDismiss,
                 onSelectChapter = onSelectChapter,
                 onSettingsChange = onSettingsChange,
                 onToggleBookmark = onToggleBookmark,
@@ -177,6 +220,14 @@ private fun ReadingSurface(
     onSeek: (Float) -> Unit,
     onShowSheet: (ReaderSheet) -> Unit,
     onDismissSheet: () -> Unit,
+    assistant: AssistantUiState,
+    onOpenConversation: (Long) -> Unit,
+    onDeleteConversation: (Long) -> Unit,
+    onRecapAccept: () -> Unit,
+    onRecapDismiss: () -> Unit,
+    onAssistantSend: (String) -> Unit,
+    onAssistantRetry: () -> Unit,
+    onAssistantDismiss: () -> Unit,
     onSelectChapter: (TocItem) -> Unit,
     onSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
     onToggleBookmark: () -> Unit,
@@ -202,7 +253,6 @@ private fun ReadingSurface(
             onNavigator = onNavigator,
             modifier = Modifier.fillMaxSize()
         )
-        BrightnessGestureZone(modifier = Modifier.align(Alignment.CenterStart))
         ReaderTopBar(
             title = state.title,
             visible = state.chromeVisible,
@@ -220,6 +270,18 @@ private fun ReadingSurface(
             onShowSettings = { onShowSheet(ReaderSheet.Settings) },
             modifier = Modifier.align(Alignment.BottomCenter)
         )
+        AnimatedVisibility(
+            visible = assistant.recapOffered && !assistant.visible,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically { it },
+            exit = slideOutVertically { it }
+        ) {
+            RecapOffer(
+                daysAway = assistant.daysAway,
+                onAccept = onRecapAccept,
+                onDismiss = onRecapDismiss
+            )
+        }
     }
 
     when (state.sheet) {
@@ -228,14 +290,21 @@ private fun ReadingSurface(
         ReaderSheet.Contents -> ReaderContentsSheet(
             toc = state.toc,
             bookmarks = state.bookmarks,
+            conversations = assistant.threads,
             onSelectChapter = onSelectChapter,
             onSelectBookmark = onSelectBookmark,
             onDeleteBookmark = onDeleteBookmark,
+            onOpenConversation = { id ->
+                onDismissSheet()
+                onOpenConversation(id)
+            },
+            onDeleteConversation = onDeleteConversation,
             onDismiss = onDismissSheet
         )
 
         ReaderSheet.Settings -> ReaderSettingsSheet(
             settings = state.settings,
+            isFixedLayout = state.isFixedLayout,
             onChange = onSettingsChange,
             onDismiss = onDismissSheet
         )
@@ -246,6 +315,15 @@ private fun ReadingSurface(
             onLoadMore = onLoadMoreResults,
             onSelect = onSelectSearchHit,
             onDismiss = onDismissSheet
+        )
+    }
+
+    if (assistant.visible) {
+        ReaderAssistantSheet(
+            state = assistant,
+            onSend = onAssistantSend,
+            onRetry = onAssistantRetry,
+            onDismiss = onAssistantDismiss
         )
     }
 

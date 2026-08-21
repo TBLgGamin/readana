@@ -91,6 +91,10 @@ internal sealed interface ReaderUiState {
         val bookmarks: List<BookmarkItem> = emptyList(),
         val currentIsBookmarked: Boolean = false,
         val isSearchable: Boolean = false,
+        /** False for books whose text cannot be read, which is where the assistant stays away. */
+        val hasText: Boolean = false,
+        /** True for comics and other fixed-layout EPUBs that always turn one page at a time. */
+        val isFixedLayout: Boolean = false,
         val search: SearchState = SearchState(),
         val highlights: List<HighlightItem> = emptyList(),
         /** The highlight whose note is being edited, if any. */
@@ -149,7 +153,11 @@ internal class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.readerSettings.collect { settings ->
                 _uiState.update { state ->
-                    if (state is ReaderUiState.Ready) state.copy(settings = settings) else state
+                    if (state is ReaderUiState.Ready) {
+                        state.copy(settings = settings.forLayout(state.isFixedLayout))
+                    } else {
+                        state
+                    }
                 }
             }
         }
@@ -383,14 +391,16 @@ internal class ReaderViewModel @Inject constructor(
         _uiState.value = ReaderUiState.Ready(
             book = book,
             title = newSession.title,
-            settings = settings,
+            settings = settings.forLayout(newSession.isFixedLayout),
             sessionId = SESSION_IDS.incrementAndGet(),
             toc = newSession.toc.mapIndexed { index, entry ->
                 TocItem(index = index, title = entry.title, depth = entry.depth)
             },
             positionCount = newSession.positions.size,
             progression = book.progress?.fraction ?: 0f,
-            isSearchable = newSession.isSearchable
+            isSearchable = newSession.isSearchable,
+            hasText = newSession.hasText,
+            isFixedLayout = newSession.isFixedLayout
         )
     }
 

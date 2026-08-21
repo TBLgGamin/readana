@@ -23,7 +23,7 @@ Milestones are sized so each one ships something usable on the tablet.
 ## M2 — Reader ✅ (2026-08-21)
 
 - [x] Readium `EpubNavigatorFragment` hosted in Compose (`AndroidFragment`), PDF via pdfium navigator
-- [x] Controls: tap zones & swipe, paginated/scrolled, font family/size, margins, line height, themes (light/sepia/dark/black), brightness gesture, keep-screen-on, volume-key paging
+- [x] Controls: tap zones & swipe, paginated/scrolled, font family/size, margins, line height, themes (light/sepia/dark/black), keep-screen-on, volume-key paging
 - [x] Progress slider + chapter/TOC drawer, bookmarks, in-book search, progress persisted as Readium locator
 - [x] Tablet layout: two-page spread in landscape, immersive mode
 - [x] Highlights/notes (Readium decorations) and dictionary lookup (stretch)
@@ -42,6 +42,17 @@ Milestones are sized so each one ships something usable on the tablet.
 - [x] Conversion settings (headers/footers, heading sensitivity), per-book re-convert
 - [x] Quality corpus with golden content snapshots — PDFs generated rather than checked in, see
       [ADR 0012](adr/0012-conversion-golden-corpus.md); real-world scans remain future work
+
+## M4.5 — Reading assistant ✅ (2026-08-21)
+
+- [x] Ask and Explain on a text selection, threaded per book and saved; "Where was I?" recap after
+      time away, reusing a recent one rather than paying twice
+- [x] Context cut at the reading position by walking the publication backwards from the page on
+      screen, so unread text is never sent — see [ADR 0014](adr/0014-provider-agnostic-reading-assistant.md)
+- [x] Provider-agnostic clients: Anthropic (native, with prompt caching) plus one OpenAI-compatible
+      client covering OpenAI, Gemini, OpenRouter, DeepSeek and user-added endpoints
+- [x] Settings: per-provider key/model/base URL, model fetch, connection test, context budget,
+      recap threshold
 
 ## M5 — More sources
 

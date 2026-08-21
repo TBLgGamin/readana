@@ -4,8 +4,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
@@ -41,4 +43,9 @@ object ReadanaIcons {
 
     /** PDF → EPUB conversion. */
     val Convert: ImageVector = Icons.Filled.Transform
+
+    /** The reading assistant. */
+    val Assistant: ImageVector = Icons.Filled.AutoAwesome
+
+    val Send: ImageVector = Icons.AutoMirrored.Filled.Send
 }

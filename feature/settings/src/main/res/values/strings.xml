@@ -37,4 +37,35 @@
     <string name="feature_settings_background_battery">Battery settings</string>
     <string name="feature_settings_background_autostart">Autostart</string>
     <string name="feature_settings_background_note">A long download also survives better if you lock Readana in the Recents list. HyperOS updates can reset both settings.</string>
+    <string name="feature_settings_section_ai">Reading assistant</string>
+    <string name="feature_settings_summary_ai_off">Off</string>
+    <string name="feature_settings_ai_key">API key</string>
+    <string name="feature_settings_ai_base_url">Server address</string>
+    <string name="feature_settings_ai_model">Model</string>
+    <string name="feature_settings_ai_fetch_models">Fetch models</string>
+    <string name="feature_settings_ai_test">Test</string>
+    <string name="feature_settings_ai_test_ok">Answered in %1$d ms</string>
+    <string name="feature_settings_ai_get_key">Get a key</string>
+    <string name="feature_settings_ai_remove">Remove this provider</string>
+    <string name="feature_settings_ai_add_custom">Add a provider</string>
+    <string name="feature_settings_ai_add_custom_help">Any server that speaks the OpenAI chat API: Ollama, LM Studio, a gateway, your own.</string>
+    <string name="feature_settings_ai_custom_name">Name</string>
+    <string name="feature_settings_ai_add">Add</string>
+    <string name="feature_settings_ai_cancel">Cancel</string>
+    <string name="feature_settings_ai_status_key">Key set · %1$s</string>
+    <string name="feature_settings_ai_status_no_key">No key yet</string>
+    <string name="feature_settings_ai_status_local">Ready</string>
+    <string name="feature_settings_ai_status_incomplete">Needs an address and a model</string>
+    <string name="feature_settings_ai_context">How much of the book to send</string>
+    <string name="feature_settings_ai_context_help">Only what you have already read is ever sent. More of it means better answers about earlier chapters, and a bigger bill.</string>
+    <string name="feature_settings_ai_context_small">Recent</string>
+    <string name="feature_settings_ai_context_medium">Balanced</string>
+    <string name="feature_settings_ai_context_large">Generous</string>
+    <string name="feature_settings_ai_context_whole">Everything read</string>
+    <string name="feature_settings_ai_recap">Offer a recap when I come back</string>
+    <plurals name="feature_settings_ai_recap_days">
+        <item quantity="one">After a day away</item>
+        <item quantity="other">After %1$d days away</item>
+    </plurals>
+    <string name="feature_settings_ai_privacy">Asking a question sends the part of the book you have read to the provider you picked. Nothing you have not reached is ever sent.</string>
 </resources>

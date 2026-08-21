@@ -17,7 +17,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -30,11 +29,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.readana.core.model.HighlightStyle
 import dev.readana.core.model.HighlightTint
-import kotlinx.coroutines.launch
 import org.readium.r2.navigator.DecorableNavigator
 import org.readium.r2.navigator.Decoration
 import org.readium.r2.navigator.Navigator
-import org.readium.r2.navigator.SelectableNavigator
 import org.readium.r2.shared.publication.Locator
 
 /** Decoration group the reader owns; Readium keeps groups independent of each other. */
@@ -87,39 +84,6 @@ internal fun HighlightDecorations(
             decorable.addDecorationListener(HIGHLIGHTS_GROUP, listener)
             onDispose { decorable.removeDecorationListener(listener) }
         }
-    }
-}
-
-/**
- * Fills in what the text-selection menu does. The selection lives in the navigator, so the actions
- * read it back before handing it to the ViewModel or to a dictionary app.
- */
-@Composable
-internal fun SelectionActions(
-    relay: ReaderSelectionRelay,
-    navigator: Navigator?,
-    onHighlight: (Locator, String) -> Unit
-) {
-    val scope = rememberCoroutineScope()
-    val labels = ReaderSelectionRelay.Labels(
-        highlight = stringResource(R.string.feature_reader_highlight)
-    )
-    val currentOnHighlight by rememberUpdatedState(onHighlight)
-
-    DisposableEffect(relay, navigator, labels) {
-        val selectable = navigator as? SelectableNavigator
-        relay.labels = labels
-        relay.actions = ReaderSelectionRelay.Actions {
-            if (selectable != null) {
-                scope.launch {
-                    val selection = selectable.currentSelection()
-                    selectable.clearSelection()
-                    val locator = selection?.locator ?: return@launch
-                    currentOnHighlight(locator, locator.text.highlight.orEmpty())
-                }
-            }
-        }
-        onDispose { relay.actions = null }
     }
 }
 

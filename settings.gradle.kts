@@ -43,6 +43,8 @@ include(":core:data")
 include(":core:designsystem")
 include(":core:testing")
 
+include(":ai:client")
+
 include(":engine:epub")
 include(":engine:reflow")
 include(":engine:pdf2epub")

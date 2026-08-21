@@ -1,0 +1,5 @@
+
+Ai feature? -- done: Ask / Explain / Where was I?, provider settings
+Come up with a logo
+make downloads list scrollable instead of infitely grow larger
+remove downloads and background settings thngy

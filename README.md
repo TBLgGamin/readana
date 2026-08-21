@@ -20,7 +20,8 @@ dedicated e-reader app.
 | **Download** | WorkManager-driven background downloads that survive HyperOS's aggressive process killing, with progress in the library. |
 | **Convert** | On-device PDF → EPUB: PDFBox text extraction → layout heuristics (headers/footers, paragraphs, hyphenation, headings) → valid EPUB 3. Validated with epubcheck in tests. |
 | **Library** | Room database + files in app storage (or a user-chosen SAF folder), covers extracted on import, reading progress, sort and search. |
-| **Read** | Readium Kotlin Toolkit navigator: paginated/scrolled, tap zones & swipe, font/size/margins/line-height, themes (light/sepia/dark/black), brightness gesture, progress slider, TOC, search, highlights, TTS later. |
+| **Assist** | Ask about a passage, have it explained, or get a recap after time away — using your own API key with Anthropic, OpenAI, Gemini, OpenRouter, DeepSeek or any OpenAI-compatible server. The model only ever sees the part of the book you have already read, so it cannot spoil what comes next. |
+| **Read** | Readium Kotlin Toolkit navigator: paginated/scrolled, tap zones & swipe, font/size/margins/line-height, themes (light/sepia/dark/black), progress slider, TOC, search, highlights, TTS later. |
 
 ## Stack
 
@@ -82,13 +83,14 @@ engine/pdf2epub           PDFBox-Android text extraction + converter facade
 source/api                BookSource interface, search/download models          (pure Kotlin)
 source/gutenberg          Project Gutenberg via Gutendex                        (pure Kotlin)
 source/annas              Anna's Archive: HTML search, member API, mirror failover (pure Kotlin)
+ai/client                 LLM clients (Anthropic + OpenAI-compatible), spoiler-safe context builder (pure Kotlin)
 feature/library|discover|reader|settings   Compose screens + ViewModels + nav keys
 docs/                     Architecture, device notes, research, roadmap, ADRs
 ```
 
 Module rules (enforced by Konsist tests in `app/src/test`): features never import each other;
-`core/model`, `core/common`, `engine/*` and `source/*` never import Android; sources and engines
-never depend on the data layer.
+`core/model`, `core/common`, `engine/*`, `source/*` and `ai/client` never import Android; sources,
+engines and the AI client never depend on the data layer.
 
 ## Documentation
 

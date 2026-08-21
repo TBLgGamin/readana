@@ -10,12 +10,14 @@ import dev.readana.core.data.repository.BookmarksRepository
 import dev.readana.core.data.repository.HighlightsRepository
 import dev.readana.core.data.repository.LibraryRepository
 import dev.readana.core.data.repository.SettingsRepository
+import dev.readana.core.model.AiSettings
 import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
 import dev.readana.core.model.Bookmark
 import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.Highlight
 import dev.readana.core.model.HighlightTint
+import dev.readana.core.model.PageTurnMode
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.ReaderTheme
 import dev.readana.core.model.ReadingProgress
@@ -207,6 +209,24 @@ class ReaderViewModelTest {
         val ready = assertIs<ReaderUiState.Ready>(viewModel.uiState.value)
         assertEquals(ReaderTheme.Sepia, ready.settings.theme)
     }
+
+    @Test
+    fun `fixed layout books stay paginated when scrolling is selected globally`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            library.upsert(book())
+            sessionFactory.isFixedLayout = true
+            settings.updateReaderSettings {
+                it.copy(pageTurnMode = PageTurnMode.Scrolled)
+            }
+            val viewModel = viewModel(backgroundScope)
+
+            viewModel.open("1", systemInDarkTheme = false)
+            advanceUntilIdle()
+
+            val ready = assertIs<ReaderUiState.Ready>(viewModel.uiState.value)
+            assertTrue(ready.isFixedLayout)
+            assertEquals(PageTurnMode.Paginated, ready.settings.pageTurnMode)
+        }
 
     @Test
     fun `bookmarks the current page and removes it again`() = runTest(mainDispatcherRule.testDispatcher) {
@@ -431,6 +451,7 @@ private class FakeHighlightsRepository : HighlightsRepository {
 }
 
 private class FakeSettingsRepository : SettingsRepository {
+    private val ai = MutableStateFlow(AiSettings())
     private val reader = MutableStateFlow(ReaderSettings())
     private val sources = MutableStateFlow(SourceSettings())
     private val folder = MutableStateFlow<String?>(null)
@@ -447,6 +468,10 @@ private class FakeSettingsRepository : SettingsRepository {
 
     override suspend fun updateConversionSettings(transform: (ConversionSettings) -> ConversionSettings) = Unit
 
+    override val aiSettings: Flow<AiSettings> = ai
+
+    override suspend fun updateAiSettings(transform: (AiSettings) -> AiSettings) = ai.update(transform)
+
     override val libraryFolderUri: Flow<String?> = folder
 
     override suspend fun setLibraryFolderUri(uri: String?) {
@@ -460,6 +485,7 @@ private class FakeReaderSessionFactory : ReaderSessionFactory {
     var requestedLocator: Locator? = null
     var closed = false
     var searchPages: List<List<Locator>> = emptyList()
+    var isFixedLayout = false
 
     override suspend fun create(
         book: Book,
@@ -477,6 +503,9 @@ private class FakeReaderSessionFactory : ReaderSessionFactory {
             toc = emptyList(),
             positions = positions,
             isSearchable = true,
+            hasText = true,
+            textWalker = { null },
+            isFixedLayout = isFixedLayout,
             search = { FakeSearchIterator(searchPages) },
             onClose = { closed = true }
         ).asSuccess()

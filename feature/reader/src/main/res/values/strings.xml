@@ -28,8 +28,26 @@
     <string name="feature_reader_margins">Margins</string>
     <string name="feature_reader_theme">Theme</string>
     <string name="feature_reader_page_turn">Page turning</string>
+    <string name="feature_reader_fixed_layout_pages">Fixed-layout books such as comics always use pages. Swipe horizontally or tap the page edges to turn them.</string>
     <string name="feature_reader_columns">Columns</string>
     <string name="feature_reader_tap_to_turn">Tap edges to turn pages</string>
     <string name="feature_reader_volume_keys">Volume keys turn pages</string>
     <string name="feature_reader_keep_screen_on">Keep screen on</string>
+    <string name="feature_reader_ai_ask">Ask</string>
+    <string name="feature_reader_ai_explain">Explain</string>
+    <string name="feature_reader_ai_recap">Where was I?</string>
+    <string name="feature_reader_ai_coverage">Only what you have read · up to %1$d%%</string>
+    <string name="feature_reader_ai_coverage_unknown">Only what you have read</string>
+    <string name="feature_reader_ai_gathering">Reading back through the book…</string>
+    <string name="feature_reader_ai_question">Ask about this passage</string>
+    <string name="feature_reader_ai_send">Send</string>
+    <string name="feature_reader_ai_retry">Try again</string>
+    <string name="feature_reader_ai_error_key">That provider would not take the key. Check it in Settings.</string>
+    <plurals name="feature_reader_ai_recap_offer">
+        <item quantity="one">Catch me up — you have been away a day</item>
+        <item quantity="other">Catch me up — you have been away %1$d days</item>
+    </plurals>
+    <string name="feature_reader_ai_recap_dismiss">Not now</string>
+    <string name="feature_reader_ai_conversations">Conversations</string>
+    <string name="feature_reader_ai_delete">Delete this conversation</string>
 </resources>

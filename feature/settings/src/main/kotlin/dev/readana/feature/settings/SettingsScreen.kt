@@ -54,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.readana.core.data.repository.SourceDefaults
 import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.LoadingState
+import dev.readana.core.model.AiSettings
 import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.HeadingSensitivity
 import dev.readana.core.model.SourceSettings
@@ -62,10 +63,29 @@ private const val PERSISTABLE_FLAGS =
     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
 
 @Composable
-internal fun SettingsRoute(modifier: Modifier = Modifier, viewModel: SettingsViewModel = hiltViewModel()) {
+internal fun SettingsRoute(
+    modifier: Modifier = Modifier,
+    viewModel: SettingsViewModel = hiltViewModel(),
+    aiViewModel: AiSettingsViewModel = hiltViewModel()
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val aiState by aiViewModel.uiState.collectAsStateWithLifecycle()
     SettingsScreen(
         uiState = uiState,
+        aiState = aiState,
+        aiActions = AiSettingsActions(
+            onSetActiveProvider = aiViewModel::setActiveProvider,
+            onApiKeyChange = aiViewModel::setApiKey,
+            onModelChange = aiViewModel::setModel,
+            onBaseUrlChange = aiViewModel::setBaseUrl,
+            onAddCustomProvider = aiViewModel::addCustomProvider,
+            onRemoveProvider = aiViewModel::removeProvider,
+            onFetchModels = aiViewModel::fetchModels,
+            onTestProvider = aiViewModel::testProvider,
+            onContextSizeChange = aiViewModel::setContextSize,
+            onRecapEnabledChange = aiViewModel::setRecapEnabled,
+            onRecapAfterDaysChange = aiViewModel::setRecapAfterDays
+        ),
         onLibraryFolderChange = viewModel::setLibraryFolder,
         onSourceEnabledChange = viewModel::setSourceEnabled,
         onAnnasMirrorsChange = viewModel::setAnnasMirrors,
@@ -82,6 +102,8 @@ internal fun SettingsRoute(modifier: Modifier = Modifier, viewModel: SettingsVie
 @Composable
 internal fun SettingsScreen(
     uiState: SettingsUiState,
+    aiState: AiSettingsUiState,
+    aiActions: AiSettingsActions,
     onLibraryFolderChange: (String?) -> Unit,
     onSourceEnabledChange: (sourceId: String, enabled: Boolean) -> Unit,
     onAnnasMirrorsChange: (String) -> Unit,
@@ -146,6 +168,15 @@ internal fun SettingsScreen(
                         )
                     }
                     SettingsGroup(
+                        title = stringResource(R.string.feature_settings_section_ai),
+                        summary = aiState.settings.summary(),
+                        icon = ReadanaIcons.Assistant,
+                        expanded = openGroup == SettingsGroupId.Assistant,
+                        onToggle = { toggle(SettingsGroupId.Assistant) }
+                    ) {
+                        AiSettingsSection(state = aiState, actions = aiActions)
+                    }
+                    SettingsGroup(
                         title = stringResource(R.string.feature_settings_section_storage),
                         summary = uiState.libraryFolderUri?.let { folderLabel(it) }
                             ?: stringResource(R.string.feature_settings_library_folder_default),
@@ -173,7 +204,7 @@ internal fun SettingsScreen(
     }
 }
 
-private enum class SettingsGroupId { Sources, Conversion, Storage, Background }
+private enum class SettingsGroupId { Sources, Conversion, Assistant, Storage, Background }
 
 /**
  * One collapsible settings group. Collapsed it is a single row — icon, name and what the settings
@@ -246,6 +277,14 @@ private fun SettingsUiState.Loaded.sourcesSummary(): String {
     } else {
         names + SUMMARY_SEPARATOR + stringResource(R.string.feature_settings_summary_member_key)
     }
+}
+
+@Composable
+private fun AiSettings.summary(): String {
+    val provider = active ?: return stringResource(R.string.feature_settings_summary_ai_off)
+    return listOf(provider.name, provider.effectiveModel.orEmpty())
+        .filter { it.isNotEmpty() }
+        .joinToString(SUMMARY_SEPARATOR)
 }
 
 private const val SUMMARY_SEPARATOR = " · "

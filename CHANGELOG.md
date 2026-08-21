@@ -8,6 +8,22 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Selecting text in the reader now offers **Ask** and **Explain** alongside Highlight, and a book
+  reopened after a while offers **Where was I?** — a recap of the story so far. All three are built
+  so they cannot spoil the book: the assistant is only ever given the text above the reader's
+  current position (plus the selected passage itself), gathered by walking backwards from the page
+  on screen, and a conversation keeps the exact text it started with, so a follow-up months later
+  still asks about the same part of the book. Conversations are saved and listed in the contents
+  sheet.
+- The assistant works with whichever provider the reader already pays for. Anthropic, OpenAI,
+  Google Gemini, OpenRouter and DeepSeek come preconfigured — paste a key, fetch the model list,
+  test the connection — and any other OpenAI-compatible endpoint, including a model running on the
+  same network, can be added by hand. Settings also control how much of the read text is sent and
+  how long an absence earns a recap.
+
+- Readana has a complete Android launcher-icon set based on the new logo: adaptive colour and
+  themed monochrome layers, round and legacy density fallbacks, plus 512 px Play Store artwork.
+
 - The reader spaces paragraphs apart. Publishers usually mark a new paragraph with an indent and
   no gap, which is hard going on a backlit screen, so Readana now adds a gap and drops the indent —
   adjustable, including back to the publisher's own styling, in the reader's settings sheet.
@@ -27,6 +43,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Vertical swipes no longer change the app brightness. The reader now leaves brightness entirely
+  to Android and no longer places a gesture-capturing strip over the left edge of the page.
+- Fixed-layout EPUBs such as comics open one full-size page at a time by default, and the reader's
+  one/two-column choice now controls their page spread. They stay in paginated mode even if the
+  global preference is scrolling, and their settings explain the horizontal swipe and page-edge
+  controls instead of offering a scrolling option Readium cannot apply. This previously left
+  downloaded image-based editions tiny and difficult to navigate.
 - Selecting text in the reader offers Highlight and the platform's own copy and share, nothing
   else. Note and Define were a menu deep enough to get in the way of reading; a highlight's colour,
   note and deletion still live in its editor, which opens by tapping the highlight.

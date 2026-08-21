@@ -37,6 +37,9 @@ internal object SettingsKeys {
 
     val LIBRARY_FOLDER_URI = stringPreferencesKey("library_folder_uri")
 
+    /** The whole assistant configuration, JSON-encoded: it holds a list of provider records. */
+    val AI_SETTINGS = stringPreferencesKey("ai_settings_json")
+
     const val MIRROR_SEPARATOR = "\n"
     const val OVERRIDE_SEPARATOR = "\n"
     const val OVERRIDE_ASSIGNMENT = "="

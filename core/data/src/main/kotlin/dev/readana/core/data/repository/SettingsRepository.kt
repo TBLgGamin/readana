@@ -3,11 +3,14 @@ package dev.readana.core.data.repository
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import dev.readana.core.data.ai.decodeAiSettings
+import dev.readana.core.data.ai.encodeToJson
 import dev.readana.core.data.datastore.SettingsKeys
 import dev.readana.core.data.datastore.toConversionSettings
 import dev.readana.core.data.datastore.toReaderSettings
 import dev.readana.core.data.datastore.toSourceSettings
 import dev.readana.core.data.datastore.write
+import dev.readana.core.model.AiSettings
 import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.SourceSettings
@@ -29,6 +32,10 @@ interface SettingsRepository {
     val conversionSettings: Flow<ConversionSettings>
 
     suspend fun updateConversionSettings(transform: (ConversionSettings) -> ConversionSettings)
+
+    val aiSettings: Flow<AiSettings>
+
+    suspend fun updateAiSettings(transform: (AiSettings) -> AiSettings)
 
     /** Persisted SAF tree URI of the user-chosen library folder, or null for app-private storage. */
     val libraryFolderUri: Flow<String?>
@@ -63,6 +70,16 @@ class DataStoreSettingsRepository @Inject constructor(private val dataStore: Dat
     override suspend fun updateConversionSettings(transform: (ConversionSettings) -> ConversionSettings) {
         dataStore.edit { preferences ->
             preferences.write(transform(preferences.toConversionSettings()))
+        }
+    }
+
+    override val aiSettings: Flow<AiSettings> =
+        dataStore.data.map { it[SettingsKeys.AI_SETTINGS].decodeAiSettings() }.distinctUntilChanged()
+
+    override suspend fun updateAiSettings(transform: (AiSettings) -> AiSettings) {
+        dataStore.edit { preferences ->
+            val updated = transform(preferences[SettingsKeys.AI_SETTINGS].decodeAiSettings())
+            preferences[SettingsKeys.AI_SETTINGS] = updated.encodeToJson()
         }
     }
 
