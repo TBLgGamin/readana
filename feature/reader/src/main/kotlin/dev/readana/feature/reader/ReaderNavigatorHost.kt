@@ -12,6 +12,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.fragment.compose.AndroidFragment
+import dev.readana.core.model.PageTurnMode
 import dev.readana.core.model.ReaderSettings
 import org.readium.adapter.pdfium.navigator.PdfiumPreferences
 import org.readium.adapter.pdfium.navigator.PdfiumSettings
@@ -64,8 +65,16 @@ internal fun ReaderNavigatorHost(
         navigator?.submitReaderPreferences(settings, systemInDarkTheme)
     }
 
-    LaunchedEffect(navigator) {
-        navigator?.currentLocator?.collect { currentOnLocatorChanged(it) }
+    val scrolling = settings.pageTurnMode == PageTurnMode.Scrolled
+    LaunchedEffect(navigator, scrolling) {
+        var previous: Locator? = null
+        navigator?.currentLocator?.collect { locator ->
+            if (shouldSnapToResourceStart(previous, locator, scrolling)) {
+                navigator?.go(locator.atResourceStart(), animated = false)
+            }
+            previous = locator
+            currentOnLocatorChanged(locator)
+        }
     }
 
     val turnPagesOnTap = settings.tapToTurnPages

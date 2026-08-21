@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Reading on into the next chapter in scrolling mode now starts at its first line. Readium carried
+  the scroll offset across the boundary, so finishing a chapter dropped you the same distance down
+  the next one. Jumps from the contents list, bookmarks and search hits still land where they were
+  asked to.
 - Converting a PDF whose pages share an image (a logo, a chapter ornament) no longer fails with
   "Can't compress a recycled bitmap" once every page has been read. The extractor was freeing the
   bitmap PDFBox caches and reuses, so the second page drawing that image got a released one back.
