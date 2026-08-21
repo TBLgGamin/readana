@@ -76,13 +76,14 @@ class ReaderAssistantViewModelTest {
     }
 
     @Test
-    fun `the assistant stays away in a book whose text cannot be read`() = runTest {
+    fun `a book whose text cannot be read is never offered a recap`() = runTest {
+        library.book = testBook(lastOpened = Instant.now().minus(Duration.ofDays(5)), progress = 0.4f)
         val viewModel = viewModel()
 
         viewModel.attach(BOOK_ID, hasText = false)
         advanceUntilIdle()
 
-        assertFalse(viewModel.uiState.value.enabled)
+        assertFalse(viewModel.uiState.value.recapOffered)
     }
 
     @Test

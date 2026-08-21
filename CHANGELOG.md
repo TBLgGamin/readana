@@ -80,6 +80,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- An API key typed into the reading assistant's settings is saved as it is typed rather than only
+  when the field loses focus, and a provider can be picked before it is finished. Pasting a key and
+  collapsing the section threw the key away, and the provider's radio button stayed disabled until
+  a key had been saved — so the assistant stayed switched off with nothing on screen to say why.
+
 - A finished download reaches the library instead of being refused as "Not an EPUB or PDF". The
   file was handed to the importer still named after the job it came from, and the importer works
   the format out from the name — so every download ran to completion and was then thrown away. It

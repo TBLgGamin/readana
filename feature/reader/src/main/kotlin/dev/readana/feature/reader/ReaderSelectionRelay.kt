@@ -31,8 +31,8 @@ internal class ReaderSelectionRelay @Inject constructor() {
     var labels: Labels = Labels()
 
     /**
-     * Whether the assistant items belong in the menu at all. False with no provider configured, or
-     * in a book whose text cannot be read — a dead menu item is worse than no menu item.
+     * Whether the assistant items belong in the menu at all. False until a provider is configured;
+     * a dead menu item is worse than no menu item.
      */
     var assistantEnabled: Boolean = false
 
@@ -42,13 +42,28 @@ internal class ReaderSelectionRelay @Inject constructor() {
 /** Adds Readana's own items to the selection menu, keeping the platform ones (copy, share). */
 internal class ReaderSelectionActionMode(private val relay: ReaderSelectionRelay) : BaseActionModeCallback() {
     override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
-        // Our items go first; the platform's copy and share stay where they are.
-        menu.add(Menu.NONE, ITEM_HIGHLIGHT, Menu.FIRST, relay.labels.highlight)
-        if (relay.assistantEnabled) {
-            menu.add(Menu.NONE, ITEM_ASK, Menu.FIRST + 1, relay.labels.ask)
-            menu.add(Menu.NONE, ITEM_EXPLAIN, Menu.FIRST + 2, relay.labels.explain)
-        }
+        menu.putOurItems()
         return true
+    }
+
+    /**
+     * The platform keeps one action mode alive across selections, so the menu is built once — long
+     * before the assistant knows whether it has a provider. Rebuilding here means every selection
+     * sees the current answer instead of whatever was true at the first long-press.
+     */
+    override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
+        menu.putOurItems()
+        return true
+    }
+
+    private fun Menu.putOurItems() {
+        listOf(ITEM_HIGHLIGHT, ITEM_ASK, ITEM_EXPLAIN).forEach { removeItem(it) }
+        // Our items go first; the platform's copy and share stay where they are.
+        addOurItem(ITEM_HIGHLIGHT, Menu.FIRST, relay.labels.highlight)
+        if (relay.assistantEnabled) {
+            addOurItem(ITEM_ASK, Menu.FIRST + 1, relay.labels.ask)
+            addOurItem(ITEM_EXPLAIN, Menu.FIRST + 2, relay.labels.explain)
+        }
     }
 
     override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
@@ -62,6 +77,14 @@ internal class ReaderSelectionActionMode(private val relay: ReaderSelectionRelay
         // Finish first: the floating toolbar must be gone before a sheet takes the focus.
         mode.finish()
         return true
+    }
+
+    /**
+     * The selection toolbar hides anything it cannot fit behind an overflow arrow, and the
+     * platform's own copy/share get first refusal; asking for room keeps our items visible.
+     */
+    private fun Menu.addOurItem(id: Int, order: Int, title: String) {
+        add(Menu.NONE, id, order, title).setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
     }
 
     private companion object {

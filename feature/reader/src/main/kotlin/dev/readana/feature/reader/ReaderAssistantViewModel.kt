@@ -336,8 +336,13 @@ internal class ReaderAssistantViewModel @Inject constructor(
         }
     }
 
+    /**
+     * The menu items follow the provider alone. Gating them on the text service as well made the
+     * assistant invisible whenever that check was wrong, with nothing on screen to say why; a book
+     * whose text cannot be read now says so in the sheet instead.
+     */
     private fun refreshAvailability() {
-        _uiState.update { it.copy(enabled = providerReady && hasText) }
+        _uiState.update { it.copy(enabled = providerReady) }
     }
 
     private fun observeThreads(bookId: String) {

@@ -282,6 +282,11 @@ private fun SettingsUiState.Loaded.sourcesSummary(): String {
 @Composable
 private fun AiSettings.summary(): String {
     val provider = active ?: return stringResource(R.string.feature_settings_summary_ai_off)
+    // A chosen provider that still needs a key says so here, rather than looking configured while
+    // the reader wonders why nothing appears when they select text.
+    if (!provider.isUsable) {
+        return provider.name + SUMMARY_SEPARATOR + stringResource(R.string.feature_settings_ai_status_no_key)
+    }
     return listOf(provider.name, provider.effectiveModel.orEmpty())
         .filter { it.isNotEmpty() }
         .joinToString(SUMMARY_SEPARATOR)

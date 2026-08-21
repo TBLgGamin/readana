@@ -72,7 +72,7 @@ internal fun String?.decodeAiSettings(): AiSettings {
             ?: AiContextSize.Medium,
         recapEnabled = dto.recapEnabled,
         recapAfterDays = dto.recapAfterDays.coerceIn(AiSettings.RECAP_DAYS_RANGE)
-    ).withBuiltIns()
+    ).withBuiltIns().withActiveDefaulted()
 }
 
 /** A row naming a provider kind this build no longer knows is dropped rather than guessed at. */

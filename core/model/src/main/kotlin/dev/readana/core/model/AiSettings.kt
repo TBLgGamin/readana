@@ -121,7 +121,17 @@ data class AiSettings(
     }
 
     fun withProvider(id: String, transform: (AiProviderConfig) -> AiProviderConfig): AiSettings =
-        copy(providers = providers.map { if (it.id == id) transform(it) else it })
+        copy(providers = providers.map { if (it.id == id) transform(it) else it }).withActiveDefaulted()
+
+    /**
+     * Picks a provider to use when none is chosen, or when the chosen one has become unusable.
+     * Pasting a key is the whole of what a reader means to do; making them also find a radio
+     * button before anything works is a trap.
+     */
+    fun withActiveDefaulted(): AiSettings {
+        if (active?.isUsable == true) return this
+        return copy(activeProviderId = providers.firstOrNull { it.isUsable }?.id ?: activeProviderId)
+    }
 
     companion object {
         const val DEFAULT_RECAP_AFTER_DAYS = 3

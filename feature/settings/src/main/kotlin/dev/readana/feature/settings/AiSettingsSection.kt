@@ -32,7 +32,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -109,10 +108,11 @@ private fun ProviderRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Always tappable: a disabled radio gives the reader no way to tell a provider they
+            // have not finished setting up from one the app has silently refused.
             RadioButton(
                 selected = isActive,
-                onClick = { actions.onSetActiveProvider(provider.id) },
-                enabled = provider.isUsable
+                onClick = { actions.onSetActiveProvider(provider.id) }
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(provider.name, style = MaterialTheme.typography.bodyLarge)
@@ -232,8 +232,11 @@ private fun ProbeResult(probe: ProviderProbe, modifier: Modifier = Modifier) {
 }
 
 /**
- * A text field that keeps a local draft and saves once, when it loses focus or the keyboard's Done
- * is pressed — writing per keystroke would rewrite the settings blob on every letter.
+ * A settings text field that saves as it is typed.
+ *
+ * It deliberately does not wait for focus to be lost, the way the mirror list does: a key pasted
+ * into a field that is then collapsed away — or a row whose radio button is waiting on that key —
+ * left the assistant switched off with nothing on screen to say why.
  */
 @Composable
 private fun CommittingField(
@@ -247,10 +250,11 @@ private fun CommittingField(
     var draft by rememberSaveable(value) { mutableStateOf(value) }
     OutlinedTextField(
         value = draft,
-        onValueChange = { draft = it },
-        modifier = modifier
-            .fillMaxWidth()
-            .onFocusChanged { focus -> if (!focus.isFocused) onCommit(draft) },
+        onValueChange = {
+            draft = it
+            onCommit(it)
+        },
+        modifier = modifier.fillMaxWidth(),
         label = { Text(label) },
         placeholder = { if (placeholder.isNotEmpty()) Text(placeholder) },
         singleLine = true,
