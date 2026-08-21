@@ -12,6 +12,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -30,36 +32,49 @@ import dev.readana.core.model.ReaderColumns
 import dev.readana.core.model.ReaderFont
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.ReaderTheme
+import kotlin.math.roundToInt
 
 private val SheetPadding = 24.dp
+private const val PERCENT = 100
 private val IndentPerLevel = 16.dp
 
-/** Chapter list; tapping a row jumps there and closes the sheet. */
+/** Chapters and bookmarks; tapping a row jumps there and closes the sheet. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ReaderContentsSheet(
     toc: List<TocItem>,
-    onSelect: (TocItem) -> Unit,
+    bookmarks: List<BookmarkItem>,
+    onSelectChapter: (TocItem) -> Unit,
+    onSelectBookmark: (BookmarkItem) -> Unit,
+    onDeleteBookmark: (Long) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, modifier = modifier) {
-        Text(
-            text = stringResource(R.string.feature_reader_contents),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(horizontal = SheetPadding, vertical = 8.dp)
-        )
-        if (toc.isEmpty()) {
+        if (toc.isEmpty() && bookmarks.isEmpty()) {
             EmptyState(
                 icon = ReadanaIcons.Library,
                 title = stringResource(R.string.feature_reader_contents_empty)
             )
-        } else {
-            LazyColumn {
-                items(toc, key = { it.index }) { item ->
+            return@ModalBottomSheet
+        }
+        LazyColumn {
+            if (bookmarks.isNotEmpty()) {
+                item { SheetHeading(stringResource(R.string.feature_reader_bookmarks)) }
+                items(bookmarks, key = { it.id }) { bookmark ->
+                    BookmarkRow(
+                        bookmark = bookmark,
+                        onSelect = onSelectBookmark,
+                        onDelete = onDeleteBookmark
+                    )
+                }
+            }
+            if (toc.isNotEmpty()) {
+                item { SheetHeading(stringResource(R.string.feature_reader_contents)) }
+                items(toc, key = { "toc-${it.index}" }) { item ->
                     ListItem(
                         modifier = Modifier
-                            .clickable { onSelect(item) }
+                            .clickable { onSelectChapter(item) }
                             .padding(start = IndentPerLevel * item.depth)
                     ) {
                         Text(item.title)
@@ -67,6 +82,48 @@ internal fun ReaderContentsSheet(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SheetHeading(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = modifier.padding(horizontal = SheetPadding, vertical = 8.dp)
+    )
+}
+
+@Composable
+private fun BookmarkRow(
+    bookmark: BookmarkItem,
+    onSelect: (BookmarkItem) -> Unit,
+    onDelete: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    ListItem(
+        modifier = modifier.clickable { onSelect(bookmark) },
+        supportingContent = bookmark.progression?.let { progression ->
+            {
+                Text(
+                    stringResource(
+                        R.string.feature_reader_progress,
+                        (progression * PERCENT).roundToInt()
+                    )
+                )
+            }
+        },
+        trailingContent = {
+            IconButton(onClick = { onDelete(bookmark.id) }) {
+                Icon(
+                    ReadanaIcons.Delete,
+                    contentDescription = stringResource(R.string.feature_reader_bookmark_delete)
+                )
+            }
+        }
+    ) {
+        Text(bookmark.title ?: stringResource(R.string.feature_reader_bookmark_untitled))
     }
 }
 

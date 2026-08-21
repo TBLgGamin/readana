@@ -7,13 +7,17 @@ import dev.readana.core.common.coroutines.ApplicationScope
 import dev.readana.core.common.input.VolumeKeyRelay
 import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
+import dev.readana.core.data.repository.BookmarksRepository
 import dev.readana.core.data.repository.LibraryRepository
 import dev.readana.core.data.repository.SettingsRepository
 import dev.readana.core.model.Book
+import dev.readana.core.model.Bookmark
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.ReadingProgress
+import java.time.Instant
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
+import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -27,9 +31,30 @@ import org.json.JSONException
 import org.json.JSONObject
 import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
+import org.readium.r2.shared.publication.services.search.SearchIterator
 
 /** Which sheet, if any, is covering the page. */
-internal enum class ReaderSheet { None, Contents, Settings }
+internal enum class ReaderSheet { None, Contents, Settings, Search }
+
+/** A saved place, as the sheet shows it. */
+internal data class BookmarkItem(val id: Long, val title: String?, val progression: Double?)
+
+/** One search hit, addressed by index so the UI never touches Readium types. */
+internal data class SearchHit(
+    val index: Int,
+    val before: String,
+    val highlight: String,
+    val after: String,
+    val chapter: String?
+)
+
+internal data class SearchState(
+    val query: String = "",
+    val hits: List<SearchHit> = emptyList(),
+    val isSearching: Boolean = false,
+    val hasSearched: Boolean = false,
+    val hasMore: Boolean = false
+)
 
 internal sealed interface ReaderUiState {
     data object Loading : ReaderUiState
@@ -50,16 +75,31 @@ internal sealed interface ReaderUiState {
         val chapterTitle: String? = null,
         val progression: Float = 0f,
         val positionCount: Int = 0,
-        val currentPosition: Int = 0
+        val currentPosition: Int = 0,
+        val bookmarks: List<BookmarkItem> = emptyList(),
+        val currentIsBookmarked: Boolean = false,
+        val isSearchable: Boolean = false,
+        val search: SearchState = SearchState()
     ) : ReaderUiState
 }
 
 /** A table-of-contents row, addressed by index so the UI never touches Readium types. */
 internal data class TocItem(val index: Int, val title: String, val depth: Int)
 
+/** Somewhere the reader can jump to, named without Readium types. */
+internal sealed interface ReaderTarget {
+    data class Bookmark(val id: Long) : ReaderTarget
+
+    data class Hit(val index: Int) : ReaderTarget
+
+    /** A fraction of the way through the book, as the progress slider reports it. */
+    data class Progress(val fraction: Float) : ReaderTarget
+}
+
 @HiltViewModel
 internal class ReaderViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
+    private val bookmarksRepository: BookmarksRepository,
     private val settingsRepository: SettingsRepository,
     private val sessionFactory: ReaderSessionFactory,
     private val sessionStore: ReaderSessionStore,
@@ -74,6 +114,11 @@ internal class ReaderViewModel @Inject constructor(
     private var session: ReaderSession? = null
     private var lastLocator: Locator? = null
     private var progressJob: Job? = null
+    private var bookmarksJob: Job? = null
+    private var bookmarks: List<Bookmark> = emptyList()
+    private var searchJob: Job? = null
+    private var searchIterator: SearchIterator? = null
+    private var searchHits: List<Locator> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -114,19 +159,83 @@ internal class ReaderViewModel @Inject constructor(
         it.copy(chromeVisible = !it.chromeVisible)
     }
 
+    /** Shows a sheet, or dismisses whatever is showing when passed [ReaderSheet.None]. */
     fun showSheet(sheet: ReaderSheet) = updateReady { it.copy(sheet = sheet) }
-
-    fun dismissSheet() = updateReady { it.copy(sheet = ReaderSheet.None) }
 
     fun updateSettings(transform: (ReaderSettings) -> ReaderSettings) {
         viewModelScope.launch { settingsRepository.updateReaderSettings(transform) }
     }
 
+    /** Bookmarks the current page, or removes the bookmark that is already on it. */
+    fun toggleBookmark() {
+        val bookId = openedBookId ?: return
+        val locator = lastLocator ?: return
+        val existing = bookmarks.firstOrNull { it.matches(locator) }
+        viewModelScope.launch {
+            if (existing != null) {
+                bookmarksRepository.remove(existing.id)
+            } else {
+                bookmarksRepository.add(
+                    Bookmark(
+                        id = Bookmark.UNSAVED_ID,
+                        bookId = bookId,
+                        locatorJson = locator.toJSON().toString(),
+                        progression = locator.locations.totalProgression,
+                        title = locator.title,
+                        createdAt = Instant.now()
+                    )
+                )
+            }
+        }
+    }
+
+    fun deleteBookmark(id: Long) {
+        viewModelScope.launch { bookmarksRepository.remove(id) }
+    }
+
+    fun onSearchQueryChange(query: String) = updateReady {
+        it.copy(search = it.search.copy(query = query))
+    }
+
+    /** Runs the query in the state, replacing any previous results. */
+    fun runSearch() {
+        val query = readyState()?.search?.query?.trim().orEmpty()
+        searchJob?.cancel()
+        searchHits = emptyList()
+        searchIterator = null
+        if (query.isEmpty()) {
+            updateReady { it.copy(search = it.search.copy(hits = emptyList(), hasSearched = false)) }
+            return
+        }
+        updateReady {
+            it.copy(search = it.search.copy(hits = emptyList(), isSearching = true, hasSearched = true))
+        }
+        searchJob = viewModelScope.launch {
+            searchIterator = session?.search?.invoke(query)
+            loadNextHits()
+        }
+    }
+
+    fun loadMoreResults() {
+        if (searchJob?.isActive == true || searchIterator == null) return
+        updateReady { it.copy(search = it.search.copy(isSearching = true)) }
+        searchJob = viewModelScope.launch { loadNextHits() }
+    }
+
     /** The link the table-of-contents row at [index] points at. */
     fun tocLink(index: Int): Link? = session?.toc?.getOrNull(index)?.link
 
-    /** Locator closest to [fraction] of the way through the book, for the progress slider. */
-    fun positionAt(fraction: Float): Locator? {
+    /** Resolves where the reader should jump for [target], or null when it cannot be found. */
+    fun locatorFor(target: ReaderTarget): Locator? = when (target) {
+        is ReaderTarget.Bookmark -> bookmarks.firstOrNull { it.id == target.id }
+            ?.let { parseLocator(it.locatorJson) }
+
+        is ReaderTarget.Hit -> searchHits.getOrNull(target.index)
+
+        is ReaderTarget.Progress -> positionAt(target.fraction)
+    }
+
+    private fun positionAt(fraction: Float): Locator? {
         val positions = session?.positions?.takeIf { it.isNotEmpty() } ?: return null
         val index = ((positions.size - 1) * fraction).toInt().coerceIn(0, positions.size - 1)
         return positions[index]
@@ -141,7 +250,8 @@ internal class ReaderViewModel @Inject constructor(
                 progression = progression.coerceIn(0f, 1f),
                 chapterTitle = locator.title ?: state.chapterTitle,
                 currentPosition = locator.locations.position
-                    ?: (progression * positions.size).toInt()
+                    ?: (progression * positions.size).toInt(),
+                currentIsBookmarked = bookmarks.any { it.matches(locator) }
             )
         }
         scheduleProgressSave(locator)
@@ -152,6 +262,9 @@ internal class ReaderViewModel @Inject constructor(
     /** Writes the final position and closes the publication. Called when the reader goes away. */
     fun release() {
         progressJob?.cancel()
+        bookmarksJob?.cancel()
+        searchJob?.cancel()
+        searchIterator = null
         val bookId = openedBookId
         val locator = lastLocator
         val closing = session
@@ -168,6 +281,20 @@ internal class ReaderViewModel @Inject constructor(
         session?.close()
         session = newSession
         sessionStore.session = newSession
+        bookmarksJob?.cancel()
+        bookmarksJob = viewModelScope.launch {
+            bookmarksRepository.observeForBook(book.id).collect { saved ->
+                bookmarks = saved
+                updateReady { state ->
+                    state.copy(
+                        bookmarks = saved.map { BookmarkItem(it.id, it.title, it.progression) },
+                        currentIsBookmarked = lastLocator?.let { locator ->
+                            saved.any { it.matches(locator) }
+                        } == true
+                    )
+                }
+            }
+        }
         _uiState.value = ReaderUiState.Ready(
             book = book,
             title = newSession.title,
@@ -177,9 +304,46 @@ internal class ReaderViewModel @Inject constructor(
                 TocItem(index = index, title = entry.title, depth = entry.depth)
             },
             positionCount = newSession.positions.size,
-            progression = book.progress?.fraction ?: 0f
+            progression = book.progress?.fraction ?: 0f,
+            isSearchable = newSession.isSearchable
         )
     }
+
+    /** Pulls one page of hits out of the running search. */
+    private suspend fun loadNextHits() {
+        val iterator = searchIterator
+        val page = iterator?.next()?.getOrNull()
+        val locators = page?.locators.orEmpty()
+        searchHits = searchHits + locators
+        updateReady { state ->
+            state.copy(
+                search = state.search.copy(
+                    hits = searchHits.mapIndexed { index, locator -> locator.toHit(index) },
+                    isSearching = false,
+                    hasMore = page != null
+                )
+            )
+        }
+    }
+
+    private fun Locator.toHit(index: Int) = SearchHit(
+        index = index,
+        before = text.before.orEmpty(),
+        highlight = text.highlight.orEmpty(),
+        after = text.after.orEmpty(),
+        chapter = title
+    )
+
+    /** Two locators point at the same page when the resource and progression line up. */
+    private fun Bookmark.matches(locator: Locator): Boolean {
+        val saved = parseLocator(locatorJson) ?: return false
+        if (saved.href != locator.href) return false
+        val savedProgression = saved.locations.progression ?: return true
+        val currentProgression = locator.locations.progression ?: return true
+        return abs(savedProgression - currentProgression) < PROGRESSION_EPSILON
+    }
+
+    private fun readyState(): ReaderUiState.Ready? = _uiState.value as? ReaderUiState.Ready
 
     private fun scheduleProgressSave(locator: Locator) {
         val bookId = openedBookId ?: return
@@ -215,6 +379,7 @@ internal class ReaderViewModel @Inject constructor(
 
     private companion object {
         const val PROGRESS_SAVE_DELAY_MS = 1_000L
+        const val PROGRESSION_EPSILON = 0.001
         val SESSION_IDS = AtomicLong()
     }
 }

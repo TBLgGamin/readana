@@ -6,6 +6,14 @@
     <string name="feature_reader_contents">Contents</string>
     <string name="feature_reader_contents_empty">This book has no table of contents.</string>
     <string name="feature_reader_settings">Reading settings</string>
+    <string name="feature_reader_bookmarks">Bookmarks</string>
+    <string name="feature_reader_bookmark">Bookmark this page</string>
+    <string name="feature_reader_bookmark_delete">Remove bookmark</string>
+    <string name="feature_reader_bookmark_untitled">Bookmark</string>
+    <string name="feature_reader_search">Search in book</string>
+    <string name="feature_reader_search_hint">Search this book</string>
+    <string name="feature_reader_search_no_results">Nothing found in this book.</string>
+    <string name="feature_reader_search_more">Load more results</string>
     <string name="feature_reader_position">Position %1$d of %2$d</string>
     <string name="feature_reader_progress">%1$d%%</string>
     <string name="feature_reader_font">Typeface</string>

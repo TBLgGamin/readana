@@ -15,6 +15,8 @@ All notable changes to this project are documented here. The format follows
 - Reader controls: progress slider, chapter list, a reading-settings sheet (typeface, size, line
   spacing, margins, theme, paginated or scrolled, columns), a left-edge brightness drag and
   volume-key page turns.
+- Reader bookmarks and in-book full-text search: bookmark the current page from the top bar, jump
+  back from the contents sheet, and search the open book with paged results.
 - New `columns` reading setting: a two-page spread in landscape by default, or forced to one or two.
 - Library screen: import books from the system file picker, sort by recently read, title or author,
   search by title and author, a book details sheet, and delete with confirmation.

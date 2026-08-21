@@ -6,10 +6,12 @@ import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
 import dev.readana.core.common.result.asFailure
 import dev.readana.core.common.result.asSuccess
+import dev.readana.core.data.repository.BookmarksRepository
 import dev.readana.core.data.repository.LibraryRepository
 import dev.readana.core.data.repository.SettingsRepository
 import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
+import dev.readana.core.model.Bookmark
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.ReaderTheme
 import dev.readana.core.model.ReadingProgress
@@ -18,6 +20,7 @@ import dev.readana.core.testing.MainDispatcherRule
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -33,6 +36,9 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.runner.RunWith
 import org.readium.r2.shared.publication.Locator
+import org.readium.r2.shared.publication.LocatorCollection
+import org.readium.r2.shared.publication.services.search.SearchIterator
+import org.readium.r2.shared.util.Try
 import org.readium.r2.shared.util.Url
 import org.readium.r2.shared.util.mediatype.MediaType
 
@@ -42,12 +48,14 @@ class ReaderViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val library = FakeLibraryRepository()
+    private val bookmarks = FakeBookmarksRepository()
     private val settings = FakeSettingsRepository()
     private val sessionStore = ReaderSessionStore()
     private val sessionFactory = FakeReaderSessionFactory()
 
     private fun viewModel(applicationScope: CoroutineScope) = ReaderViewModel(
         libraryRepository = library,
+        bookmarksRepository = bookmarks,
         settingsRepository = settings,
         sessionFactory = sessionFactory,
         sessionStore = sessionStore,
@@ -164,7 +172,7 @@ class ReaderViewModelTest {
             assertIs<ReaderUiState.Ready>(viewModel.uiState.value).sheet
         )
 
-        viewModel.dismissSheet()
+        viewModel.showSheet(ReaderSheet.None)
         assertEquals(ReaderSheet.None, assertIs<ReaderUiState.Ready>(viewModel.uiState.value).sheet)
     }
 
@@ -175,8 +183,8 @@ class ReaderViewModelTest {
         viewModel.open("1", systemInDarkTheme = false)
         advanceUntilIdle()
 
-        assertEquals(sessionFactory.positions.first(), viewModel.positionAt(0f))
-        assertEquals(sessionFactory.positions.last(), viewModel.positionAt(1f))
+        assertEquals(sessionFactory.positions.first(), viewModel.locatorFor(ReaderTarget.Progress(0f)))
+        assertEquals(sessionFactory.positions.last(), viewModel.locatorFor(ReaderTarget.Progress(1f)))
     }
 
     @Test
@@ -191,6 +199,92 @@ class ReaderViewModelTest {
 
         val ready = assertIs<ReaderUiState.Ready>(viewModel.uiState.value)
         assertEquals(ReaderTheme.Sepia, ready.settings.theme)
+    }
+
+    @Test
+    fun `bookmarks the current page and removes it again`() = runTest(mainDispatcherRule.testDispatcher) {
+        library.upsert(book())
+        val viewModel = viewModel(backgroundScope)
+        viewModel.open("1", systemInDarkTheme = false)
+        advanceUntilIdle()
+        viewModel.onLocatorChanged(locator(progression = 0.5))
+
+        viewModel.toggleBookmark()
+        advanceUntilIdle()
+
+        val added = assertIs<ReaderUiState.Ready>(viewModel.uiState.value)
+        assertEquals(1, added.bookmarks.size)
+        assertTrue(added.currentIsBookmarked)
+
+        viewModel.toggleBookmark()
+        advanceUntilIdle()
+
+        val removed = assertIs<ReaderUiState.Ready>(viewModel.uiState.value)
+        assertTrue(removed.bookmarks.isEmpty())
+        assertFalse(removed.currentIsBookmarked)
+    }
+
+    @Test
+    fun `deletes a bookmark by id`() = runTest(mainDispatcherRule.testDispatcher) {
+        library.upsert(book())
+        val viewModel = viewModel(backgroundScope)
+        viewModel.open("1", systemInDarkTheme = false)
+        advanceUntilIdle()
+        viewModel.onLocatorChanged(locator(progression = 0.5))
+        viewModel.toggleBookmark()
+        advanceUntilIdle()
+        val stored = assertIs<ReaderUiState.Ready>(viewModel.uiState.value).bookmarks.single()
+
+        viewModel.deleteBookmark(stored.id)
+        advanceUntilIdle()
+
+        assertTrue(assertIs<ReaderUiState.Ready>(viewModel.uiState.value).bookmarks.isEmpty())
+    }
+
+    @Test
+    fun `searching collects hits and can load another page`() = runTest(mainDispatcherRule.testDispatcher) {
+        library.upsert(book())
+        sessionFactory.searchPages = listOf(
+            listOf(locator(progression = 0.1)),
+            listOf(locator(progression = 0.2))
+        )
+        val viewModel = viewModel(backgroundScope)
+        viewModel.open("1", systemInDarkTheme = false)
+        advanceUntilIdle()
+
+        viewModel.onSearchQueryChange("whale")
+        viewModel.runSearch()
+        advanceUntilIdle()
+
+        val first = assertIs<ReaderUiState.Ready>(viewModel.uiState.value).search
+        assertEquals(1, first.hits.size)
+        assertTrue(first.hasSearched)
+        assertTrue(first.hasMore)
+
+        viewModel.loadMoreResults()
+        advanceUntilIdle()
+
+        assertEquals(2, assertIs<ReaderUiState.Ready>(viewModel.uiState.value).search.hits.size)
+    }
+
+    @Test
+    fun `an empty query clears the results`() = runTest(mainDispatcherRule.testDispatcher) {
+        library.upsert(book())
+        sessionFactory.searchPages = listOf(listOf(locator(progression = 0.1)))
+        val viewModel = viewModel(backgroundScope)
+        viewModel.open("1", systemInDarkTheme = false)
+        advanceUntilIdle()
+        viewModel.onSearchQueryChange("whale")
+        viewModel.runSearch()
+        advanceUntilIdle()
+
+        viewModel.onSearchQueryChange("   ")
+        viewModel.runSearch()
+        advanceUntilIdle()
+
+        val search = assertIs<ReaderUiState.Ready>(viewModel.uiState.value).search
+        assertTrue(search.hits.isEmpty())
+        assertFalse(search.hasSearched)
     }
 
     private fun book(progress: ReadingProgress? = null) = Book(
@@ -240,6 +334,22 @@ private class FakeLibraryRepository : LibraryRepository {
     }
 }
 
+private class FakeBookmarksRepository : BookmarksRepository {
+    private val state = MutableStateFlow<List<Bookmark>>(emptyList())
+    private var nextId = 1L
+
+    override fun observeForBook(bookId: String): Flow<List<Bookmark>> =
+        state.map { saved -> saved.filter { it.bookId == bookId } }
+
+    override suspend fun add(bookmark: Bookmark): Bookmark {
+        val stored = bookmark.copy(id = nextId++)
+        state.update { it + stored }
+        return stored
+    }
+
+    override suspend fun remove(id: Long) = state.update { saved -> saved.filterNot { it.id == id } }
+}
+
 private class FakeSettingsRepository : SettingsRepository {
     private val reader = MutableStateFlow(ReaderSettings())
     private val sources = MutableStateFlow(SourceSettings())
@@ -265,6 +375,7 @@ private class FakeReaderSessionFactory : ReaderSessionFactory {
     var failure: AppError? = null
     var requestedLocator: Locator? = null
     var closed = false
+    var searchPages: List<List<Locator>> = emptyList()
 
     override suspend fun create(
         book: Book,
@@ -281,7 +392,21 @@ private class FakeReaderSessionFactory : ReaderSessionFactory {
             fragmentFactory = androidx.fragment.app.FragmentFactory(),
             toc = emptyList(),
             positions = positions,
+            isSearchable = true,
+            search = { FakeSearchIterator(searchPages) },
             onClose = { closed = true }
         ).asSuccess()
     }
+}
+
+/** Hands out one canned page of hits per call, then reports the end of the results. */
+private class FakeSearchIterator(private val pages: List<List<Locator>>) : SearchIterator {
+    private var page = 0
+
+    override suspend fun next(): Try<LocatorCollection?, Nothing> {
+        if (page >= pages.size) return Try.success(null)
+        return Try.success(LocatorCollection(locators = pages[page++]))
+    }
+
+    override fun close() = Unit
 }

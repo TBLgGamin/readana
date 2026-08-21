@@ -58,14 +58,27 @@ internal fun ReaderRoute(
         onToggleChrome = viewModel::toggleChrome,
         onLocatorChange = viewModel::onLocatorChanged,
         onNavigator = { navigator = it },
-        onSeek = { fraction -> viewModel.positionAt(fraction)?.let { navigator?.go(it) } },
+        onSeek = { fraction -> viewModel.locatorFor(ReaderTarget.Progress(fraction))?.let { navigator?.go(it) } },
         onShowSheet = viewModel::showSheet,
-        onDismissSheet = viewModel::dismissSheet,
+        onDismissSheet = { viewModel.showSheet(ReaderSheet.None) },
         onSelectChapter = { item ->
             viewModel.tocLink(item.index)?.let { navigator?.go(it) }
-            viewModel.dismissSheet()
+            viewModel.showSheet(ReaderSheet.None)
         },
         onSettingsChange = viewModel::updateSettings,
+        onToggleBookmark = viewModel::toggleBookmark,
+        onSelectBookmark = { bookmark ->
+            viewModel.locatorFor(ReaderTarget.Bookmark(bookmark.id))?.let { navigator?.go(it) }
+            viewModel.showSheet(ReaderSheet.None)
+        },
+        onDeleteBookmark = viewModel::deleteBookmark,
+        onSearchQueryChange = viewModel::onSearchQueryChange,
+        onSearch = viewModel::runSearch,
+        onLoadMoreResults = viewModel::loadMoreResults,
+        onSelectSearchHit = { hit ->
+            viewModel.locatorFor(ReaderTarget.Hit(hit.index))?.let { navigator?.go(it) }
+            viewModel.showSheet(ReaderSheet.None)
+        },
         modifier = modifier
     )
 
@@ -88,6 +101,13 @@ internal fun ReaderScreen(
     onDismissSheet: () -> Unit,
     onSelectChapter: (TocItem) -> Unit,
     onSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
+    onToggleBookmark: () -> Unit,
+    onSelectBookmark: (BookmarkItem) -> Unit,
+    onDeleteBookmark: (Long) -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    onLoadMoreResults: () -> Unit,
+    onSelectSearchHit: (SearchHit) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -114,7 +134,14 @@ internal fun ReaderScreen(
                 onShowSheet = onShowSheet,
                 onDismissSheet = onDismissSheet,
                 onSelectChapter = onSelectChapter,
-                onSettingsChange = onSettingsChange
+                onSettingsChange = onSettingsChange,
+                onToggleBookmark = onToggleBookmark,
+                onSelectBookmark = onSelectBookmark,
+                onDeleteBookmark = onDeleteBookmark,
+                onSearchQueryChange = onSearchQueryChange,
+                onSearch = onSearch,
+                onLoadMoreResults = onLoadMoreResults,
+                onSelectSearchHit = onSelectSearchHit
             )
         }
     }
@@ -132,6 +159,13 @@ private fun ReadingSurface(
     onDismissSheet: () -> Unit,
     onSelectChapter: (TocItem) -> Unit,
     onSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
+    onToggleBookmark: () -> Unit,
+    onSelectBookmark: (BookmarkItem) -> Unit,
+    onDeleteBookmark: (Long) -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    onLoadMoreResults: () -> Unit,
+    onSelectSearchHit: (SearchHit) -> Unit,
     modifier: Modifier = Modifier
 ) {
     KeepScreenOnEffect(state.settings.keepScreenOn)
@@ -150,7 +184,11 @@ private fun ReadingSurface(
         ReaderTopBar(
             title = state.title,
             visible = state.chromeVisible,
+            bookmarked = state.currentIsBookmarked,
+            searchable = state.isSearchable,
             onBack = onBack,
+            onToggleBookmark = onToggleBookmark,
+            onSearch = { onShowSheet(ReaderSheet.Search) },
             modifier = Modifier.align(Alignment.TopCenter)
         )
         ReaderBottomBar(
@@ -167,13 +205,25 @@ private fun ReadingSurface(
 
         ReaderSheet.Contents -> ReaderContentsSheet(
             toc = state.toc,
-            onSelect = onSelectChapter,
+            bookmarks = state.bookmarks,
+            onSelectChapter = onSelectChapter,
+            onSelectBookmark = onSelectBookmark,
+            onDeleteBookmark = onDeleteBookmark,
             onDismiss = onDismissSheet
         )
 
         ReaderSheet.Settings -> ReaderSettingsSheet(
             settings = state.settings,
             onChange = onSettingsChange,
+            onDismiss = onDismissSheet
+        )
+
+        ReaderSheet.Search -> ReaderSearchSheet(
+            state = state.search,
+            onQueryChange = onSearchQueryChange,
+            onSearch = onSearch,
+            onLoadMore = onLoadMoreResults,
+            onSelect = onSelectSearchHit,
             onDismiss = onDismissSheet
         )
     }
@@ -197,7 +247,16 @@ private fun VolumeKeyPaging(relay: VolumeKeyRelay, navigator: OverflowableNaviga
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ReaderTopBar(title: String, visible: Boolean, onBack: () -> Unit, modifier: Modifier = Modifier) {
+private fun ReaderTopBar(
+    title: String,
+    visible: Boolean,
+    bookmarked: Boolean,
+    searchable: Boolean,
+    onBack: () -> Unit,
+    onToggleBookmark: () -> Unit,
+    onSearch: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     AnimatedVisibility(
         visible = visible,
         modifier = modifier,
@@ -213,6 +272,22 @@ private fun ReaderTopBar(title: String, visible: Boolean, onBack: () -> Unit, mo
                     Icon(
                         ReadanaIcons.Back,
                         contentDescription = stringResource(R.string.feature_reader_back)
+                    )
+                }
+            },
+            actions = {
+                if (searchable) {
+                    IconButton(onClick = onSearch) {
+                        Icon(
+                            ReadanaIcons.Discover,
+                            contentDescription = stringResource(R.string.feature_reader_search)
+                        )
+                    }
+                }
+                IconButton(onClick = onToggleBookmark) {
+                    Icon(
+                        if (bookmarked) ReadanaIcons.BookmarkOn else ReadanaIcons.BookmarkOff,
+                        contentDescription = stringResource(R.string.feature_reader_bookmark)
                     )
                 }
             },

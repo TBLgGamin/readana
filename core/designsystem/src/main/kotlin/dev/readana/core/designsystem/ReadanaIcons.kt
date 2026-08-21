@@ -6,6 +6,8 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
@@ -27,4 +29,6 @@ object ReadanaIcons {
     val Delete: ImageVector = Icons.Filled.Delete
     val Close: ImageVector = Icons.Filled.Close
     val Folder: ImageVector = Icons.Filled.Folder
+    val BookmarkOn: ImageVector = Icons.Filled.Bookmark
+    val BookmarkOff: ImageVector = Icons.Filled.BookmarkBorder
 }

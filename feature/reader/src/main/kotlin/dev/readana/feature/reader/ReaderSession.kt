@@ -6,6 +6,7 @@ import dagger.hilt.android.scopes.ActivityRetainedScoped
 import javax.inject.Inject
 import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
+import org.readium.r2.shared.publication.services.search.SearchIterator
 
 /** One entry of a publication's table of contents, flattened with its nesting depth. */
 internal data class TocEntry(val title: String, val depth: Int, val link: Link)
@@ -22,6 +23,9 @@ internal class ReaderSession(
     val toc: List<TocEntry>,
     /** Every reading position, used to map the progress slider onto locators. */
     val positions: List<Locator>,
+    /** False for formats Readium cannot search, such as PDFs opened through pdfium. */
+    val isSearchable: Boolean,
+    val search: suspend (String) -> SearchIterator?,
     private val onClose: () -> Unit
 ) {
     fun close() = onClose()

@@ -20,6 +20,8 @@ import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.services.positions
+import org.readium.r2.shared.publication.services.search.isSearchable
+import org.readium.r2.shared.publication.services.search.search
 
 /** Opens a book and builds the navigator that will render it. */
 internal interface ReaderSessionFactory {
@@ -91,6 +93,8 @@ internal class ReadiumReaderSessionFactory @Inject constructor(
         fragmentFactory = factory,
         toc = publication.tableOfContents.flatten(depth = 0),
         positions = publication.positions(),
+        isSearchable = publication.isSearchable,
+        search = { query -> publication.search(query) },
         onClose = { publication.close() }
     )
 
