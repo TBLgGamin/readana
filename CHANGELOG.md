@@ -11,6 +11,7 @@ All notable changes to this project are documented here. The format follows
 - Reader: EPUB and PDF are rendered by the Readium navigator hosted in Compose, with tap zones and
   swipes for page turns, live reading settings, immersive full-screen reading, keep-screen-on, and
   the reading position restored and saved as a Readium locator.
+- Bookmarks: a `bookmarks` table added by a Room auto-migration to schema version 2.
 - Reader controls: progress slider, chapter list, a reading-settings sheet (typeface, size, line
   spacing, margins, theme, paginated or scrolled, columns), a left-edge brightness drag and
   volume-key page turns.

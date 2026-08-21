@@ -10,8 +10,10 @@ import dev.readana.core.data.importing.BookMetadataExtractor
 import dev.readana.core.data.importing.DefaultBookImportManager
 import dev.readana.core.data.importing.DefaultBookImporter
 import dev.readana.core.data.importing.ReadiumMetadataExtractor
+import dev.readana.core.data.repository.BookmarksRepository
 import dev.readana.core.data.repository.DataStoreSettingsRepository
 import dev.readana.core.data.repository.LibraryRepository
+import dev.readana.core.data.repository.RoomBookmarksRepository
 import dev.readana.core.data.repository.RoomLibraryRepository
 import dev.readana.core.data.repository.SettingsRepository
 
@@ -23,6 +25,9 @@ abstract class DataModule {
 
     @Binds
     abstract fun bindsSettingsRepository(impl: DataStoreSettingsRepository): SettingsRepository
+
+    @Binds
+    abstract fun bindsBookmarksRepository(impl: RoomBookmarksRepository): BookmarksRepository
 
     @Binds
     abstract fun bindsBookMetadataExtractor(impl: ReadiumMetadataExtractor): BookMetadataExtractor

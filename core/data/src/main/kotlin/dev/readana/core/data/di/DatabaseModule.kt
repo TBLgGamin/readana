@@ -8,6 +8,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dev.readana.core.data.database.BookDao
+import dev.readana.core.data.database.BookmarkDao
 import dev.readana.core.data.database.ReadanaDatabase
 import javax.inject.Singleton
 
@@ -21,4 +22,7 @@ object DatabaseModule {
 
     @Provides
     fun providesBookDao(database: ReadanaDatabase): BookDao = database.bookDao()
+
+    @Provides
+    fun providesBookmarkDao(database: ReadanaDatabase): BookmarkDao = database.bookmarkDao()
 }
