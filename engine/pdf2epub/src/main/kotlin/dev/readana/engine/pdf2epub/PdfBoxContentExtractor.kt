@@ -82,7 +82,7 @@ class PdfBoxContentExtractor(context: Context, private val options: PdfExtractio
         stripper.getText(document)
 
         val figures = if (options.extractImages) {
-            PageImageCollector(mediaBox.height, options, images).collect(page)
+            PageImageCollector(mediaBox.height, options, images).collect(page, index)
         } else {
             emptyList()
         }

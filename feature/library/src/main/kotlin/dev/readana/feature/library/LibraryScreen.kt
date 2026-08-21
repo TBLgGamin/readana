@@ -227,10 +227,6 @@ internal fun LibraryScreen(
         BookDetailsSheet(
             book = book,
             isConverting = uiState.conversions.any { it.bookId == book.id },
-            onOpen = {
-                onShowDetails(null)
-                onOpenBook(book.id)
-            },
             onDelete = { onRequestDelete(book) },
             onConvert = { onConvert(book.id) },
             onDismiss = { onShowDetails(null) }

@@ -25,7 +25,6 @@
     <string name="feature_library_details_location">File</string>
     <string name="feature_library_details_progress">Progress</string>
     <string name="feature_library_details_progress_value">%1$d%% read</string>
-    <string name="feature_library_details_open">Read</string>
     <string name="feature_library_details_delete">Delete</string>
     <string name="feature_library_details_unknown">Unknown</string>
     <string name="feature_library_delete_dialog_title">Delete “%1$s”?</string>

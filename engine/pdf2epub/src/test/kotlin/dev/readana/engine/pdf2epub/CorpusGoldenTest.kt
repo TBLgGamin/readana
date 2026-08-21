@@ -95,6 +95,26 @@ class CorpusGoldenTest {
         assertTrue(entries.any { it.startsWith("OEBPS/images/") }, "the figure was not packaged: $entries")
     }
 
+    /**
+     * Regression: the collector used to recycle the bitmap PDFBox handed it. PDFBox caches that
+     * bitmap per image XObject, so the second page drawing the same logo got a freed one back and
+     * the whole conversion died with "Can't compress a recycled bitmap" — after processing every
+     * page, which made it look like a late failure rather than an image problem.
+     */
+    @Test
+    fun `an image repeated on every page converts instead of failing`() {
+        val outcome = converter().convert(
+            CorpusPdfs.repeatedLogo(pages = 3).inputStream(),
+            ByteArrayOutputStream(),
+            metadata()
+        )
+
+        val report = assertIs<AppResult.Success<ConversionReport>>(outcome, "$outcome").value
+        assertEquals(3, report.pages)
+        assertEquals(1, report.images, "the same logo should be stored once, not per page")
+        assertTrue(report.warnings.none { "recycled" in it.lowercase() }, report.warnings.toString())
+    }
+
     @Test
     fun `the running header and page number are stripped from the novel`() {
         val blocks = blocksOf(CorpusPdfs.novel())

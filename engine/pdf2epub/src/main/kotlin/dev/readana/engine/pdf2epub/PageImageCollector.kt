@@ -33,6 +33,8 @@ internal class PageImageCollector(
     private val budget: ImageBudget
 ) : PDFStreamEngine() {
     private val collected = mutableListOf<PageImage>()
+
+    /** Only used to say which page a warning came from. */
     private var pageIndex = 0
 
     init {
@@ -44,12 +46,13 @@ internal class PageImageCollector(
         addOperator(SetMatrix())
     }
 
-    fun collect(page: PDPage): List<PageImage> {
+    fun collect(page: PDPage, index: Int): List<PageImage> {
         collected.clear()
+        pageIndex = index
         try {
             processPage(page)
         } catch (e: IOException) {
-            budget.warnings += "Could not read figures on a page: ${e.message ?: "unknown error"}"
+            budget.warnings += "Could not read figures on page ${index + 1}: ${e.message ?: "unknown error"}"
         }
         return collected.toList()
     }
@@ -65,7 +68,7 @@ internal class PageImageCollector(
             // Forms nest their own content stream, which may draw images of its own.
             is PDFormXObject -> showForm(xObject)
 
-            is PDImageXObject -> take(xObject)
+            is PDImageXObject -> takeSafely(xObject)
 
             else -> Unit
         }
@@ -75,6 +78,21 @@ internal class PageImageCollector(
         resources?.getXObject(name)
     } catch (_: IOException) {
         null
+    }
+
+    /**
+     * A figure is a bonus, never a reason to lose the book: anything the decoders throw at us is
+     * recorded as a warning and the text carries on.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    private fun takeSafely(image: PDImageXObject) {
+        try {
+            take(image)
+        } catch (e: RuntimeException) {
+            budget.warnings += "Skipped a figure on page ${pageIndex + 1}: ${e.message ?: e::class.simpleName}"
+        } catch (e: OutOfMemoryError) {
+            budget.warnings += "Skipped a figure on page ${pageIndex + 1}: ${e.message ?: "out of memory"}"
+        }
     }
 
     private fun take(image: PDImageXObject) {
@@ -89,10 +107,15 @@ internal class PageImageCollector(
         if (image.width < options.minImageDimensionPx || image.height < options.minImageDimensionPx) return
 
         val bitmap = decode(image) ?: return
+        // PDFBox hands back a bitmap it caches and reuses, so recycling it breaks every later draw
+        // of the same XObject — a logo repeated across pages would fail the whole conversion with
+        // "Can't compress a recycled bitmap". Only the scaled copy below is ours to free.
         val scaled = downscale(bitmap)
-        val encoded = encode(scaled) ?: return
-        if (scaled !== bitmap) scaled.recycle()
-        bitmap.recycle()
+        val encoded = try {
+            encode(scaled)
+        } finally {
+            if (scaled !== bitmap) scaled.recycle()
+        } ?: return
 
         budget.record(encoded.bytes.size)
         collected += PageImage(

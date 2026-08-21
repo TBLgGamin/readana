@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Converting a PDF whose pages share an image (a logo, a chapter ornament) no longer fails with
+  "Can't compress a recycled bitmap" once every page has been read. The extractor was freeing the
+  bitmap PDFBox caches and reuses, so the second page drawing that image got a released one back.
+  A figure that still cannot be read is now skipped with a note in the conversion report rather
+  than losing the whole book.
 - Cover art from search results and the popular shelf actually loads. Coil was configured without a
   network fetcher back when covers were only ever local files, so every remote cover failed silently
   and fell back to its title card. Covers are now memory- and disk-cached.
@@ -30,6 +35,8 @@ All notable changes to this project are documented here. The format follows
 - Settings is now five collapsible groups, one open at a time, each showing what its settings
   currently add up to ("Sepia · 1.0× text · Auto") so most answers need no tap. Theme, page-turn and
   column choices are proper labels instead of raw enum names.
+- The book details sheet drops its "Read" button: tapping the cover in the grid already opens the
+  book, and the sheet is reached by long-pressing that same cover.
 - Discover shows results as a two-column cover grid, with the download button on the cover.
 - Discover and its popular shelf show pulsing skeleton placeholders while covers load, instead of an
   empty screen.

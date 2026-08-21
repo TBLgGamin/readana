@@ -55,7 +55,6 @@ private val AddedDateFormatter: DateTimeFormatter = DateTimeFormatter
 internal fun BookDetailsSheet(
     book: Book,
     isConverting: Boolean,
-    onOpen: () -> Unit,
     onDelete: () -> Unit,
     onConvert: () -> Unit,
     onDismiss: () -> Unit,
@@ -96,10 +95,9 @@ internal fun BookDetailsSheet(
             Spacer(Modifier.height(SheetPadding))
             BookFacts(book, onShowReport = { showReport = true })
             Spacer(Modifier.height(SheetPadding))
+            // No "Read" here: tapping the book in the grid already opens it, and this sheet is
+            // reached by long-pressing that same cover.
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = onOpen) {
-                    Text(stringResource(R.string.feature_library_details_open))
-                }
                 ConvertButton(
                     book = book,
                     isConverting = isConverting,

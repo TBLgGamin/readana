@@ -101,6 +101,27 @@ internal object CorpusPdfs {
         document.documentCatalog.documentOutline = outline
     }
 
+    /**
+     * The same image XObject drawn on every page, the way a logo or a chapter ornament is. PDFBox
+     * caches and reuses that bitmap, so anything which frees it breaks every later page.
+     */
+    fun repeatedLogo(pages: Int = 3): ByteArray = document { document ->
+        val logo = LosslessFactory.createFromImage(document, solidBitmap())
+        repeat(pages) { index ->
+            page(document) { stream, _ ->
+                stream.drawImage(logo, MARGIN, 700f, 80f, 40f)
+                bodyParagraph(
+                    stream,
+                    640f,
+                    listOf(
+                        "Page ${index + 1} carries the same logo as every other page,",
+                        "which is exactly the case that used to break conversion."
+                    )
+                )
+            }
+        }
+    }
+
     /** An illustrated page: text, a figure, more text. */
     fun illustrated(): ByteArray = document { document ->
         page(document) { stream, _ ->
@@ -172,6 +193,16 @@ internal object CorpusPdfs {
         return y - LINE_HEIGHT
     }
 
+    private fun solidBitmap(): Bitmap {
+        val bitmap = Bitmap.createBitmap(IMAGE_PX, IMAGE_PX / 2, Bitmap.Config.ARGB_8888)
+        for (px in 0 until bitmap.width) {
+            for (py in 0 until bitmap.height) {
+                bitmap.setPixel(px, py, if (px < bitmap.width / 2) Color.DKGRAY else Color.LTGRAY)
+            }
+        }
+        return bitmap
+    }
+
     /** A flat two-colour bitmap: small, deterministic, and a real image XObject once embedded. */
     private fun image(
         document: PDDocument,
@@ -181,12 +212,7 @@ internal object CorpusPdfs {
         width: Float,
         height: Float
     ) {
-        val bitmap = Bitmap.createBitmap(IMAGE_PX, IMAGE_PX / 2, Bitmap.Config.ARGB_8888)
-        for (px in 0 until bitmap.width) {
-            for (py in 0 until bitmap.height) {
-                bitmap.setPixel(px, py, if (px < bitmap.width / 2) Color.DKGRAY else Color.LTGRAY)
-            }
-        }
+        val bitmap = solidBitmap()
         val xObject = LosslessFactory.createFromImage(document, bitmap)
         stream.drawImage(xObject, x, y, width, height)
         bitmap.recycle()
