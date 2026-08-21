@@ -57,6 +57,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A finished download reaches the library instead of being refused as "Not an EPUB or PDF". The
+  file was handed to the importer still named after the job it came from, and the importer works
+  the format out from the name — so every download ran to completion and was then thrown away. It
+  now takes the extension its own first bytes prove, which also catches a book the catalogue
+  mislabelled, and a server that answers with an error page instead of a file is refused outright
+  rather than imported as a broken book.
+
 - Downloads work on connections whose ISP blocks Anna's Archive. The site hands out download links
   on rotating partner domains, and a blocked one simply stops resolving — the download then spent
   all five of its attempts on a name that was never going to resolve, and gave up. Readana now

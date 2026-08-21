@@ -106,12 +106,31 @@ class BookDownloader @Inject constructor(
         partFile(jobId).delete()
     }
 
-    /** Removes partial files with no matching row, e.g. after a crash. */
+    /** Removes downloaded files with no matching row, e.g. after a crash. */
     fun sweepOrphans(liveJobIds: Set<String>) {
+        // Both the ".part" being written and the finished file waiting to be imported are named
+        // after their job, so either is rubbish once the job is gone.
         partsDir.listFiles()?.forEach { file ->
-            if (file.name.endsWith(PART_SUFFIX) && file.name.removeSuffix(PART_SUFFIX) !in liveJobIds) {
-                file.delete()
-            }
+            if (file.nameWithoutExtension !in liveJobIds) file.delete()
+        }
+    }
+
+    /**
+     * What the bytes say the file is, which is not always what the catalogue claimed. A download
+     * that is neither — an error page served with a 200, most often — is worth catching here
+     * rather than failing later with something about a corrupt publication.
+     */
+    private fun File.sniffFormat(): BookFormat? {
+        val magic = ByteArray(MAGIC_BYTES)
+        val read = inputStream().use { it.read(magic) }
+        if (read < MAGIC_BYTES) return null
+        return when {
+            magic.decodeToString() == PDF_MAGIC -> BookFormat.PDF
+
+            // Every EPUB is a zip; nothing else we accept is.
+            magic[0] == 'P'.code.toByte() && magic[1] == 'K'.code.toByte() -> BookFormat.EPUB
+
+            else -> null
         }
     }
 
@@ -289,9 +308,23 @@ class BookDownloader @Inject constructor(
     }
 
     private suspend fun finish(entity: DownloadEntity, part: File): Outcome {
-        val origin = BookOrigin(entity.sourceId, entity.recordId, BookFormat.valueOf(entity.format))
-        val imported = importer.import(Uri.fromFile(part).toString(), origin)
-        part.delete()
+        val format = part.sniffFormat()
+            ?: return fail(
+                entity.id,
+                DownloadErrorKind.Unexpected,
+                "The download was not a book — the server sent something else"
+            )
+        // The importer works out the format from the file name, and ".part" tells it nothing, so
+        // the finished file takes the extension its own first bytes just proved.
+        val book = File(part.parentFile, "${entity.id}.${format.extension}")
+        book.delete()
+        if (!part.renameTo(book)) {
+            return fail(entity.id, DownloadErrorKind.Storage, "Could not put the download in place")
+        }
+
+        val origin = BookOrigin(entity.sourceId, entity.recordId, format)
+        val imported = importer.import(Uri.fromFile(book).toString(), origin)
+        book.delete()
         return when (imported) {
             is AppResult.Failure -> fail(entity.id, DownloadErrorKind.Storage, imported.error.message)
 
@@ -326,6 +359,8 @@ class BookDownloader @Inject constructor(
 
     private companion object {
         const val PART_SUFFIX = ".part"
+        const val MAGIC_BYTES = 4
+        const val PDF_MAGIC = "%PDF"
         const val CHUNK_BYTES = 64 * 1024
         const val PROGRESS_STEP_BYTES = 256L * 1024
         const val SOCKET_TIMEOUT_MS = 60_000L

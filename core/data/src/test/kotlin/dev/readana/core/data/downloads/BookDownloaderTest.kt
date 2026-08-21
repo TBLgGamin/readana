@@ -61,14 +61,51 @@ class BookDownloaderTest {
     }
 
     @Test
-    fun `streams the file and hands it to the importer with its origin`() = runTest {
+    fun `the imported file is named for what its bytes actually are`() = runTest {
+        // The importer works the format out from the file name, and a ".part" file told it
+        // nothing — a download would run to completion and then be refused as "not an EPUB".
         downloads.upsert(downloadEntity())
-        val downloader = downloader { respond("epub bytes", HttpStatusCode.OK) }
+        val downloader = downloader { respond(EPUB_BYTES, HttpStatusCode.OK) }
+
+        downloader.run("job-1", isRetryAttempt = false) { _, _ -> }
+
+        assertEquals("job-1.epub", importer.importedName)
+    }
+
+    @Test
+    fun `a record that claimed EPUB but downloaded a PDF is imported as a PDF`() = runTest {
+        downloads.upsert(downloadEntity())
+        val downloader = downloader { respond("%PDF-1.7 and the rest", HttpStatusCode.OK) }
 
         val outcome = downloader.run("job-1", isRetryAttempt = false) { _, _ -> }
 
         assertEquals(BookDownloader.Outcome.Success, outcome)
-        assertEquals("epub bytes", importer.importedText)
+        assertEquals("job-1.pdf", importer.importedName)
+        assertEquals(BookFormat.PDF, importer.origin?.originalFormat)
+    }
+
+    @Test
+    fun `a page served in place of a book is refused instead of imported`() = runTest {
+        downloads.upsert(downloadEntity())
+        // What a partner server sends when it would rather not: an error page, with a 200 on it.
+        val downloader = downloader { respond("<!doctype html><html>Try again later", HttpStatusCode.OK) }
+
+        val outcome = downloader.run("job-1", isRetryAttempt = false) { _, _ -> }
+
+        assertEquals(BookDownloader.Outcome.Failure, outcome)
+        assertNull(importer.importedText, "nothing that shape should reach the library")
+        assertEquals(DownloadStatus.Failed, downloads.getJob("job-1")?.status)
+    }
+
+    @Test
+    fun `streams the file and hands it to the importer with its origin`() = runTest {
+        downloads.upsert(downloadEntity())
+        val downloader = downloader { respond(EPUB_BYTES, HttpStatusCode.OK) }
+
+        val outcome = downloader.run("job-1", isRetryAttempt = false) { _, _ -> }
+
+        assertEquals(BookDownloader.Outcome.Success, outcome)
+        assertEquals(EPUB_BYTES, importer.importedText)
         assertEquals(BookOrigin("annas-archive", "0123456789abcdef0123456789abcdef", BookFormat.EPUB), importer.origin)
         assertEquals(DownloadStatus.Completed, downloads.getJob("job-1")?.status)
         assertEquals("book-1", downloads.getJob("job-1")?.bookId)
@@ -78,33 +115,34 @@ class BookDownloaderTest {
     @Test
     fun `resumes a partial file with a Range request`() = runTest {
         downloads.upsert(downloadEntity())
-        File(partsDir, "job-1.part").writeText("epub ")
+        // Nine bytes of it already on disk, signature included.
+        File(partsDir, "job-1.part").writeText("PKepub ")
         var range: String? = null
         val downloader = downloader { request ->
             range = request.headers[HttpHeaders.Range]
             respond(
                 "bytes",
                 HttpStatusCode.PartialContent,
-                headersOf(HttpHeaders.ContentRange, "bytes 5-9/10")
+                headersOf(HttpHeaders.ContentRange, "bytes 9-13/14")
             )
         }
 
         val outcome = downloader.run("job-1", isRetryAttempt = true) { _, _ -> }
 
         assertEquals(BookDownloader.Outcome.Success, outcome)
-        assertEquals("bytes=5-", range)
-        assertEquals("epub bytes", importer.importedText)
+        assertEquals("bytes=9-", range)
+        assertEquals(EPUB_BYTES, importer.importedText)
     }
 
     @Test
     fun `restarts from scratch when the server ignores the range`() = runTest {
         downloads.upsert(downloadEntity())
         File(partsDir, "job-1.part").writeText("stale")
-        val downloader = downloader { respond("epub bytes", HttpStatusCode.OK) }
+        val downloader = downloader { respond(EPUB_BYTES, HttpStatusCode.OK) }
 
         downloader.run("job-1", isRetryAttempt = true) { _, _ -> }
 
-        assertEquals("epub bytes", importer.importedText)
+        assertEquals(EPUB_BYTES, importer.importedText)
     }
 
     @Test
@@ -134,7 +172,7 @@ class BookDownloaderTest {
                 if (request.url.toString().endsWith("expired.epub")) {
                     respondError(HttpStatusCode.Forbidden)
                 } else {
-                    respond("epub bytes", HttpStatusCode.OK)
+                    respond(EPUB_BYTES, HttpStatusCode.OK)
                 }
             }
 
@@ -179,7 +217,7 @@ class BookDownloaderTest {
         val source = FakeSource(AppError.Unexpected("must not be called").asFailure())
         val downloader = downloader(source = source) { request ->
             cookie = request.headers[HttpHeaders.Cookie]
-            respond("epub bytes", HttpStatusCode.OK)
+            respond(EPUB_BYTES, HttpStatusCode.OK)
         }
 
         val outcome = downloader.run("job-1", isRetryAttempt = true) { _, _ -> }
@@ -245,12 +283,20 @@ class BookDownloaderTest {
         }
     }
 
+    private companion object {
+        /** A zip signature, because that is what the downloader now checks an EPUB by. */
+        const val EPUB_BYTES = "PKepub bytes"
+    }
+
     private class RecordingImporter : BookImporter {
         var importedText: String? = null
+        var importedName: String? = null
         var origin: BookOrigin? = null
 
         override suspend fun import(uri: String, origin: BookOrigin?): AppResult<ImportResult> {
-            importedText = File(checkNotNull(Uri.parse(uri).path)).readText()
+            val file = File(checkNotNull(Uri.parse(uri).path))
+            importedText = file.readText()
+            importedName = file.name
             this.origin = origin
             return ImportResult.Imported(book()).asSuccess()
         }
