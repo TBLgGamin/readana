@@ -299,14 +299,22 @@ class ReaderViewModelTest {
             viewModel.open("1", systemInDarkTheme = false)
             advanceUntilIdle()
 
-            viewModel.addHighlight(locator(progression = 0.3), "call me Ishmael", openNote = true)
+            viewModel.addHighlight(locator(progression = 0.3), "call me Ishmael")
             advanceUntilIdle()
 
             val added = assertIs<ReaderUiState.Ready>(viewModel.uiState.value)
             val stored = added.highlights.single()
             assertEquals("call me Ishmael", stored.text)
             assertEquals(HighlightTint.Yellow, stored.tint)
-            assertEquals(stored.id, assertNotNull(added.editingHighlight).id)
+            assertNull(added.editingHighlight, "marking text does not interrupt reading")
+
+            // Colour, a note and deletion come from the editor, opened by tapping the highlight.
+            viewModel.editHighlight(stored.id)
+            advanceUntilIdle()
+            assertEquals(
+                stored.id,
+                assertNotNull(assertIs<ReaderUiState.Ready>(viewModel.uiState.value).editingHighlight).id
+            )
 
             viewModel.updateHighlight(stored.id, HighlightTint.Green, "why this matters")
             advanceUntilIdle()
@@ -328,7 +336,7 @@ class ReaderViewModelTest {
         val viewModel = viewModel(backgroundScope)
         viewModel.open("1", systemInDarkTheme = false)
         advanceUntilIdle()
-        viewModel.addHighlight(locator(progression = 0.3), "text", openNote = false)
+        viewModel.addHighlight(locator(progression = 0.3), "text")
         advanceUntilIdle()
         val stored = assertIs<ReaderUiState.Ready>(viewModel.uiState.value).highlights.single()
 

@@ -16,7 +16,6 @@
     <string name="feature_reader_note">Note</string>
     <string name="feature_reader_note_hint">Your note</string>
     <string name="feature_reader_note_save">Save</string>
-    <string name="feature_reader_define">Define</string>
     <string name="feature_reader_search_hint">Search this book</string>
     <string name="feature_reader_search_no_results">Nothing found in this book.</string>
     <string name="feature_reader_search_more">Load more results</string>

@@ -98,47 +98,24 @@ internal fun HighlightDecorations(
 internal fun SelectionActions(
     relay: ReaderSelectionRelay,
     navigator: Navigator?,
-    onHighlight: (Locator, String, Boolean) -> Unit
+    onHighlight: (Locator, String) -> Unit
 ) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val labels = ReaderSelectionRelay.Labels(
-        highlight = stringResource(R.string.feature_reader_highlight),
-        note = stringResource(R.string.feature_reader_note),
-        define = stringResource(R.string.feature_reader_define)
+        highlight = stringResource(R.string.feature_reader_highlight)
     )
     val currentOnHighlight by rememberUpdatedState(onHighlight)
 
     DisposableEffect(relay, navigator, labels) {
         val selectable = navigator as? SelectableNavigator
         relay.labels = labels
-        relay.actions = object : ReaderSelectionRelay.Actions {
-            override fun highlight() = mark(openNote = false)
-
-            override fun annotate() = mark(openNote = true)
-
-            override fun define() {
-                selectable ?: return
-                scope.launch {
-                    val text = selectable.currentSelection()?.locator?.text?.highlight
-                    selectable.clearSelection()
-                    if (!text.isNullOrBlank()) {
-                        context.lookUp(text)
-                    }
-                }
-            }
-
-            private fun mark(openNote: Boolean) {
-                selectable ?: return
+        relay.actions = ReaderSelectionRelay.Actions {
+            if (selectable != null) {
                 scope.launch {
                     val selection = selectable.currentSelection()
                     selectable.clearSelection()
                     val locator = selection?.locator ?: return@launch
-                    currentOnHighlight(
-                        locator,
-                        locator.text.highlight.orEmpty(),
-                        openNote
-                    )
+                    currentOnHighlight(locator, locator.text.highlight.orEmpty())
                 }
             }
         }
@@ -200,19 +177,6 @@ internal fun HighlightEditorDialog(
             }
         }
     )
-}
-
-/**
- * Hands [text] to whichever app can define it. The chooser is a system activity, so it always
- * resolves and tells the user itself when nothing on the device handles the text.
- */
-private fun Context.lookUp(text: String) {
-    val define = Intent(Intent.ACTION_PROCESS_TEXT).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_PROCESS_TEXT, text)
-        putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, true)
-    }
-    startActivity(Intent.createChooser(define, null))
 }
 
 private fun HighlightTint.toDecorationStyle(style: HighlightStyle): Decoration.Style {

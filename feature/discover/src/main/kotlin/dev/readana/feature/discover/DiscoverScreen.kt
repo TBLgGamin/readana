@@ -58,8 +58,8 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.BookCover
-import dev.readana.core.designsystem.component.BookGridSkeleton
 import dev.readana.core.designsystem.component.EmptyState
+import dev.readana.core.designsystem.component.LoadingState
 import dev.readana.core.designsystem.component.WavyProgress
 import dev.readana.core.designsystem.theme.ReadanaTheme
 import dev.readana.core.model.BookFormat
@@ -273,9 +273,9 @@ private fun DiscoverContent(
     val waitingForFirstResults = uiState.isSearching && uiState.results.isEmpty()
     val waitingForShelf = !uiState.hasSearched && uiState.isLoadingTrending
     when {
-        // A grid of pulsing placeholders beats an empty screen while covers arrive.
-        waitingForFirstResults || waitingForShelf ->
-            BookGridSkeleton(modifier = modifier, columns = GRID_COLUMNS)
+        // The same spinner a book opens with, rather than a grid of placeholder cards pretending
+        // to be results that may not arrive.
+        waitingForFirstResults || waitingForShelf -> LoadingState(modifier = modifier)
 
         !uiState.hasSearched && uiState.trending.isNotEmpty() -> TrendingGrid(
             books = uiState.trending,

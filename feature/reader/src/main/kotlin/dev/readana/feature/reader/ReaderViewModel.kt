@@ -215,13 +215,13 @@ internal class ReaderViewModel @Inject constructor(
     }
 
     /**
-     * Marks [locator] with the text the reader selected. When [openNote] is true the note editor
-     * opens on the new highlight.
+     * Marks [locator] with the text the reader selected. Colour, a note and deletion live in the
+     * editor, which opens by tapping the highlight itself.
      */
-    fun addHighlight(locator: Locator, text: String, openNote: Boolean) {
+    fun addHighlight(locator: Locator, text: String) {
         val bookId = openedBookId ?: return
         viewModelScope.launch {
-            val stored = highlightsRepository.add(
+            highlightsRepository.add(
                 highlight = Highlight(
                     id = Highlight.UNSAVED_ID,
                     bookId = bookId,
@@ -234,9 +234,6 @@ internal class ReaderViewModel @Inject constructor(
                 ),
                 progression = locator.locations.totalProgression
             )
-            if (openNote) {
-                updateReady { it.copy(editingHighlight = stored.toItem()) }
-            }
         }
     }
 

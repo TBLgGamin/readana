@@ -27,6 +27,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Selecting text in the reader offers Highlight and the platform's own copy and share, nothing
+  else. Note and Define were a menu deep enough to get in the way of reading; a highlight's colour,
+  note and deletion still live in its editor, which opens by tapping the highlight.
+- Discover waits with the same spinner a book opens with, instead of a grid of placeholder cards
+  that promised results which may not arrive.
+
 - Progress bars are Material 3 Expressive's. The wavy one is kept for work happening right now —
   downloading, importing, converting, searching, loading a page — while how far you have read a
   book is the flat determinate bar, whose stop indicator doubles as a marker for the end. A

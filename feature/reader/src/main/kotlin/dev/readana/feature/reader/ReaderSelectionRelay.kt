@@ -14,15 +14,9 @@ import org.readium.r2.navigator.util.BaseActionModeCallback
  */
 @ActivityRetainedScoped
 internal class ReaderSelectionRelay @Inject constructor() {
-    interface Actions {
+    fun interface Actions {
         /** Marks the current selection. */
         fun highlight()
-
-        /** Marks the current selection and opens the note editor. */
-        fun annotate()
-
-        /** Looks the selection up in whatever dictionary the device offers. */
-        fun define()
     }
 
     var actions: Actions? = null
@@ -30,15 +24,14 @@ internal class ReaderSelectionRelay @Inject constructor() {
     /** Labels come from the reader's resources, which the action mode has no access to. */
     var labels: Labels = Labels()
 
-    data class Labels(val highlight: String = "Highlight", val note: String = "Note", val define: String = "Define")
+    data class Labels(val highlight: String = "Highlight")
 }
 
 /** Adds Readana's own items to the selection menu, keeping the platform ones (copy, share). */
 internal class ReaderSelectionActionMode(private val relay: ReaderSelectionRelay) : BaseActionModeCallback() {
     override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
+        // Just the one item of our own; the platform's copy and share stay where they are.
         menu.add(Menu.NONE, ITEM_HIGHLIGHT, Menu.FIRST, relay.labels.highlight)
-        menu.add(Menu.NONE, ITEM_NOTE, Menu.FIRST + 1, relay.labels.note)
-        menu.add(Menu.NONE, ITEM_DEFINE, Menu.FIRST + 2, relay.labels.define)
         return true
     }
 
@@ -46,8 +39,6 @@ internal class ReaderSelectionActionMode(private val relay: ReaderSelectionRelay
         val actions = relay.actions ?: return false
         when (item.itemId) {
             ITEM_HIGHLIGHT -> actions.highlight()
-            ITEM_NOTE -> actions.annotate()
-            ITEM_DEFINE -> actions.define()
             else -> return false
         }
         mode.finish()
@@ -56,7 +47,5 @@ internal class ReaderSelectionActionMode(private val relay: ReaderSelectionRelay
 
     private companion object {
         const val ITEM_HIGHLIGHT = 1
-        const val ITEM_NOTE = 2
-        const val ITEM_DEFINE = 3
     }
 }
