@@ -6,6 +6,8 @@ import dev.readana.core.common.result.asFailure
 import dev.readana.core.common.result.asSuccess
 import dev.readana.core.model.BookFormat
 import dev.readana.source.api.BookSource
+import dev.readana.source.api.BrowserLogin
+import dev.readana.source.api.DownloadQuota
 import dev.readana.source.api.DownloadRequest
 import dev.readana.source.api.FileNames
 import dev.readana.source.api.SearchPage
@@ -86,12 +88,7 @@ class AnnasArchiveSource(
 
         return mirrors.withMirror(settings.normalizedMirrors) { base ->
             if (key == null) {
-                return@withMirror DownloadRequest(
-                    url = "$base/md5/$md5",
-                    format = format,
-                    suggestedFileName = fileName,
-                    requiresBrowser = true
-                ).asSuccess()
+                return@withMirror browserFallback(base, md5, format, fileName, key = null).asSuccess()
             }
             val response = client.get("$base/dyn/api/fast_download.json") {
                 header(HttpHeaders.UserAgent, USER_AGENT)
@@ -106,24 +103,52 @@ class AnnasArchiveSource(
             } catch (e: IllegalArgumentException) {
                 return@withMirror AppError.Parse("Unexpected fast-download response", e).asFailure()
             }
-            interpret(payload, response.status, format, fileName, result.sizeBytes)
+            interpret(payload, response.status, base, md5, key, format, fileName, result.sizeBytes)
         }
     }
 
+    /**
+     * The record page, for the in-app browser to run a slow partner download. When a key is
+     * configured the browser can sign in with it first: the key is the account.
+     */
+    private fun browserFallback(
+        base: String,
+        md5: String,
+        format: BookFormat,
+        fileName: String,
+        key: String?,
+        quota: DownloadQuota? = null
+    ) = DownloadRequest(
+        url = "$base/md5/$md5",
+        format = format,
+        suggestedFileName = fileName,
+        requiresBrowser = true,
+        quota = quota,
+        browserLogin = key?.let { BrowserLogin("$base/account/", "key=$it") }
+    )
+
+    @Suppress("LongParameterList")
     private fun interpret(
         payload: FastDownloadResponse,
         status: HttpStatusCode,
+        base: String,
+        md5: String,
+        key: String,
         format: BookFormat,
         fileName: String,
         expectedSize: Long?
     ): AppResult<DownloadRequest> {
         val url = payload.downloadUrl
+        val quota = payload.accountInfo?.let {
+            DownloadQuota(remaining = it.downloadsLeft, perDay = it.downloadsPerDay)
+        }
         return when {
             url != null -> DownloadRequest(
                 url,
                 format,
                 fileName,
-                expectedSizeBytes = expectedSize
+                expectedSizeBytes = expectedSize,
+                quota = quota
             ).asSuccess()
 
             status == HttpStatusCode.Unauthorized || status == HttpStatusCode.Forbidden ||
@@ -131,6 +156,17 @@ class AnnasArchiveSource(
                 AppError.Unauthorized(
                     payload.error ?: "Anna's Archive rejected the secret key"
                 ).asFailure()
+
+            // The membership is fine, today's fast downloads are simply spent: offer the browser.
+            quota?.isExhausted == true || payload.error?.looksLikeQuota() == true ->
+                browserFallback(
+                    base,
+                    md5,
+                    format,
+                    fileName,
+                    key,
+                    quota ?: DownloadQuota(remaining = 0, perDay = null)
+                ).asSuccess()
 
             !status.isSuccess() -> AppError.Http(
                 status.value,
@@ -140,6 +176,9 @@ class AnnasArchiveSource(
             else -> AppError.Unexpected(payload.error ?: "Fast download unavailable").asFailure()
         }
     }
+
+    private fun String.looksLikeQuota(): Boolean =
+        contains("limit", ignoreCase = true) || contains("quota", ignoreCase = true)
 
     private fun HttpResponse.failIfMirrorBroken() {
         if (status.value >= HttpStatusCode.InternalServerError.value) {

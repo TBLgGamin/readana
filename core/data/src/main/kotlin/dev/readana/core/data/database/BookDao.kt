@@ -19,6 +19,9 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE title = :title AND size_bytes = :sizeBytes LIMIT 1")
     suspend fun findByTitleAndSize(title: String, sizeBytes: Long): BookEntity?
 
+    @Query("SELECT * FROM books WHERE source_id = :sourceId AND source_record_id = :recordId LIMIT 1")
+    suspend fun findBySource(sourceId: String, recordId: String): BookEntity?
+
     @Upsert
     suspend fun upsert(book: BookEntity)
 

@@ -10,7 +10,10 @@ data class SourceSettings(
     /** Base URLs tried in order; empty falls back to the source's built-in defaults. */
     val annasMirrors: List<String> = emptyList(),
     /** Anna's Archive member key. Stored in app-private storage; never logged. */
-    val annasSecretKey: String? = null
+    val annasSecretKey: String? = null,
+    /** Fast downloads the membership had left when it last answered; null until a download runs. */
+    val annasDownloadsLeft: Int? = null,
+    val annasDownloadsPerDay: Int? = null
 ) {
     fun isEnabled(sourceId: String, enabledByDefault: Boolean): Boolean = sourceOverrides[sourceId] ?: enabledByDefault
 

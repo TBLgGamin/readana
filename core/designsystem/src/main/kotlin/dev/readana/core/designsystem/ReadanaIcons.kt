@@ -11,7 +11,10 @@ import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -31,4 +34,7 @@ object ReadanaIcons {
     val Folder: ImageVector = Icons.Filled.Folder
     val BookmarkOn: ImageVector = Icons.Filled.Bookmark
     val BookmarkOff: ImageVector = Icons.Filled.BookmarkBorder
+    val Refresh: ImageVector = Icons.Filled.Refresh
+    val ExpandMore: ImageVector = Icons.Filled.ExpandMore
+    val ExpandLess: ImageVector = Icons.Filled.ExpandLess
 }

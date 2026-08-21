@@ -51,6 +51,7 @@ include(":source:api")
 include(":source:gutenberg")
 include(":source:annas")
 
+include(":feature:browser")
 include(":feature:library")
 include(":feature:discover")
 include(":feature:reader")

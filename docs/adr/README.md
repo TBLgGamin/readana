@@ -14,3 +14,4 @@ Short, dated records of the decisions that shape the project. Add a new file
 | [0007](0007-storage-strategy.md) | Library storage strategy | accepted |
 | [0008](0008-import-pipeline.md) | Book import pipeline | accepted |
 | [0009](0009-material3-expressive.md) | Material 3 Expressive for the whole UI | accepted |
+| [0010](0010-download-pipeline.md) | Download pipeline | accepted |

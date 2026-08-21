@@ -4,6 +4,7 @@ import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.SourceSettings
@@ -23,6 +24,8 @@ internal object SettingsKeys {
     val SOURCE_OVERRIDES = stringPreferencesKey("source_overrides")
     val ANNAS_MIRRORS = stringPreferencesKey("source_annas_mirrors")
     val ANNAS_SECRET_KEY = stringPreferencesKey("source_annas_secret_key")
+    val ANNAS_DOWNLOADS_LEFT = intPreferencesKey("source_annas_downloads_left")
+    val ANNAS_DOWNLOADS_PER_DAY = intPreferencesKey("source_annas_downloads_per_day")
 
     val LIBRARY_FOLDER_URI = stringPreferencesKey("library_folder_uri")
 
@@ -78,7 +81,9 @@ internal fun Preferences.toSourceSettings(): SourceSettings = SourceSettings(
         ?.map { it.trim() }
         ?.filter { it.isNotEmpty() }
         .orEmpty(),
-    annasSecretKey = this[SettingsKeys.ANNAS_SECRET_KEY]?.takeIf { it.isNotBlank() }
+    annasSecretKey = this[SettingsKeys.ANNAS_SECRET_KEY]?.takeIf { it.isNotBlank() },
+    annasDownloadsLeft = this[SettingsKeys.ANNAS_DOWNLOADS_LEFT],
+    annasDownloadsPerDay = this[SettingsKeys.ANNAS_DOWNLOADS_PER_DAY]
 )
 
 internal fun MutablePreferences.write(settings: SourceSettings) {
@@ -95,6 +100,12 @@ internal fun MutablePreferences.write(settings: SourceSettings) {
         this[SettingsKeys.ANNAS_SECRET_KEY] =
             key
     }
+    writeOrRemove(SettingsKeys.ANNAS_DOWNLOADS_LEFT, settings.annasDownloadsLeft)
+    writeOrRemove(SettingsKeys.ANNAS_DOWNLOADS_PER_DAY, settings.annasDownloadsPerDay)
+}
+
+private fun MutablePreferences.writeOrRemove(key: Preferences.Key<Int>, value: Int?) {
+    if (value == null) remove(key) else this[key] = value
 }
 
 private inline fun <reified E : Enum<E>> enumOrDefault(name: String?, default: E): E =

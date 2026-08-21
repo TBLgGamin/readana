@@ -5,6 +5,10 @@ import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
 import dev.readana.core.common.result.asFailure
 import dev.readana.core.common.result.asSuccess
+import dev.readana.core.data.downloads.BookDownloadManager
+import dev.readana.core.data.downloads.CapturedDownload
+import dev.readana.core.data.downloads.EnqueueOutcome
+import dev.readana.core.data.downloads.RetryOutcome
 import dev.readana.core.data.importing.BookImportManager
 import dev.readana.core.data.importing.BookImporter
 import dev.readana.core.data.importing.ImportEvent
@@ -12,8 +16,13 @@ import dev.readana.core.data.importing.ImportResult
 import dev.readana.core.data.repository.LibraryRepository
 import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
+import dev.readana.core.model.BookOrigin
+import dev.readana.core.model.BrowserDownload
+import dev.readana.core.model.DownloadJob
+import dev.readana.core.model.DownloadStatus
 import dev.readana.core.model.ReadingProgress
 import dev.readana.core.testing.MainDispatcherRule
+import dev.readana.source.api.SearchResult
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,6 +36,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 
@@ -37,8 +47,9 @@ class LibraryViewModelTest {
     private val repository = FakeLibraryRepository()
     private val importManager = FakeBookImportManager()
     private val importer = FakeBookImporter()
+    private val downloadManager = FakeBookDownloadManager()
 
-    private fun viewModel() = LibraryViewModel(repository, importManager, importer)
+    private fun viewModel() = LibraryViewModel(repository, importManager, importer, downloadManager)
 
     @Test
     fun `shows a loading state until the first books arrive`() {
@@ -189,6 +200,75 @@ class LibraryViewModelTest {
         assertNull(viewModel.uiState.value.detailsBook)
     }
 
+    @Test
+    fun `shows the download queue`() = runTest {
+        val viewModel = viewModel()
+
+        downloadManager.setJobs(listOf(downloadJob("job-1", DownloadStatus.Downloading)))
+        runCurrent()
+
+        assertEquals(listOf("job-1"), viewModel.uiState.value.downloads.map { it.id })
+    }
+
+    @Test
+    fun `cancelling and dismissing reach the manager`() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.cancelDownload("job-1")
+        viewModel.dismissDownload("job-2")
+        runCurrent()
+
+        assertEquals(listOf("job-1"), downloadManager.cancelled)
+        assertEquals(listOf("job-2"), downloadManager.dismissed)
+    }
+
+    @Test
+    fun `a retry that needs the browser becomes a navigation effect`() = runTest {
+        downloadManager.retryOutcome = RetryOutcome.NeedsBrowser(
+            BrowserDownload(
+                sourceId = "annas-archive",
+                recordId = "md5abc",
+                title = "Pride and Prejudice",
+                authors = listOf("Jane Austen"),
+                format = BookFormat.EPUB,
+                url = "https://one.test/md5/md5abc",
+                loginUrl = "https://one.test/account/",
+                loginFormBody = "key=s3cr3t"
+            )
+        )
+        val viewModel = viewModel()
+
+        viewModel.retryDownload("job-1")
+        runCurrent()
+
+        val effect = assertIs<LibraryEffect.OpenBrowser>(viewModel.uiState.value.effect)
+        assertEquals("https://one.test/md5/md5abc", effect.download.url)
+        assertEquals(listOf("job-1"), downloadManager.retried)
+
+        viewModel.consumeEffect()
+        assertNull(viewModel.uiState.value.effect)
+    }
+
+    @Test
+    fun `a plain retry leaves the screen alone`() = runTest {
+        val viewModel = viewModel()
+
+        viewModel.retryDownload("job-1")
+        runCurrent()
+
+        assertNull(viewModel.uiState.value.effect)
+        assertNull(viewModel.uiState.value.message)
+    }
+
+    private fun downloadJob(id: String, status: DownloadStatus) = DownloadJob(
+        id = id,
+        sourceId = "annas-archive",
+        recordId = "md5abc",
+        title = "Pride and Prejudice",
+        format = BookFormat.EPUB,
+        status = status
+    )
+
     private fun book(
         id: String,
         title: String = "Book $id",
@@ -222,6 +302,10 @@ private class FakeLibraryRepository : LibraryRepository {
 
     override suspend fun findDuplicate(title: String, sizeBytes: Long): Book? =
         state.value.values.firstOrNull { it.title == title && it.sizeBytes == sizeBytes }
+
+    override suspend fun findBySource(sourceId: String, recordId: String): Book? = state.value.values.firstOrNull {
+        it.origin?.sourceId == sourceId && it.origin?.recordId == recordId
+    }
 
     override suspend fun upsert(book: Book) = state.update { it + (book.id to book) }
 
@@ -258,12 +342,45 @@ private class FakeBookImporter : BookImporter {
     val deleted = mutableListOf<String>()
     var failure: AppError? = null
 
-    override suspend fun import(uri: String): AppResult<ImportResult> =
+    override suspend fun import(uri: String, origin: BookOrigin?): AppResult<ImportResult> =
         failure?.asFailure() ?: error("not used in these tests")
 
     override suspend fun delete(bookId: String): AppResult<Unit> {
         failure?.let { return it.asFailure() }
         deleted += bookId
         return Unit.asSuccess()
+    }
+}
+
+private class FakeBookDownloadManager : BookDownloadManager {
+    val retried = mutableListOf<String>()
+    val cancelled = mutableListOf<String>()
+    val dismissed = mutableListOf<String>()
+    var retryOutcome: RetryOutcome = RetryOutcome.Requeued
+    private val _jobs = MutableStateFlow<List<DownloadJob>>(emptyList())
+
+    override val jobs: Flow<List<DownloadJob>> = _jobs
+
+    fun setJobs(value: List<DownloadJob>) {
+        _jobs.value = value
+    }
+
+    override suspend fun enqueue(result: SearchResult): EnqueueOutcome =
+        EnqueueOutcome.Failed(AppError.Unexpected("not used"))
+
+    override suspend fun enqueueCaptured(capture: CapturedDownload): EnqueueOutcome =
+        EnqueueOutcome.Failed(AppError.Unexpected("not used"))
+
+    override suspend fun retry(jobId: String): RetryOutcome {
+        retried += jobId
+        return retryOutcome
+    }
+
+    override suspend fun cancel(jobId: String) {
+        cancelled += jobId
+    }
+
+    override suspend fun dismiss(jobId: String) {
+        dismissed += jobId
     }
 }

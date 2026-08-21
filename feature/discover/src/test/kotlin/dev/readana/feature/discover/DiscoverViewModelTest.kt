@@ -1,13 +1,24 @@
 package dev.readana.feature.discover
 
 import dev.readana.core.common.result.AppError
+import dev.readana.core.data.downloads.BookDownloadManager
+import dev.readana.core.data.downloads.CapturedDownload
+import dev.readana.core.data.downloads.EnqueueOutcome
+import dev.readana.core.data.downloads.RetryOutcome
 import dev.readana.core.data.repository.BookSourceRegistry
 import dev.readana.core.data.repository.SettingsRepository
+import dev.readana.core.model.Book
+import dev.readana.core.model.BookFormat
+import dev.readana.core.model.DownloadJob
+import dev.readana.core.model.DownloadStatus
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.SourceSettings
 import dev.readana.core.testing.FakeBookSource
 import dev.readana.core.testing.MainDispatcherRule
+import dev.readana.source.api.BrowserLogin
+import dev.readana.source.api.SearchResult
 import dev.readana.source.api.SourceId
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -15,6 +26,7 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -33,8 +45,9 @@ class DiscoverViewModelTest {
     private val broken =
         FakeBookSource(id = SourceId("broken"), displayName = "Broken", error = AppError.Http(503))
     private val settings = FakeSettingsRepository()
+    private val downloads = FakeBookDownloadManager()
 
-    private fun viewModel() = DiscoverViewModel(BookSourceRegistry(setOf(gutenberg, broken)), settings)
+    private fun viewModel() = DiscoverViewModel(BookSourceRegistry(setOf(gutenberg, broken)), settings, downloads)
 
     @Test
     fun `search merges results and reports per-source errors`() = runTest {
@@ -81,21 +94,122 @@ class DiscoverViewModelTest {
     }
 
     @Test
-    fun `download resolves through the owning source and emits a message`() = runTest {
-        val viewModel = viewModel()
-        viewModel.onQueryChange("pride")
-        viewModel.search()
-        advanceUntilIdle()
+    fun `downloading queues the book and reports the remaining quota`() = runTest {
+        downloads.outcome = { EnqueueOutcome.Enqueued(job(it.title), fastDownloadsLeft = 4) }
+        val viewModel = searchedViewModel()
 
         viewModel.download(viewModel.uiState.value.results.single())
         advanceUntilIdle()
 
-        val message = assertIs<DiscoverMessage.ReadyToDownload>(viewModel.uiState.value.message)
-        assertEquals("https://example.test/1342.epub", message.url)
+        val message = assertIs<DiscoverMessage.Queued>(viewModel.uiState.value.message)
+        assertEquals("Pride and Prejudice", message.title)
+        assertEquals(4, message.fastDownloadsLeft)
+        assertEquals(listOf("1342"), downloads.enqueued.map { it.recordId })
 
         viewModel.consumeMessage()
         assertEquals(null, viewModel.uiState.value.message)
     }
+
+    @Test
+    fun `a book already in the library is reported instead of queued`() = runTest {
+        downloads.outcome = { EnqueueOutcome.AlreadyInLibrary(book()) }
+        val viewModel = searchedViewModel()
+
+        viewModel.download(viewModel.uiState.value.results.single())
+        advanceUntilIdle()
+
+        val message = assertIs<DiscoverMessage.AlreadyInLibrary>(viewModel.uiState.value.message)
+        assertEquals("Pride and Prejudice", message.title)
+    }
+
+    @Test
+    fun `a source that needs a browser asks to navigate there`() = runTest {
+        downloads.outcome = { result ->
+            EnqueueOutcome.RequiresBrowser(
+                result = result,
+                url = "https://one.test/md5/abc",
+                login = BrowserLogin("https://one.test/account/", "key=s3cr3t"),
+                quotaExhausted = true
+            )
+        }
+        val viewModel = searchedViewModel()
+
+        viewModel.download(viewModel.uiState.value.results.single())
+        advanceUntilIdle()
+
+        val effect = assertIs<DiscoverEffect.OpenBrowser>(viewModel.uiState.value.effect)
+        assertEquals("https://one.test/md5/abc", effect.download.url)
+        assertEquals("https://one.test/account/", effect.download.loginUrl)
+        assertEquals("key=s3cr3t", effect.download.loginFormBody)
+        assertEquals("1342", effect.download.recordId)
+
+        viewModel.consumeEffect()
+        assertEquals(null, viewModel.uiState.value.effect)
+    }
+
+    @Test
+    fun `a failing enqueue surfaces the error`() = runTest {
+        downloads.outcome = { EnqueueOutcome.Failed(AppError.Unauthorized("bad key")) }
+        val viewModel = searchedViewModel()
+
+        viewModel.download(viewModel.uiState.value.results.single())
+        advanceUntilIdle()
+
+        assertIs<DiscoverMessage.Failed>(viewModel.uiState.value.message)
+    }
+
+    private fun TestScope.searchedViewModel(): DiscoverViewModel {
+        val viewModel = viewModel()
+        viewModel.onQueryChange("pride")
+        viewModel.search()
+        advanceUntilIdle()
+        return viewModel
+    }
+
+    private fun job(title: String) = DownloadJob(
+        id = "job-1",
+        sourceId = "gutenberg",
+        recordId = "1342",
+        title = title,
+        format = BookFormat.EPUB,
+        status = DownloadStatus.Queued
+    )
+
+    private fun book() = Book(
+        id = "book-1",
+        title = "Pride and Prejudice",
+        authors = listOf("Jane Austen"),
+        language = "en",
+        format = BookFormat.EPUB,
+        fileUri = "file:///books/pride.epub",
+        coverUri = null,
+        sizeBytes = 10,
+        addedAt = Instant.EPOCH,
+        lastOpenedAt = null,
+        progress = null,
+        origin = null
+    )
+}
+
+private class FakeBookDownloadManager : BookDownloadManager {
+    val enqueued = mutableListOf<SearchResult>()
+    var outcome: (SearchResult) -> EnqueueOutcome = { EnqueueOutcome.Failed(AppError.Unexpected("unset")) }
+
+    override val jobs: Flow<List<DownloadJob>> = MutableStateFlow(emptyList())
+
+    override suspend fun enqueue(result: SearchResult): EnqueueOutcome {
+        enqueued += result
+        return outcome(result)
+    }
+
+    override suspend fun enqueueCaptured(capture: CapturedDownload): EnqueueOutcome =
+        EnqueueOutcome.Failed(AppError.Unexpected("not used"))
+
+    override suspend fun retry(jobId: String): RetryOutcome = RetryOutcome.Requeued
+
+    override suspend fun cancel(jobId: String) = Unit
+
+    override suspend fun dismiss(jobId: String) = Unit
 }
 
 private class FakeSettingsRepository : SettingsRepository {

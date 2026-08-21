@@ -66,6 +66,7 @@ android {
 }
 
 dependencies {
+    implementation(projects.feature.browser)
     implementation(projects.feature.library)
     implementation(projects.feature.discover)
     implementation(projects.feature.reader)
@@ -89,6 +90,9 @@ dependencies {
     implementation(libs.androidx.compose.material3.adaptive.navigation3)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.timber)
+    // On-demand WorkManager init: the app supplies the Hilt worker factory (see ReadanaApplication).
+    implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.hilt.work)
 
     testImplementation(libs.konsist)
     testImplementation(libs.kotlinx.coroutines.test)

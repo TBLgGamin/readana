@@ -9,6 +9,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dev.readana.core.data.database.BookDao
 import dev.readana.core.data.database.BookmarkDao
+import dev.readana.core.data.database.DownloadDao
 import dev.readana.core.data.database.HighlightDao
 import dev.readana.core.data.database.ReadanaDatabase
 import javax.inject.Singleton
@@ -29,4 +30,7 @@ object DatabaseModule {
 
     @Provides
     fun providesHighlightDao(database: ReadanaDatabase): HighlightDao = database.highlightDao()
+
+    @Provides
+    fun providesDownloadDao(database: ReadanaDatabase): DownloadDao = database.downloadDao()
 }

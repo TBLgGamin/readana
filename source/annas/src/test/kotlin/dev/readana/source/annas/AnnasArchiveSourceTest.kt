@@ -18,6 +18,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 
@@ -84,6 +85,30 @@ class AnnasArchiveSourceTest {
         assertTrue(request.requiresBrowser)
         assertEquals("https://one.test/md5/0123456789abcdef0123456789abcdef", request.url)
         assertEquals("Pride and Prejudice - Jane Austen.epub", request.suggestedFileName)
+        assertNull(request.browserLogin, "there is no key to sign in with")
+    }
+
+    @Test
+    fun `a spent quota falls back to the browser and offers a key login`() = runTest {
+        val source = source(config = AnnasConfig(mirrors, secretKey = "s3cr3t")) {
+            respond(
+                """{"download_url":null,"account_fast_download_info":""" +
+                    """{"downloads_left":0,"downloads_per_day":100}}""",
+                HttpStatusCode.OK,
+                headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+
+        val request = assertNotNull(source.resolveDownload(result()).getOrNull())
+
+        assertTrue(request.requiresBrowser)
+        assertEquals("https://one.test/md5/0123456789abcdef0123456789abcdef", request.url)
+        assertEquals(0, request.quota?.remaining)
+        assertEquals(100, request.quota?.perDay)
+        assertEquals(true, request.quota?.isExhausted)
+        // Anna's has no password: posting the membership key to /account/ is the whole login.
+        assertEquals("https://one.test/account/", request.browserLogin?.url)
+        assertEquals("key=s3cr3t", request.browserLogin?.formBody)
     }
 
     @Test
@@ -107,6 +132,7 @@ class AnnasArchiveSourceTest {
         )
         assertEquals("https://fast.test/dl/abc.epub", request.url)
         assertEquals(false, request.requiresBrowser)
+        assertEquals(9, request.quota?.remaining)
     }
 
     @Test

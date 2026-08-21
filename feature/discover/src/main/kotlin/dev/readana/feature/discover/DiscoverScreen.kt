@@ -1,5 +1,10 @@
 package dev.readana.feature.discover
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,9 +30,14 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
@@ -38,20 +48,61 @@ import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.EmptyState
 import dev.readana.core.designsystem.theme.ReadanaTheme
 import dev.readana.core.model.BookFormat
+import dev.readana.core.model.BrowserDownload
 import dev.readana.source.api.SearchResult
 import dev.readana.source.api.SourceId
 
 @Composable
-internal fun DiscoverRoute(modifier: Modifier = Modifier, viewModel: DiscoverViewModel = hiltViewModel()) {
+internal fun DiscoverRoute(
+    onOpenBrowser: (BrowserDownload) -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: DiscoverViewModel = hiltViewModel()
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val askForNotifications = rememberNotificationPermissionRequest()
+    val currentOnOpenBrowser by rememberUpdatedState(onOpenBrowser)
+    val currentOnEffectHandled by rememberUpdatedState(viewModel::consumeEffect)
+
+    LaunchedEffect(uiState.effect) {
+        when (val effect = uiState.effect) {
+            is DiscoverEffect.OpenBrowser -> {
+                currentOnOpenBrowser(effect.download)
+                currentOnEffectHandled()
+            }
+
+            null -> Unit
+        }
+    }
+
     DiscoverScreen(
         uiState = uiState,
         onQueryChange = viewModel::onQueryChange,
         onSearch = viewModel::search,
-        onDownload = viewModel::download,
+        onDownload = { result ->
+            // Progress is only visible in the queue without it, so a refusal must not block anything.
+            askForNotifications()
+            viewModel.download(result)
+        },
         onDismissMessage = viewModel::consumeMessage,
         modifier = modifier
     )
+}
+
+/** Asks once for [Manifest.permission.POST_NOTIFICATIONS]; a no-op below Android 13. */
+@Composable
+private fun rememberNotificationPermissionRequest(): () -> Unit {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return remember { {} }
+    val context = LocalContext.current
+    var asked by rememberSaveable { mutableStateOf(false) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    return {
+        val granted = context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted && !asked) {
+            asked = true
+            launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -165,14 +216,18 @@ private fun ResultList(results: List<SearchResult>, onDownload: (SearchResult) -
 
 @Composable
 private fun messageText(message: DiscoverMessage): String = when (message) {
-    is DiscoverMessage.ReadyToDownload -> stringResource(
-        R.string.feature_discover_message_ready,
-        message.url
+    is DiscoverMessage.Queued -> message.fastDownloadsLeft?.let { left ->
+        pluralStringResource(R.plurals.feature_discover_message_queued_quota, left, message.title, left)
+    } ?: stringResource(R.string.feature_discover_message_queued, message.title)
+
+    is DiscoverMessage.AlreadyInLibrary -> stringResource(
+        R.string.feature_discover_message_in_library,
+        message.title
     )
 
-    is DiscoverMessage.OpenInBrowser -> stringResource(
-        R.string.feature_discover_message_browser,
-        message.url
+    is DiscoverMessage.AlreadyQueued -> stringResource(
+        R.string.feature_discover_message_already_queued,
+        message.title
     )
 
     is DiscoverMessage.Failed -> stringResource(

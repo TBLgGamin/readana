@@ -16,6 +16,7 @@ import dev.readana.core.data.repository.RoomLibraryRepository
 import dev.readana.core.data.storage.BookStorage
 import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
+import dev.readana.core.model.BookOrigin
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -93,6 +94,20 @@ class DefaultBookImporterTest {
         val duplicate = assertIs<ImportResult.Duplicate>(assertIs<AppResult.Success<ImportResult>>(outcome).value)
         assertEquals(booksAfterFirst.single().id, duplicate.existing.id)
         assertEquals(1, library.booksNow().size)
+    }
+
+    @Test
+    fun `records where a downloaded book came from`() = runTest {
+        val origin = BookOrigin("annas-archive", "abc123", BookFormat.PDF)
+
+        val outcome = importer().import(sourceFile("moby.epub"), origin)
+
+        val imported = assertIs<ImportResult.Imported>(assertIs<AppResult.Success<ImportResult>>(outcome).value)
+        assertEquals("annas-archive", imported.book.origin?.sourceId)
+        assertEquals("abc123", imported.book.origin?.recordId)
+        // The stored file is what it is, whatever the search result claimed.
+        assertEquals(BookFormat.EPUB, imported.book.origin?.originalFormat)
+        assertEquals(imported.book.id, library.findBySource("annas-archive", "abc123")?.id)
     }
 
     @Test

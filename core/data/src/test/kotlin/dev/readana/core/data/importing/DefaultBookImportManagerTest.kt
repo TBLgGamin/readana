@@ -7,6 +7,7 @@ import dev.readana.core.common.result.asFailure
 import dev.readana.core.common.result.asSuccess
 import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
+import dev.readana.core.model.BookOrigin
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -66,7 +67,7 @@ class DefaultBookImportManagerTest {
     }
 
     private class FakeImporter(private val outcomes: Map<String, AppResult<ImportResult>>) : BookImporter {
-        override suspend fun import(uri: String): AppResult<ImportResult> = outcomes.getValue(uri)
+        override suspend fun import(uri: String, origin: BookOrigin?): AppResult<ImportResult> = outcomes.getValue(uri)
 
         override suspend fun delete(bookId: String): AppResult<Unit> = Unit.asSuccess()
     }

@@ -51,6 +51,7 @@ import dev.readana.core.designsystem.component.LoadingState
 import dev.readana.core.designsystem.theme.ReadanaTheme
 import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
+import dev.readana.core.model.BrowserDownload
 import dev.readana.core.model.ReadingProgress
 import java.time.Instant
 
@@ -63,6 +64,7 @@ private val GridSpacing = 16.dp
 @Composable
 internal fun LibraryRoute(
     onOpenBook: (bookId: String) -> Unit,
+    onOpenBrowser: (BrowserDownload) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
@@ -75,6 +77,19 @@ internal fun LibraryRoute(
             viewModel.importFiles(uris.map(Uri::toString))
         }
     }
+    val currentOnOpenBrowser by rememberUpdatedState(onOpenBrowser)
+    val currentOnEffectHandled by rememberUpdatedState(viewModel::consumeEffect)
+    LaunchedEffect(uiState.effect) {
+        when (val effect = uiState.effect) {
+            is LibraryEffect.OpenBrowser -> {
+                currentOnOpenBrowser(effect.download)
+                currentOnEffectHandled()
+            }
+
+            null -> Unit
+        }
+    }
+
     LibraryScreen(
         uiState = uiState,
         onOpenBook = onOpenBook,
@@ -84,6 +99,9 @@ internal fun LibraryRoute(
         onShowDetails = viewModel::setDetails,
         onRequestDelete = viewModel::setPendingDelete,
         onConfirmDelete = viewModel::confirmDelete,
+        onRetryDownload = viewModel::retryDownload,
+        onCancelDownload = viewModel::cancelDownload,
+        onDismissDownload = viewModel::dismissDownload,
         onDismissMessage = viewModel::consumeMessage,
         modifier = modifier
     )
@@ -100,6 +118,9 @@ internal fun LibraryScreen(
     onShowDetails: (Book?) -> Unit,
     onRequestDelete: (Book?) -> Unit,
     onConfirmDelete: () -> Unit,
+    onRetryDownload: (String) -> Unit,
+    onCancelDownload: (String) -> Unit,
+    onDismissDownload: (String) -> Unit,
     onDismissMessage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -151,6 +172,13 @@ internal fun LibraryScreen(
                     modifier = Modifier.padding(horizontal = GridSpacing, vertical = 4.dp)
                 )
             }
+            DownloadsSection(
+                downloads = uiState.downloads,
+                onOpenBook = onOpenBook,
+                onRetry = onRetryDownload,
+                onCancel = onCancelDownload,
+                onDismiss = onDismissDownload
+            )
             LibraryContent(
                 uiState = uiState,
                 onOpenBook = onOpenBook,
@@ -336,6 +364,11 @@ private fun messageText(message: LibraryMessage): String = when (message) {
         R.string.feature_library_delete_failed,
         message.error.message
     )
+
+    is LibraryMessage.DownloadFailed -> stringResource(
+        R.string.feature_library_download_error,
+        message.error.message
+    )
 }
 
 @Preview(showBackground = true, widthDp = 800, heightDp = 600)
@@ -358,6 +391,9 @@ private fun LibraryScreenPreview() {
             onShowDetails = {},
             onRequestDelete = {},
             onConfirmDelete = {},
+            onRetryDownload = {},
+            onCancelDownload = {},
+            onDismissDownload = {},
             onDismissMessage = {}
         )
     }
@@ -376,6 +412,9 @@ private fun LibraryScreenEmptyPreview() {
             onShowDetails = {},
             onRequestDelete = {},
             onConfirmDelete = {},
+            onRetryDownload = {},
+            onCancelDownload = {},
+            onDismissDownload = {},
             onDismissMessage = {}
         )
     }

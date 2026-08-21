@@ -28,12 +28,12 @@ Milestones are sized so each one ships something usable on the tablet.
 - [x] Tablet layout: two-page spread in landscape, immersive mode
 - [x] Highlights/notes (Readium decorations) and dictionary lookup (stretch)
 
-## M3 — Downloads
+## M3 — Downloads ✅ (2026-08-21)
 
-- [ ] `DownloadWorker` (WorkManager + foreground `dataSync` service, resumable, notification)
-- [ ] Download queue UI in Library; retry/cancel; duplicate detection by source record id
-- [ ] In-app browser flow for sources that need it (Anna's slow downloads), capturing the resulting file
-- [ ] HyperOS battery-restriction guidance in-app
+- [x] `DownloadWorker` (WorkManager + foreground `dataSync` service, resumable, notification)
+- [x] Download queue UI in Library; retry/cancel; duplicate detection by source record id
+- [x] In-app browser flow for sources that need it (Anna's slow downloads), capturing the resulting file
+- [x] HyperOS battery-restriction guidance in-app
 
 ## M4 — PDF → EPUB
 

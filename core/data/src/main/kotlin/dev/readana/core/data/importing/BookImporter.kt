@@ -16,6 +16,7 @@ import dev.readana.core.data.repository.LibraryRepository
 import dev.readana.core.data.storage.BookStorage
 import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
+import dev.readana.core.model.BookOrigin
 import dev.readana.source.api.FileNames
 import java.io.File
 import java.time.Instant
@@ -35,7 +36,8 @@ sealed interface ImportResult {
 
 /** Brings outside files into the library, and removes them again. */
 interface BookImporter {
-    suspend fun import(uri: String): AppResult<ImportResult>
+    /** [origin] records which source record a downloaded file came from; null for local imports. */
+    suspend fun import(uri: String, origin: BookOrigin? = null): AppResult<ImportResult>
 
     suspend fun delete(bookId: String): AppResult<Unit>
 }
@@ -48,15 +50,15 @@ class DefaultBookImporter @Inject constructor(
     private val libraryRepository: LibraryRepository,
     @Dispatcher(ReadanaDispatchers.IO) private val ioDispatcher: CoroutineDispatcher
 ) : BookImporter {
-    override suspend fun import(uri: String): AppResult<ImportResult> =
-        suspendRunCatching { withContext(ioDispatcher) { importFile(uri) } }
+    override suspend fun import(uri: String, origin: BookOrigin?): AppResult<ImportResult> =
+        suspendRunCatching { withContext(ioDispatcher) { importFile(uri, origin) } }
             .getOrElse { AppError.Unexpected("Cannot import $uri: ${it.message}", it).asFailure() }
 
     override suspend fun delete(bookId: String): AppResult<Unit> =
         suspendRunCatching { withContext(ioDispatcher) { deleteBook(bookId) } }
             .getOrElse { AppError.Unexpected("Cannot delete book: ${it.message}", it).asFailure() }
 
-    private suspend fun importFile(uriString: String): AppResult<ImportResult> {
+    private suspend fun importFile(uriString: String, origin: BookOrigin?): AppResult<ImportResult> {
         val uri = uriString.toUri()
         val source = describe(uri)
         val format = resolveFormat(uri, source.displayName)
@@ -87,7 +89,7 @@ class DefaultBookImporter @Inject constructor(
             addedAt = Instant.now(),
             lastOpenedAt = null,
             progress = null,
-            origin = null
+            origin = origin?.copy(originalFormat = format)
         )
         libraryRepository.upsert(book)
         return ImportResult.Imported(book).asSuccess()

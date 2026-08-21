@@ -25,6 +25,9 @@ class FakeSettingsRepository(
 
     override val sourceSettings: Flow<SourceSettings> = this.sources
 
+    /** Latest value, for tests asserting on what was written. */
+    val sourceSettingsNow: SourceSettings get() = sources.value
+
     override suspend fun updateSourceSettings(transform: (SourceSettings) -> SourceSettings) {
         sources.update(transform)
     }

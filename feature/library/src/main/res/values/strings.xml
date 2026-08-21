@@ -32,4 +32,23 @@
     <string name="feature_library_delete_dialog_message">This removes the book from your library and deletes its file.</string>
     <string name="feature_library_delete_dialog_confirm">Delete</string>
     <string name="feature_library_delete_dialog_cancel">Cancel</string>
+    <string name="feature_library_downloads_title">Downloads (%1$d)</string>
+    <string name="feature_library_downloads_collapse">Collapse downloads</string>
+    <string name="feature_library_downloads_expand">Expand downloads</string>
+    <string name="feature_library_download_queued">Waiting to start…</string>
+    <string name="feature_library_download_progress">%1$s of %2$s MB</string>
+    <string name="feature_library_download_progress_unknown">%1$s MB</string>
+    <string name="feature_library_download_converting">Converting to EPUB…</string>
+    <string name="feature_library_download_completed">Added to your library</string>
+    <string name="feature_library_download_cancelled">Cancelled</string>
+    <string name="feature_library_download_failed">Download failed</string>
+    <string name="feature_library_download_quota">No fast downloads left today — finish it in the browser</string>
+    <string name="feature_library_download_needs_browser">This one needs the in-app browser</string>
+    <string name="feature_library_download_unauthorized">Check your membership key in Settings</string>
+    <string name="feature_library_download_cancel">Cancel download</string>
+    <string name="feature_library_download_retry">Try again</string>
+    <string name="feature_library_download_open_browser">Open in browser</string>
+    <string name="feature_library_download_open">Read</string>
+    <string name="feature_library_download_dismiss">Remove from list</string>
+    <string name="feature_library_download_error">Download failed: %1$s</string>
 </resources>

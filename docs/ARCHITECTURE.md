@@ -50,12 +50,12 @@ Green nodes are pure Kotlin/JVM modules: no Android dependency, millisecond unit
 |-------|----------------|----------|
 | `app` | `ReadanaApplication` (Hilt root), `MainActivity` (FragmentActivity for Readium), `ReadanaApp` (adaptive nav + `NavDisplay`), Konsist tests | yes |
 | `feature/*` | One screen family each: `XxxKey` (NavKey), `xxxEntry()` (entry provider), `XxxRoute` (wires ViewModel), `XxxScreen` (stateless UI), `XxxViewModel` | yes |
-| `core/data` | Room (`books`, `bookmarks`, `highlights`), DataStore (`SettingsKeys`), repositories, `BookSourceRegistry`, `ReadiumPublicationOpener`, the import pipeline (`BookStorage`, `BookImporter`, `BookImportManager`), all Hilt modules | yes |
+| `core/data` | Room (`books`, `bookmarks`, `highlights`, `downloads`), DataStore (`SettingsKeys`), repositories, `BookSourceRegistry`, `ReadiumPublicationOpener`, the import pipeline (`BookStorage`, `BookImporter`, `BookImportManager`), the download pipeline (`BookDownloadManager`, `BookDownloader`, `DownloadWorker`), all Hilt modules | yes |
 | `core/designsystem` | `ReadanaTheme` (Material 3 Expressive), `ReadanaIcons`, `EmptyState`, `LoadingState`, `BookCover` (Coil) | yes |
-| `core/model` | `Book`, `BookFormat`, `ReadingProgress`, `Bookmark`, `Highlight`, `ReaderSettings`, `SourceSettings`, `DownloadJob` | no |
+| `core/model` | `Book`, `BookFormat`, `ReadingProgress`, `Bookmark`, `Highlight`, `ReaderSettings`, `SourceSettings`, `DownloadJob`, `BrowserDownload` | no |
 | `core/common` | `AppResult`/`AppError`, `@Dispatcher`/`@ApplicationScope`, `suspendRunCatching`, `VolumeKeyRelay` | no |
 | `core/testing` | `MainDispatcherRule`, `FakeBookSource` | no |
-| `source/api` | `BookSource`, `SearchQuery/Page/Result`, `DownloadRequest`, `FileNames` | no |
+| `source/api` | `BookSource`, `SearchQuery/Page/Result`, `DownloadRequest`, `DownloadQuota`, `BrowserLogin`, `FileNames` | no |
 | `source/gutenberg` | Gutendex JSON client | no |
 | `source/annas` | HTML search parser, member fast-download API, `MirrorResolver` | no |
 | `engine/epub` | `EpubBook` model, `EpubWriter` (EPUB 3.3, epubcheck-validated) | no |
@@ -81,21 +81,31 @@ File picker / "Open with Readana" intent ──▶ BookImportManager.enqueue(uri
                                          LibraryRepository.upsert(Book) ──▶ Room ──▶ Library (Flow)
 ```
 
-### Discover → download → convert → library (M3/M4 target)
+### Discover → download → library (M3)
 
 ```
 DiscoverViewModel ── SearchQuery ──▶ BookSourceRegistry ──▶ each BookSource.search()   (parallel, merged)
       │
-      └─ download(result) ──▶ source.resolveDownload() ──▶ DownloadRequest
-                                   │ requiresBrowser? ──▶ in-app WebView (Anna's slow download)
+      └─ download(result) ──▶ BookDownloadManager.enqueue()
+                 │ already in the library, or already queued for this record? ──▶ report, nothing queued
+                 │ source.resolveDownload() ──▶ DownloadRequest (+ remaining quota)
+                 │
+                 ├─ requiresBrowser / quota spent ──▶ feature:browser WebView
+                 │        │ posts the membership key to /account/ (Anna's login IS the key)
+                 │        └─ DownloadListener ──▶ enqueueCaptured(url + cookies)  ──┐
+                 │                                                                  │
+                 └─ direct link ──▶ downloads row + unique work ────────────────────┤
+                                                                                    ▼
+                          DownloadWorker (WorkManager, dataSync foreground notification)
+                                   │ BookDownloader streams to filesDir/downloads/<job>.part
+                                   │ resumes with Range; re-resolves an expired link once
                                    ▼
-                          DownloadWorker (WorkManager, foreground notification)
-                                   │ stream to app storage / SAF folder
-                                   ▼ if PDF
-                          PdfToEpubConverter (IO dispatcher) ──▶ .epub next to the original
+                          BookImporter.import(part, BookOrigin)  ──▶ the M1 pipeline above
                                    ▼
-                          LibraryRepository.upsert(Book)  ──▶ Room ──▶ Library screen (Flow)
+                          downloads row Completed ──▶ Library queue offers "Read"
 ```
+
+Conversion of downloaded PDFs (`DownloadStatus.Converting`) is M4.
 
 ### Read (M2)
 

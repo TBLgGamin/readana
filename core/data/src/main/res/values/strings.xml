@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="core_data_downloads_channel_name">Downloads</string>
+    <string name="core_data_downloads_channel_description">Progress of books being downloaded</string>
+    <string name="core_data_downloads_notification_title">Downloading</string>
+    <string name="core_data_downloads_notification_cancel">Cancel</string>
+</resources>

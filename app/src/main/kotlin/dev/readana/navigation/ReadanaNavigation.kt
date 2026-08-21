@@ -3,6 +3,7 @@ package dev.readana.navigation
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.savedstate.serialization.SavedStateConfiguration
+import dev.readana.feature.browser.BrowserKey
 import dev.readana.feature.discover.DiscoverKey
 import dev.readana.feature.library.LibraryKey
 import dev.readana.feature.reader.ReaderKey
@@ -22,6 +23,7 @@ val readanaSavedStateConfiguration: SavedStateConfiguration = SavedStateConfigur
             subclass(DiscoverKey::class)
             subclass(SettingsKey::class)
             subclass(ReaderKey::class)
+            subclass(BrowserKey::class)
         }
     }
 }

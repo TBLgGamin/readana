@@ -374,6 +374,8 @@ private class FakeLibraryRepository : LibraryRepository {
 
     override suspend fun findDuplicate(title: String, sizeBytes: Long): Book? = null
 
+    override suspend fun findBySource(sourceId: String, recordId: String): Book? = null
+
     override suspend fun upsert(book: Book) = state.update { it + (book.id to book) }
 
     override suspend fun remove(id: String) = state.update { it - id }

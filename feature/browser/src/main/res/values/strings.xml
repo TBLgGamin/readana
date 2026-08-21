@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feature_browser_close">Close</string>
+    <string name="feature_browser_queued">Downloading “%1$s”</string>
+    <string name="feature_browser_in_library">“%1$s” is already in your library</string>
+    <string name="feature_browser_already_queued">“%1$s” is already downloading</string>
+    <string name="feature_browser_failed">Could not start the download: %1$s</string>
+</resources>

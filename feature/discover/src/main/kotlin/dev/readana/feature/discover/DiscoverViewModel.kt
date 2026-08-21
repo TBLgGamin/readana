@@ -5,9 +5,12 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
+import dev.readana.core.data.downloads.BookDownloadManager
+import dev.readana.core.data.downloads.EnqueueOutcome
 import dev.readana.core.data.repository.BookSourceRegistry
 import dev.readana.core.data.repository.SettingsRepository
-import dev.readana.source.api.BookSource
+import dev.readana.core.model.BookFormat
+import dev.readana.core.model.BrowserDownload
 import dev.readana.source.api.SearchQuery
 import dev.readana.source.api.SearchResult
 import javax.inject.Inject
@@ -25,7 +28,8 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class DiscoverViewModel @Inject constructor(
     private val sources: BookSourceRegistry,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val downloadManager: BookDownloadManager
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DiscoverUiState())
     val uiState: StateFlow<DiscoverUiState> = _uiState.asStateFlow()
@@ -87,33 +91,55 @@ class DiscoverViewModel @Inject constructor(
     }
 
     /**
-     * Resolves the download location. Queuing the actual transfer (WorkManager + conversion)
-     * is milestone M3; until then the resolved URL is surfaced to the user.
+     * Queues the transfer. Sources that need a browser step (a spent membership quota, a wait-list)
+     * report a [DiscoverEffect.OpenBrowser] instead of a queue entry.
      */
     fun download(result: SearchResult) {
         viewModelScope.launch {
-            val source: BookSource? = sources.byId(result.sourceId)
-            val message = when (val outcome = source?.resolveDownload(result)) {
-                null -> DiscoverMessage.Failed(
-                    AppError.NotFound("Unknown source ${result.sourceId}")
+            when (val outcome = downloadManager.enqueue(result)) {
+                is EnqueueOutcome.Enqueued -> show(
+                    DiscoverMessage.Queued(result.title, outcome.fastDownloadsLeft)
                 )
 
-                is AppResult.Failure -> DiscoverMessage.Failed(outcome.error)
+                is EnqueueOutcome.AlreadyInLibrary -> show(
+                    DiscoverMessage.AlreadyInLibrary(outcome.book.title)
+                )
 
-                is AppResult.Success ->
-                    if (outcome.value.requiresBrowser) {
-                        DiscoverMessage.OpenInBrowser(outcome.value.url)
-                    } else {
-                        DiscoverMessage.ReadyToDownload(outcome.value.url)
-                    }
+                is EnqueueOutcome.AlreadyQueued -> show(
+                    DiscoverMessage.AlreadyQueued(outcome.job.title)
+                )
+
+                is EnqueueOutcome.RequiresBrowser -> _uiState.update {
+                    it.copy(effect = DiscoverEffect.OpenBrowser(outcome.toBrowserDownload()))
+                }
+
+                is EnqueueOutcome.Failed -> show(DiscoverMessage.Failed(outcome.error))
             }
-            _uiState.update { it.copy(message = message) }
         }
     }
 
     fun consumeMessage() {
         _uiState.update { it.copy(message = null) }
     }
+
+    fun consumeEffect() {
+        _uiState.update { it.copy(effect = null) }
+    }
+
+    private fun show(message: DiscoverMessage) {
+        _uiState.update { it.copy(message = message) }
+    }
+
+    private fun EnqueueOutcome.RequiresBrowser.toBrowserDownload() = BrowserDownload(
+        sourceId = result.sourceId.value,
+        recordId = result.recordId,
+        title = result.title,
+        authors = result.authors,
+        format = result.format ?: BookFormat.EPUB,
+        url = url,
+        loginUrl = login?.url,
+        loginFormBody = login?.formBody
+    )
 }
 
 data class DiscoverUiState(
@@ -124,15 +150,24 @@ data class DiscoverUiState(
     val hasSearched: Boolean = false,
     val results: List<SearchResult> = emptyList(),
     val sourceErrors: List<SourceError> = emptyList(),
-    val message: DiscoverMessage? = null
+    val message: DiscoverMessage? = null,
+    val effect: DiscoverEffect? = null
 )
 
 data class SourceError(val sourceName: String, val error: AppError)
 
 sealed interface DiscoverMessage {
-    data class ReadyToDownload(val url: String) : DiscoverMessage
+    /** [fastDownloadsLeft] is the source's remaining allowance, when it reports one. */
+    data class Queued(val title: String, val fastDownloadsLeft: Int?) : DiscoverMessage
 
-    data class OpenInBrowser(val url: String) : DiscoverMessage
+    data class AlreadyInLibrary(val title: String) : DiscoverMessage
+
+    data class AlreadyQueued(val title: String) : DiscoverMessage
 
     data class Failed(val error: AppError) : DiscoverMessage
+}
+
+/** A one-shot navigation request. */
+sealed interface DiscoverEffect {
+    data class OpenBrowser(val download: BrowserDownload) : DiscoverEffect
 }

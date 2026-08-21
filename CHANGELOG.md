@@ -8,6 +8,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Downloads: tapping a Discover result queues a resumable transfer that runs as a WorkManager job
+  with a progress notification, resumes with a `Range` request after a dropped connection, and
+  hands the finished file to the existing import pipeline. The queue lives in a `downloads` table
+  (schema version 4) and is shown in the Library with retry, cancel, dismiss and open actions;
+  books already in the library or already queued are not fetched twice.
+- Anna's Archive membership: the fast-download API now reports the remaining daily allowance, which
+  Discover shows when a download starts. When the allowance is spent — or a record needs a
+  wait-list page — the download moves to an in-app browser that signs in with the membership key
+  and captures the resulting file back into the same queue.
+- Settings: a "Downloads & background" section explaining HyperOS's battery restrictions, with
+  shortcuts to the MIUI battery and autostart screens.
 - Reader: EPUB and PDF are rendered by the Readium navigator hosted in Compose, with tap zones and
   swipes for page turns, live reading settings, immersive full-screen reading, keep-screen-on, and
   the reading position restored and saved as a Readium locator.

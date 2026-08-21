@@ -15,6 +15,8 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import dev.readana.feature.browser.BrowserKey
+import dev.readana.feature.browser.browserEntry
 import dev.readana.feature.discover.discoverEntry
 import dev.readana.feature.library.LibraryKey
 import dev.readana.feature.library.libraryEntry
@@ -62,10 +64,14 @@ fun ReadanaApp(modifier: Modifier = Modifier) {
                 rememberViewModelStoreNavEntryDecorator<NavKey>()
             ),
             entryProvider = entryProvider {
-                libraryEntry(onOpenBook = { bookId -> backStack.add(ReaderKey(bookId)) })
-                discoverEntry()
+                libraryEntry(
+                    onOpenBook = { bookId -> backStack.add(ReaderKey(bookId)) },
+                    onOpenBrowser = { backStack.add(BrowserKey.of(it)) }
+                )
+                discoverEntry(onOpenBrowser = { backStack.add(BrowserKey.of(it)) })
                 settingsEntry()
                 readerEntry(onBack = { backStack.removeLastOrNull() })
+                browserEntry(onClose = { backStack.removeLastOrNull() })
             }
         )
     }

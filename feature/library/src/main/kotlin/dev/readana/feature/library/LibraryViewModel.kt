@@ -5,11 +5,15 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
+import dev.readana.core.data.downloads.BookDownloadManager
+import dev.readana.core.data.downloads.RetryOutcome
 import dev.readana.core.data.importing.BookImportManager
 import dev.readana.core.data.importing.BookImporter
 import dev.readana.core.data.importing.ImportEvent
 import dev.readana.core.data.repository.LibraryRepository
 import dev.readana.core.model.Book
+import dev.readana.core.model.BrowserDownload
+import dev.readana.core.model.DownloadJob
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,8 +36,16 @@ data class LibraryUiState(
     val detailsBook: Book? = null,
     val pendingDelete: Book? = null,
     val activeImports: Int = 0,
-    val message: LibraryMessage? = null
+    /** Newest first; finished rows stay until the user dismisses them. */
+    val downloads: List<DownloadJob> = emptyList(),
+    val message: LibraryMessage? = null,
+    val effect: LibraryEffect? = null
 )
+
+/** A one-shot navigation request. */
+sealed interface LibraryEffect {
+    data class OpenBrowser(val download: BrowserDownload) : LibraryEffect
+}
 
 /** One-shot outcomes worth a snackbar. */
 sealed interface LibraryMessage {
@@ -46,13 +58,16 @@ sealed interface LibraryMessage {
     data class Deleted(val title: String) : LibraryMessage
 
     data class DeleteFailed(val error: AppError) : LibraryMessage
+
+    data class DownloadFailed(val error: AppError) : LibraryMessage
 }
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     libraryRepository: LibraryRepository,
     private val importManager: BookImportManager,
-    private val importer: BookImporter
+    private val importer: BookImporter,
+    private val downloadManager: BookDownloadManager
 ) : ViewModel() {
     private val query = MutableStateFlow("")
     private val sort = MutableStateFlow(LibrarySort.Recent)
@@ -82,6 +97,11 @@ class LibraryViewModel @Inject constructor(
         viewModelScope.launch {
             importManager.activeImports.collect { count ->
                 _uiState.update { it.copy(activeImports = count) }
+            }
+        }
+        viewModelScope.launch {
+            downloadManager.jobs.collect { jobs ->
+                _uiState.update { it.copy(downloads = jobs) }
             }
         }
     }
@@ -115,7 +135,33 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
+    fun retryDownload(jobId: String) {
+        viewModelScope.launch {
+            when (val outcome = downloadManager.retry(jobId)) {
+                RetryOutcome.Requeued -> Unit
+
+                is RetryOutcome.NeedsBrowser -> _uiState.update {
+                    it.copy(effect = LibraryEffect.OpenBrowser(outcome.download))
+                }
+
+                is RetryOutcome.Failed -> _uiState.update {
+                    it.copy(message = LibraryMessage.DownloadFailed(outcome.error))
+                }
+            }
+        }
+    }
+
+    fun cancelDownload(jobId: String) {
+        viewModelScope.launch { downloadManager.cancel(jobId) }
+    }
+
+    fun dismissDownload(jobId: String) {
+        viewModelScope.launch { downloadManager.dismiss(jobId) }
+    }
+
     fun consumeMessage() = _uiState.update { it.copy(message = null) }
+
+    fun consumeEffect() = _uiState.update { it.copy(effect = null) }
 
     private fun ImportEvent.toMessage(): LibraryMessage = when (this) {
         is ImportEvent.Succeeded -> LibraryMessage.Imported(book.title)

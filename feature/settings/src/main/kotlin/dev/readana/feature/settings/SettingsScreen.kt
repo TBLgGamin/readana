@@ -1,7 +1,10 @@
 package dev.readana.feature.settings
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -120,6 +123,8 @@ internal fun SettingsScreen(
                     onAnnasMirrorsChange = onAnnasMirrorsChange,
                     onAnnasSecretKeyChange = onAnnasSecretKeyChange
                 )
+                HorizontalDivider()
+                BackgroundWorkSection()
             }
         }
     }
@@ -302,6 +307,68 @@ private fun SourcesSection(
         )
     }
 }
+
+/**
+ * HyperOS kills background work hard, which is what stops long downloads (docs/DEVICE.md). The
+ * MIUI screens are not public API, so each button falls back to the app's own settings page.
+ */
+@Composable
+private fun BackgroundWorkSection(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle(stringResource(R.string.feature_settings_section_background))
+        Text(
+            text = stringResource(R.string.feature_settings_background_help),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { context.openBatterySettings() }) {
+                Text(stringResource(R.string.feature_settings_background_battery))
+            }
+            OutlinedButton(onClick = { context.openAutostartSettings() }) {
+                Text(stringResource(R.string.feature_settings_background_autostart))
+            }
+        }
+        Text(
+            text = stringResource(R.string.feature_settings_background_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+private fun Context.openBatterySettings() = startFirstResolvable(
+    Intent().setClassName(MIUI_POWER_PACKAGE, MIUI_POWER_ACTIVITY)
+        .putExtra("package_name", packageName),
+    appDetailsIntent()
+)
+
+private fun Context.openAutostartSettings() = startFirstResolvable(
+    Intent().setClassName(MIUI_SECURITY_PACKAGE, MIUI_AUTOSTART_ACTIVITY),
+    appDetailsIntent()
+)
+
+private fun Context.appDetailsIntent() =
+    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null))
+
+private fun Context.startFirstResolvable(vararg intents: Intent) {
+    intents.forEach { intent ->
+        try {
+            startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        } catch (_: ActivityNotFoundException) {
+            // Not a MIUI build, or the screen moved; try the next one.
+        } catch (_: SecurityException) {
+            // Some HyperOS builds export the activity but refuse third-party callers.
+        }
+    }
+}
+
+private const val MIUI_POWER_PACKAGE = "com.miui.powerkeeper"
+private const val MIUI_POWER_ACTIVITY = "com.miui.powerkeeper.ui.HiddenAppsConfigActivity"
+private const val MIUI_SECURITY_PACKAGE = "com.miui.securitycenter"
+private const val MIUI_AUTOSTART_ACTIVITY = "com.miui.permcenter.autostart.AutoStartManagementActivity"
 
 @Composable
 private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
