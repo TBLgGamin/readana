@@ -4,6 +4,7 @@ import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
 import dev.readana.core.common.result.asFailure
 import dev.readana.core.common.result.asSuccess
+import dev.readana.core.data.browser.BrowserVerificationStatus
 import dev.readana.core.data.downloads.BookDownloadManager
 import dev.readana.core.data.downloads.CapturedDownload
 import dev.readana.core.data.downloads.EnqueueOutcome
@@ -37,6 +38,10 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 
+private class FakeVerificationStatus : BrowserVerificationStatus {
+    override val verifying = MutableStateFlow(false)
+}
+
 class DiscoverViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
@@ -55,8 +60,15 @@ class DiscoverViewModelTest {
 
     private val trending = FakeTrendingBooks()
 
-    private fun viewModel() =
-        DiscoverViewModel(BookSourceRegistry(setOf(gutenberg, broken)), settings, downloads, trending)
+    private val verification = FakeVerificationStatus()
+
+    private fun viewModel() = DiscoverViewModel(
+        BookSourceRegistry(setOf(gutenberg, broken)),
+        settings,
+        downloads,
+        trending,
+        verification
+    )
 
     @Test
     fun `search merges results and reports per-source errors`() = runTest {
@@ -132,28 +144,36 @@ class DiscoverViewModelTest {
     }
 
     @Test
-    fun `a source that needs a browser asks to navigate there`() = runTest {
-        downloads.outcome = { result ->
-            EnqueueOutcome.RequiresBrowser(
-                result = result,
-                url = "https://one.test/md5/abc",
-                login = BrowserLogin("https://one.test/account/", "key=s3cr3t"),
-                quotaExhausted = true
-            )
-        }
+    fun `a source stopped by a browser check offers to open it, and re-searches after`() = runTest {
+        val url = "https://one.test/search?q=pride&check=1"
+        broken.error = AppError.BrowserCheck("needs a browser check", url)
         val viewModel = searchedViewModel()
 
-        viewModel.download(viewModel.uiState.value.results.single())
-        advanceUntilIdle()
+        val error = viewModel.uiState.value.sourceErrors.single { it.sourceName == "Broken" }
+        assertEquals(url, error.verifyUrl, "the URL is what makes the offer actionable")
 
-        val effect = assertIs<DiscoverEffect.OpenBrowser>(viewModel.uiState.value.effect)
-        assertEquals("https://one.test/md5/abc", effect.download.url)
-        assertEquals("https://one.test/account/", effect.download.loginUrl)
-        assertEquals("key=s3cr3t", effect.download.loginFormBody)
-        assertEquals("1342", effect.download.recordId)
-
+        viewModel.verifyInBrowser(error)
+        val effect = assertIs<DiscoverEffect.Verify>(viewModel.uiState.value.effect)
+        assertEquals(url, effect.url)
+        assertEquals("Broken", effect.sourceName)
         viewModel.consumeEffect()
         assertEquals(null, viewModel.uiState.value.effect)
+
+        // Coming back from the browser, the check may now pass, so the search is worth redoing.
+        broken.error = null
+        viewModel.onResumed()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.sourceErrors.isEmpty())
+    }
+
+    @Test
+    fun `a source answering a browser check says so`() = runTest {
+        val viewModel = viewModel()
+
+        verification.verifying.value = true
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.isVerifying)
     }
 
     @Test

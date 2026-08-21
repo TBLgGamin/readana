@@ -47,14 +47,6 @@ sealed interface EnqueueOutcome {
 
     data class AlreadyQueued(val job: DownloadJob) : EnqueueOutcome
 
-    /** The source needs a browser session: a wait-list, a captcha, or a spent membership quota. */
-    data class RequiresBrowser(
-        val result: SearchResult,
-        val url: String,
-        val login: BrowserLogin?,
-        val quotaExhausted: Boolean
-    ) : EnqueueOutcome
-
     data class Failed(val error: AppError) : EnqueueOutcome
 }
 
@@ -115,30 +107,17 @@ class DefaultBookDownloadManager @Inject constructor(
         downloadsRepository.findActive(sourceId, result.recordId)?.let {
             return EnqueueOutcome.AlreadyQueued(it)
         }
-        val source = sources.byId(result.sourceId)
-            ?: return EnqueueOutcome.Failed(AppError.Unsupported("Unknown source $sourceId"))
-
-        val request = when (val resolved = source.resolveDownload(result)) {
-            is AppResult.Failure -> return EnqueueOutcome.Failed(resolved.error)
-            is AppResult.Success -> resolved.value
-        }
-        request.quota?.let { rememberQuota(it.remaining, it.perDay) }
-
-        // A spent allowance is not a dead end any more: the source falls back to a free route and
-        // only asks for the browser when there is nothing left to try.
-        if (request.requiresBrowser) {
-            return EnqueueOutcome.RequiresBrowser(
-                result = result,
-                url = request.url,
-                login = request.browserLogin,
-                quotaExhausted = request.quota?.isExhausted == true
-            )
+        if (sources.byId(result.sourceId) == null) {
+            return EnqueueOutcome.Failed(AppError.Unsupported("Unknown source $sourceId"))
         }
 
-        val entity = newEntity(result, request)
+        // Working out where the file actually comes from can mean a browser check or a wait-list,
+        // which is far too long to hold up a tap. The row goes in unresolved and the download
+        // worker figures it out, under the foreground service that survives being backgrounded.
+        val entity = newEntity(result)
         downloadsRepository.upsert(entity)
         scheduler.schedule(entity.id, uniqueName(sourceId, result.recordId))
-        return EnqueueOutcome.Enqueued(entity.toJob(), request.quota?.remaining)
+        return EnqueueOutcome.Enqueued(entity.toJob(), fastDownloadsLeft = null)
     }
 
     override suspend fun enqueueCaptured(capture: CapturedDownload): EnqueueOutcome {
@@ -242,21 +221,22 @@ class DefaultBookDownloadManager @Inject constructor(
         }
     }
 
-    private fun newEntity(result: SearchResult, request: DownloadRequest) = DownloadEntity(
+    private fun newEntity(result: SearchResult) = DownloadEntity(
         id = UUID.randomUUID().toString(),
         sourceId = result.sourceId.value,
         recordId = result.recordId,
         title = result.title,
         authors = result.authors.joinToString("|"),
-        format = request.format.name,
+        format = (result.format ?: BookFormat.EPUB).name,
         status = DownloadStatus.Queued.name,
         errorKind = null,
         errorMessage = null,
         bytesDownloaded = 0,
-        totalBytes = request.expectedSizeBytes ?: result.sizeBytes,
+        totalBytes = result.sizeBytes,
         extrasJson = result.extras.encodeToJson(),
-        resolvedUrl = request.url,
-        headersJson = request.headers.encodeToJson(),
+        // No URL yet: a null one is what tells the worker to ask the source.
+        resolvedUrl = null,
+        headersJson = null,
         browserUrl = result.detailUrl,
         bookId = null,
         createdAt = Instant.now().toEpochMilli(),

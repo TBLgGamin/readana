@@ -37,6 +37,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -70,16 +71,14 @@ class DefaultBookDownloadManagerTest {
     }
 
     @Test
-    fun `enqueueing schedules the job and reports the remaining quota`() = runTest {
+    fun `enqueueing schedules the job`() = runTest {
         val manager = manager(source = FakeSource(fastDownload(remaining = 7).asSuccess()))
 
         val outcome = manager.enqueue(searchResult())
 
         val enqueued = assertIs<EnqueueOutcome.Enqueued>(outcome)
-        assertEquals(7, enqueued.fastDownloadsLeft)
         assertEquals(DownloadStatus.Queued, enqueued.job.status)
         assertEquals(listOf("download:annas-archive:md5abc"), scheduler.scheduled.map { it.second })
-        assertEquals(7, settings.sourceSettingsNow.annasDownloadsLeft)
     }
 
     @Test
@@ -105,33 +104,31 @@ class DefaultBookDownloadManagerTest {
     }
 
     @Test
-    fun `a spent quota asks for the browser instead of creating a dead row`() = runTest {
-        val browserRequest = DownloadRequest(
-            url = "https://one.test/md5/md5abc",
-            format = BookFormat.EPUB,
-            suggestedFileName = "b.epub",
-            requiresBrowser = true,
-            quota = DownloadQuota(remaining = 0, perDay = 100),
-            browserLogin = BrowserLogin("https://one.test/account/", "key=s3cr3t")
+    fun `queueing does not wait for the source to work out where the file is`() = runTest {
+        // Finding a free download can mean a browser check or a wait-list, which is far too long
+        // to hold up a tap, so the row is created unresolved and the worker sorts it out.
+        var asked = false
+        val manager = manager(
+            source = FakeSource(fastDownload().asSuccess(), onResolve = { asked = true })
         )
-        val manager = manager(source = FakeSource(browserRequest.asSuccess()))
 
         val outcome = manager.enqueue(searchResult())
 
-        val browser = assertIs<EnqueueOutcome.RequiresBrowser>(outcome)
-        assertTrue(browser.quotaExhausted)
-        assertEquals("https://one.test/account/", browser.login?.url)
-        assertTrue(downloads.state.value.isEmpty(), "no row for something that never started")
-        assertEquals(0, settings.sourceSettingsNow.annasDownloadsLeft)
+        assertIs<EnqueueOutcome.Enqueued>(outcome)
+        assertFalse(asked, "resolving belongs to the download worker")
+        val row = downloads.state.value.values.single()
+        assertNull(row.resolvedUrl, "no URL yet is what tells the worker to ask the source")
+        assertEquals("https://annas.test/md5/md5abc", row.browserUrl)
+        assertEquals(1, scheduler.scheduled.size)
     }
 
     @Test
-    fun `a failing source reports the error`() = runTest {
-        val manager = manager(source = FakeSource(AppError.Unauthorized("bad key").asFailure()))
+    fun `a source the app no longer has is refused before anything is queued`() = runTest {
+        val manager = manager(source = FakeSource(fastDownload().asSuccess()), registerSource = false)
 
         val outcome = manager.enqueue(searchResult())
 
-        assertIs<AppError.Unauthorized>(assertIs<EnqueueOutcome.Failed>(outcome).error)
+        assertIs<AppError.Unsupported>(assertIs<EnqueueOutcome.Failed>(outcome).error)
         assertTrue(downloads.state.value.isEmpty())
     }
 
@@ -229,8 +226,11 @@ class DefaultBookDownloadManagerTest {
         assertTrue(manager.jobs.first().isEmpty())
     }
 
-    private fun manager(source: FakeSource = FakeSource(fastDownload().asSuccess())): DefaultBookDownloadManager {
-        val registry = BookSourceRegistry(setOf(source))
+    private fun manager(
+        source: FakeSource = FakeSource(fastDownload().asSuccess()),
+        registerSource: Boolean = true
+    ): DefaultBookDownloadManager {
+        val registry = BookSourceRegistry(if (registerSource) setOf(source) else emptySet())
         val downloader = BookDownloader(
             client = HttpClient(MockEngine { respond("", HttpStatusCode.OK) }),
             downloadsRepository = downloads,
@@ -264,7 +264,8 @@ class DefaultBookDownloadManagerTest {
         recordId = "md5abc",
         title = "Pride and Prejudice",
         authors = listOf("Jane Austen"),
-        format = BookFormat.EPUB
+        format = BookFormat.EPUB,
+        detailUrl = "https://annas.test/md5/md5abc"
     )
 
     private fun book(origin: BookOrigin?) = Book(
@@ -295,14 +296,20 @@ class DefaultBookDownloadManagerTest {
         }
     }
 
-    private class FakeSource(private val resolution: AppResult<DownloadRequest>) : BookSource {
+    private class FakeSource(
+        private val resolution: AppResult<DownloadRequest>,
+        private val onResolve: () -> Unit = {}
+    ) : BookSource {
         override val id = SourceId("annas-archive")
         override val displayName = "Anna's Archive"
 
         override suspend fun search(query: SearchQuery): AppResult<SearchPage> =
             SearchPage(emptyList(), 1, false).asSuccess()
 
-        override suspend fun resolveDownload(result: SearchResult): AppResult<DownloadRequest> = resolution
+        override suspend fun resolveDownload(result: SearchResult): AppResult<DownloadRequest> {
+            onResolve()
+            return resolution
+        }
     }
 
     private class NoopImporter : BookImporter {

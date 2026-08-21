@@ -84,7 +84,13 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setAnnasSecretKey(key: String) = updateSources {
-        it.copy(annasSecretKey = key.trim().ifEmpty { null })
+        val trimmed = key.trim().ifEmpty { null }
+        if (trimmed == it.annasSecretKey) {
+            it
+        } else {
+            // The allowance belonged to the old key; showing it against a new one would be a lie.
+            it.copy(annasSecretKey = trimmed, annasDownloadsLeft = null, annasDownloadsPerDay = null)
+        }
     }
 
     fun setAutoConvertPdf(enabled: Boolean) = updateConversion { it.copy(autoConvertPdf = enabled) }

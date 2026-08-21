@@ -37,7 +37,9 @@
     <string name="feature_settings_annas_mirrors">Anna\'s Archive mirrors</string>
     <string name="feature_settings_annas_mirrors_help">One URL per line, tried in order. Leave empty for the built-in defaults.</string>
     <string name="feature_settings_annas_secret_key">Member secret key (optional)</string>
-    <string name="feature_settings_annas_secret_key_help">Enables the fast-download API. Without it, downloads open in a browser.</string>
+    <string name="feature_settings_annas_secret_key_help">Members skip the browser check and get fast downloads. Without a key, Readana answers the check itself and downloads at the free speed.</string>
+    <string name="feature_settings_annas_quota">Fast downloads left today: %1$d of %2$d</string>
+    <string name="feature_settings_annas_quota_left">Fast downloads left today: %1$d</string>
     <string name="feature_settings_section_conversion">PDF conversion</string>
     <string name="feature_settings_conversion_auto">Convert PDFs to EPUB</string>
     <string name="feature_settings_conversion_auto_help">Converted books reflow to your font size. The original PDF is always kept, and you can convert or re-convert any book from its details.</string>

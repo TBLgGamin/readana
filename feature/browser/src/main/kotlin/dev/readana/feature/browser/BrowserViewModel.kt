@@ -52,7 +52,6 @@ class BrowserViewModel @Inject constructor(private val downloadManager: BookDown
         is EnqueueOutcome.Enqueued -> BrowserResult.Queued(job.title)
         is EnqueueOutcome.AlreadyInLibrary -> BrowserResult.AlreadyInLibrary(book.title)
         is EnqueueOutcome.AlreadyQueued -> BrowserResult.AlreadyQueued(job.title)
-        is EnqueueOutcome.RequiresBrowser -> BrowserResult.Failed(result.title)
         is EnqueueOutcome.Failed -> BrowserResult.Failed(error.message)
     }
 }

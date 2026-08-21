@@ -17,4 +17,6 @@
     <string name="feature_discover_message_in_library">“%1$s” is already in your library</string>
     <string name="feature_discover_message_already_queued">“%1$s” is already downloading</string>
     <string name="feature_discover_message_failed">Download failed: %1$s</string>
+    <string name="feature_discover_verifying">Checking with the source&#8230; this is usually quick.</string>
+    <string name="feature_discover_verify_in_browser">Open in browser to continue</string>
 </resources>

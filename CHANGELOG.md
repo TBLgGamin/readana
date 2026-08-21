@@ -6,7 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Tapping download queues the book straight away. Working out where a file actually comes from can
+  mean answering a browser check or sitting out a wait-list, so that now happens in the download
+  job — under the foreground service that survives leaving the app — instead of holding up the tap.
+  A download that turns out to need the browser says so in the queue, where it already had a button
+  for it.
+- The Anna's Archive mirror list and membership key are saved when you leave the field rather than
+  on every keystroke, and changing the key clears the remaining-allowance figure that belonged to
+  the old one.
+
 ### Fixed
+
+- Discover says when a source is answering a browser check, instead of showing a progress bar that
+  looks stuck, and a source that could not get past one offers to open the page so you can. Coming
+  back re-runs the search.
+- Settings shows how many fast downloads a membership has left today.
 
 - Downloading without a membership works on its own now. Anna's Archive is a catalogue: most of
   what it lists is held by Library Genesis, which serves the same file by md5 with no browser check

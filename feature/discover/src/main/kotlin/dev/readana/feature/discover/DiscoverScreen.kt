@@ -32,6 +32,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,6 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.BookCover
@@ -65,24 +67,30 @@ import dev.readana.source.trending.TrendingBook
 
 @Composable
 internal fun DiscoverRoute(
-    onOpenBrowser: (BrowserDownload) -> Unit,
+    onVerifyInBrowser: (url: String, title: String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DiscoverViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val askForNotifications = rememberNotificationPermissionRequest()
-    val currentOnOpenBrowser by rememberUpdatedState(onOpenBrowser)
+    val currentOnVerify by rememberUpdatedState(onVerifyInBrowser)
     val currentOnEffectHandled by rememberUpdatedState(viewModel::consumeEffect)
 
     LaunchedEffect(uiState.effect) {
         when (val effect = uiState.effect) {
-            is DiscoverEffect.OpenBrowser -> {
-                currentOnOpenBrowser(effect.download)
+            is DiscoverEffect.Verify -> {
+                currentOnVerify(effect.url, effect.sourceName)
                 currentOnEffectHandled()
             }
 
             null -> Unit
         }
+    }
+
+    // The browser hands control back here, and a check that passed makes the search worth redoing.
+    LifecycleResumeEffect(Unit) {
+        viewModel.onResumed()
+        onPauseOrDispose {}
     }
 
     DiscoverScreen(
@@ -96,6 +104,7 @@ internal fun DiscoverRoute(
         },
         onSelectTrending = viewModel::searchFor,
         onDismissMessage = viewModel::consumeMessage,
+        onVerify = viewModel::verifyInBrowser,
         modifier = modifier
     )
 }
@@ -117,6 +126,30 @@ private fun rememberNotificationPermissionRequest(): () -> Unit {
     }
 }
 
+/**
+ * One source's complaint. A site that insists on a browser check gets an action, because opening
+ * the page once is all it takes and there is nothing else the user could do about it.
+ */
+@Composable
+private fun SourceErrorRow(sourceError: SourceError, onVerify: (SourceError) -> Unit) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)) {
+        Text(
+            text = stringResource(
+                R.string.feature_discover_source_error,
+                sourceError.sourceName,
+                sourceError.error.message
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error
+        )
+        if (sourceError.verifyUrl != null) {
+            TextButton(onClick = { onVerify(sourceError) }, contentPadding = PaddingValues(0.dp)) {
+                Text(stringResource(R.string.feature_discover_verify_in_browser))
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun DiscoverScreen(
@@ -126,6 +159,7 @@ internal fun DiscoverScreen(
     onDownload: (SearchResult) -> Unit,
     onSelectTrending: (TrendingBook) -> Unit,
     onDismissMessage: () -> Unit,
+    onVerify: (SourceError) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -169,17 +203,16 @@ internal fun DiscoverScreen(
             if (uiState.isSearching && uiState.results.isNotEmpty()) {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
             }
-            uiState.sourceErrors.forEach { sourceError ->
+            if (uiState.isVerifying) {
                 Text(
-                    text = stringResource(
-                        R.string.feature_discover_source_error,
-                        sourceError.sourceName,
-                        sourceError.error.message
-                    ),
+                    text = stringResource(R.string.feature_discover_verifying),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
                 )
+            }
+            uiState.sourceErrors.forEach { sourceError ->
+                SourceErrorRow(sourceError = sourceError, onVerify = onVerify)
             }
             DiscoverContent(
                 uiState = uiState,
@@ -386,7 +419,8 @@ private fun DiscoverScreenPreview() {
             onSearch = {},
             onDownload = {},
             onSelectTrending = {},
-            onDismissMessage = {}
+            onDismissMessage = {},
+            onVerify = {}
         )
     }
 }
@@ -407,7 +441,8 @@ private fun DiscoverTrendingPreview() {
             onSearch = {},
             onDownload = {},
             onSelectTrending = {},
-            onDismissMessage = {}
+            onDismissMessage = {},
+            onVerify = {}
         )
     }
 }

@@ -58,6 +58,17 @@ internal data class CapturedFile(
     val sizeBytes: Long?
 )
 
+/**
+ * Navigation 3 key for answering a site's browser check by hand. No book attached: nothing is
+ * captured here, the page is opened only so whatever it grants reaches the shared cookie store.
+ */
+@Serializable
+data class BrowserVerifyKey(val url: String, val title: String) : NavKey
+
 fun EntryProviderScope<NavKey>.browserEntry(onClose: () -> Unit) {
     entry<BrowserKey> { key -> BrowserRoute(key = key, onClose = onClose) }
+}
+
+fun EntryProviderScope<NavKey>.browserVerifyEntry(onDone: () -> Unit) {
+    entry<BrowserVerifyKey> { key -> BrowserVerifyScreen(key = key, onDone = onDone) }
 }

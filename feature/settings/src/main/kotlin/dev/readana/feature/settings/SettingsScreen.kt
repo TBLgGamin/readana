@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -38,9 +40,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -508,11 +512,12 @@ private fun SourcesSection(
         )
         OutlinedTextField(
             value = mirrorsDraft,
-            onValueChange = {
-                mirrorsDraft = it
-                onAnnasMirrorsChange(it)
+            onValueChange = { mirrorsDraft = it },
+            // Saving per keystroke rewrites the mirror list on every letter typed, and every
+            // search reads it; committing once the field is done is enough.
+            modifier = Modifier.fillMaxWidth().onFocusChanged { focus ->
+                if (!focus.isFocused) onAnnasMirrorsChange(mirrorsDraft)
             },
-            modifier = Modifier.fillMaxWidth(),
             label = { Text(stringResource(R.string.feature_settings_annas_mirrors)) },
             // An empty box does not mean "no mirrors": it means the built-in list is in use, so
             // show that list as the placeholder rather than leaving it a mystery.
@@ -522,18 +527,29 @@ private fun SourcesSection(
         )
         OutlinedTextField(
             value = keyDraft,
-            onValueChange = {
-                keyDraft = it
-                onAnnasSecretKeyChange(it)
+            onValueChange = { keyDraft = it },
+            modifier = Modifier.fillMaxWidth().onFocusChanged { focus ->
+                if (!focus.isFocused) onAnnasSecretKeyChange(keyDraft)
             },
-            modifier = Modifier.fillMaxWidth(),
             label = { Text(stringResource(R.string.feature_settings_annas_secret_key)) },
             supportingText = {
                 Text(stringResource(R.string.feature_settings_annas_secret_key_help))
             },
             singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { onAnnasSecretKeyChange(keyDraft) }),
             visualTransformation = PasswordVisualTransformation()
         )
+        val downloadsLeft = settings.annasDownloadsLeft
+        if (settings.annasSecretKey != null && downloadsLeft != null) {
+            Text(
+                text = settings.annasDownloadsPerDay?.let { perDay ->
+                    stringResource(R.string.feature_settings_annas_quota, downloadsLeft, perDay)
+                } ?: stringResource(R.string.feature_settings_annas_quota_left, downloadsLeft),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

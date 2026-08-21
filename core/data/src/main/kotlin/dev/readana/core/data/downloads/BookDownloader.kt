@@ -153,6 +153,13 @@ class BookDownloader @Inject constructor(
     }
 
     private suspend fun interpret(entity: DownloadEntity, request: DownloadRequest): Resolution {
+        // Resolving is the only moment the source reports a membership allowance, and Settings
+        // shows it, so record it wherever the resolution happens to land.
+        request.quota?.let { quota ->
+            settingsRepository.updateSourceSettings {
+                it.copy(annasDownloadsLeft = quota.remaining, annasDownloadsPerDay = quota.perDay)
+            }
+        }
         // A spent allowance still carries a URL when the source found a free route to the file;
         // only a request that insists on a browser has nowhere else to go. When that happens to a
         // member whose allowance is spent, say so — it is the more useful half of the story.

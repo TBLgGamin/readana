@@ -5,12 +5,11 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
+import dev.readana.core.data.browser.BrowserVerificationStatus
 import dev.readana.core.data.downloads.BookDownloadManager
 import dev.readana.core.data.downloads.EnqueueOutcome
 import dev.readana.core.data.repository.BookSourceRegistry
 import dev.readana.core.data.repository.SettingsRepository
-import dev.readana.core.model.BookFormat
-import dev.readana.core.model.BrowserDownload
 import dev.readana.source.api.SearchQuery
 import dev.readana.source.api.SearchResult
 import dev.readana.source.trending.TrendingBook
@@ -32,12 +31,14 @@ class DiscoverViewModel @Inject constructor(
     private val sources: BookSourceRegistry,
     private val settingsRepository: SettingsRepository,
     private val downloadManager: BookDownloadManager,
-    private val trendingBooks: TrendingBooks
+    private val trendingBooks: TrendingBooks,
+    verification: BrowserVerificationStatus
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DiscoverUiState())
     val uiState: StateFlow<DiscoverUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
+    private var awaitingVerification = false
 
     init {
         viewModelScope.launch {
@@ -49,6 +50,13 @@ class DiscoverViewModel @Inject constructor(
                         }
                     )
                 }
+            }
+        }
+        viewModelScope.launch {
+            // A source may have to answer a bot check before it can answer us; saying so beats a
+            // progress bar that looks stuck.
+            verification.verifying.collect { verifying ->
+                _uiState.update { it.copy(isVerifying = verifying) }
             }
         }
         loadTrending()
@@ -104,7 +112,11 @@ class DiscoverViewModel @Inject constructor(
                     },
                     sourceErrors = outcomes.mapNotNull { (source, outcome) ->
                         (outcome as? AppResult.Failure)?.let {
-                            SourceError(source.displayName, it.error)
+                            SourceError(
+                                sourceName = source.displayName,
+                                error = it.error,
+                                verifyUrl = (it.error as? AppError.BrowserCheck)?.url
+                            )
                         }
                     }
                 )
@@ -131,13 +143,23 @@ class DiscoverViewModel @Inject constructor(
                     DiscoverMessage.AlreadyQueued(outcome.job.title)
                 )
 
-                is EnqueueOutcome.RequiresBrowser -> _uiState.update {
-                    it.copy(effect = DiscoverEffect.OpenBrowser(outcome.toBrowserDownload()))
-                }
-
                 is EnqueueOutcome.Failed -> show(DiscoverMessage.Failed(outcome.error))
             }
         }
+    }
+
+    /** Hands the check to a browser the user can see, and re-runs the search when they come back. */
+    fun verifyInBrowser(error: SourceError) {
+        val url = error.verifyUrl ?: return
+        awaitingVerification = true
+        _uiState.update { it.copy(effect = DiscoverEffect.Verify(url, error.sourceName)) }
+    }
+
+    /** Called when the screen comes back to the foreground, which is where the browser returns to. */
+    fun onResumed() {
+        if (!awaitingVerification) return
+        awaitingVerification = false
+        if (_uiState.value.hasSearched) search()
     }
 
     fun consumeMessage() {
@@ -151,17 +173,6 @@ class DiscoverViewModel @Inject constructor(
     private fun show(message: DiscoverMessage) {
         _uiState.update { it.copy(message = message) }
     }
-
-    private fun EnqueueOutcome.RequiresBrowser.toBrowserDownload() = BrowserDownload(
-        sourceId = result.sourceId.value,
-        recordId = result.recordId,
-        title = result.title,
-        authors = result.authors,
-        format = result.format ?: BookFormat.EPUB,
-        url = url,
-        loginUrl = login?.url,
-        loginFormBody = login?.formBody
-    )
 }
 
 data class DiscoverUiState(
@@ -169,6 +180,8 @@ data class DiscoverUiState(
     /** Display names of the sources that will be searched. */
     val sourceNames: List<String> = emptyList(),
     val isSearching: Boolean = false,
+    /** A source is answering a "checking your browser" page right now. */
+    val isVerifying: Boolean = false,
     val hasSearched: Boolean = false,
     val results: List<SearchResult> = emptyList(),
     /** Suggestions shown until the user searches for something. */
@@ -180,7 +193,8 @@ data class DiscoverUiState(
     val effect: DiscoverEffect? = null
 )
 
-data class SourceError(val sourceName: String, val error: AppError)
+/** [verifyUrl] is set when the source could not get past a bot check on its own. */
+data class SourceError(val sourceName: String, val error: AppError, val verifyUrl: String? = null)
 
 sealed interface DiscoverMessage {
     /** [fastDownloadsLeft] is the source's remaining allowance, when it reports one. */
@@ -195,5 +209,6 @@ sealed interface DiscoverMessage {
 
 /** A one-shot navigation request. */
 sealed interface DiscoverEffect {
-    data class OpenBrowser(val download: BrowserDownload) : DiscoverEffect
+    /** Open [url] in a browser the user can see, so they can answer the site's check themselves. */
+    data class Verify(val url: String, val sourceName: String) : DiscoverEffect
 }
