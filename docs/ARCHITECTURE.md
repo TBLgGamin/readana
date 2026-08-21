@@ -28,11 +28,11 @@ graph TD
     core_data --> core_model[core:model]
     core_data --> core_common[core:common]
     core_data --> source_api[source:api]
-    core_data --> source_gutenberg[source:gutenberg]
     core_data --> source_annas[source:annas]
+    core_data --> source_trending[source:trending]
 
-    source_gutenberg --> source_api
     source_annas --> source_api
+    source_trending --> core_common
     source_api --> core_model
     source_api --> core_common
 
@@ -41,7 +41,7 @@ graph TD
     engine_reflow --> engine_epub[engine:epub]
 
     classDef jvm fill:#e8f4e8,stroke:#4f6d4a;
-    class core_model,core_common,source_api,source_gutenberg,source_annas,engine_reflow,engine_epub jvm;
+    class core_model,core_common,source_api,source_annas,source_trending,engine_reflow,engine_epub jvm;
 ```
 
 Green nodes are pure Kotlin/JVM modules: no Android dependency, millisecond unit tests, no Robolectric.
@@ -56,8 +56,9 @@ Green nodes are pure Kotlin/JVM modules: no Android dependency, millisecond unit
 | `core/common` | `AppResult`/`AppError`, `@Dispatcher`/`@ApplicationScope`, `suspendRunCatching`, `VolumeKeyRelay` | no |
 | `core/testing` | `MainDispatcherRule`, `FakeBookSource` | no |
 | `source/api` | `BookSource`, `SearchQuery/Page/Result`, `DownloadRequest`, `DownloadQuota`, `BrowserLogin`, `FileNames` | no |
-| `source/gutenberg` | Gutendex JSON client | no |
+| `source/gutenberg` | Gutendex JSON client — built, but not registered in `SourcesModule` | no |
 | `source/annas` | HTML search parser, member fast-download API, `MirrorResolver` | no |
+| `source/trending` | Open Library trending feed for the Discover shelf; not a `BookSource` | no |
 | `engine/epub` | `EpubBook` model, `NavEntry`, `EpubWriter` (EPUB 3.3, epubcheck-validated) | no |
 | `engine/reflow` | `PageContent`/`PageText` models, `ReadingOrder` (column detection), `ReflowEngine` heuristics, `EpubAssembler` | no |
 | `engine/pdf2epub` | `PdfBoxContentExtractor` (text, figures, outline), `PageImageCollector`, `PdfToEpubConverter` | yes (PDFBox needs a Context) |

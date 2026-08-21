@@ -67,19 +67,34 @@ still be read through Readium's pdfium navigator.
   `{"download_url": null, "error": "…"}`. Daily quotas depend on the membership tier.
 - **Non-members** use "slow" partner downloads behind wait-lists/verification pages that cannot be
   scripted reliably → the app hands those to an in-app browser (`DownloadRequest.requiresBrowser`).
-- **Domains rotate and disappear.** On 2026-08-20 from a Dutch connection: `annas-archive.org`,
-  `.se`, `.gl` unreachable (Dutch court-ordered ISP blocks), `annas-archive.li` and `.pm` are now
-  **parking pages**. Hence a user-editable mirror list, automatic failover
-  (`MirrorResolver`) and a "does this look like the real site" check before parsing.
+- **A membership key does not unlock search.** `fast_download.json` is the *only* documented JSON
+  API, it takes an md5, and it returns a download URL. Every client (ours included) scrapes the
+  search page to find the md5, then calls the JSON API to fetch. Re-checked 2026-08-21.
+- **Scraping is throttled per IP.** Measured 2026-08-21: a handful of `/search` requests from one
+  address earn a `403` on every mirror at once, and it persists for minutes. It is not a
+  user-agent problem — a desktop Chrome UA succeeded once and then 403'd like the rest. So 403/429
+  must fail over to the next mirror rather than end the search, and the user needs to be told to
+  wait rather than shown "HTTP 403".
+- **Domains rotate and disappear.** On 2026-08-21 from a Dutch connection: `annas-archive.org` and
+  `.se` no longer resolve at all (`No such host`); `.gl` and `.pk` serve the site but throttle;
+  `.li` answers every search with a `<meta refresh>` interstitial carrying a tracking id — it
+  mentions the site, so the "is this the real site" check passes and it reads as an empty result
+  page unless the interstitial is detected explicitly. Hence a user-editable mirror list, failover
+  on blocked/5xx replies, and both guards before parsing.
 - **Legal**: downloading copyrighted works without permission is unlawful in most countries; the
   app shows a notice in Settings and ships the source unconfigured.
 
 ### Legitimate / open sources
 
 - **Project Gutenberg** via [Gutendex](https://gutendex.com) (`/books/?search=…&languages=…&page=…`,
-  EPUB links under `formats["application/epub+zip"]`) — implemented as the reference source.
+  EPUB links under `formats["application/epub+zip"]`) — implemented, but **not registered** as a
+  search source: a public-domain-only catalogue mostly added noise to results.
+- **Open Library trending** (`/trending/weekly.json?limit=n` → `works[].title`, `author_name`,
+  `cover_i`; art at `https://covers.openlibrary.org/b/id/<cover_i>-M.jpg`) — no key, no throttling,
+  ships cover art. Used for the Discover "Popular right now" shelf, deliberately *not* Anna's
+  Archive, whose scraping budget belongs to real searches.
 - Planned: **OPDS** catalogs (Standard Ebooks, Feedbooks, DOAB/OAPEN, Calibre-Web) through
-  `readium-opds`; **Open Library / Internet Archive**; **arXiv** (PDF → converted).
+  `readium-opds`; **Internet Archive**; **arXiv** (PDF → converted).
 
 ## 5. Toolchain versions (verified against Maven Central / Google Maven on 2026-08-20)
 

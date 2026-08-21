@@ -76,6 +76,7 @@ class ArchitectureTest {
             "source/api",
             "source/gutenberg",
             "source/annas",
+            "source/trending",
             "engine/epub",
             "engine/reflow"
         )

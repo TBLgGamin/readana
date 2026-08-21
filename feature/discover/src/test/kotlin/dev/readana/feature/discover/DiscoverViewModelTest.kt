@@ -1,6 +1,9 @@
 package dev.readana.feature.discover
 
 import dev.readana.core.common.result.AppError
+import dev.readana.core.common.result.AppResult
+import dev.readana.core.common.result.asFailure
+import dev.readana.core.common.result.asSuccess
 import dev.readana.core.data.downloads.BookDownloadManager
 import dev.readana.core.data.downloads.CapturedDownload
 import dev.readana.core.data.downloads.EnqueueOutcome
@@ -19,6 +22,8 @@ import dev.readana.core.testing.MainDispatcherRule
 import dev.readana.source.api.BrowserLogin
 import dev.readana.source.api.SearchResult
 import dev.readana.source.api.SourceId
+import dev.readana.source.trending.TrendingBook
+import dev.readana.source.trending.TrendingBooks
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -48,7 +53,10 @@ class DiscoverViewModelTest {
     private val settings = FakeSettingsRepository()
     private val downloads = FakeBookDownloadManager()
 
-    private fun viewModel() = DiscoverViewModel(BookSourceRegistry(setOf(gutenberg, broken)), settings, downloads)
+    private val trending = FakeTrendingBooks()
+
+    private fun viewModel() =
+        DiscoverViewModel(BookSourceRegistry(setOf(gutenberg, broken)), settings, downloads, trending)
 
     @Test
     fun `search merges results and reports per-source errors`() = runTest {
@@ -159,6 +167,43 @@ class DiscoverViewModelTest {
         assertIs<DiscoverMessage.Failed>(viewModel.uiState.value.message)
     }
 
+    @Test
+    fun `popular books fill the screen before anything is searched`() = runTest {
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(false, state.hasSearched)
+        assertEquals(listOf("Atomic Habits"), state.trending.map { it.title })
+    }
+
+    @Test
+    fun `tapping a popular book searches the sources for it`() = runTest {
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.searchFor(viewModel.uiState.value.trending.single())
+        advanceUntilIdle()
+
+        assertEquals("Atomic Habits James Clear", gutenberg.queries.single().text)
+        assertTrue(viewModel.uiState.value.hasSearched)
+    }
+
+    @Test
+    fun `a failing popular shelf leaves search working`() = runTest {
+        trending.failure = AppError.Network("offline")
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.trending.isEmpty())
+
+        viewModel.onQueryChange("pride")
+        viewModel.search()
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.uiState.value.results.size)
+    }
+
     private fun TestScope.searchedViewModel(): DiscoverViewModel {
         val viewModel = viewModel()
         viewModel.onQueryChange("pride")
@@ -190,6 +235,18 @@ class DiscoverViewModelTest {
         progress = null,
         origin = null
     )
+}
+
+private class FakeTrendingBooks : TrendingBooks {
+    var failure: AppError? = null
+
+    override suspend fun trending(limit: Int): AppResult<List<TrendingBook>> = failure?.asFailure() ?: listOf(
+        TrendingBook(
+            title = "Atomic Habits",
+            authors = listOf("James Clear"),
+            coverUrl = "https://covers.example/atomic.jpg"
+        )
+    ).asSuccess()
 }
 
 private class FakeBookDownloadManager : BookDownloadManager {

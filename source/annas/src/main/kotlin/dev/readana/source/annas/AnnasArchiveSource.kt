@@ -63,11 +63,15 @@ class AnnasArchiveSource(
             response.failIfMirrorBroken()
             if (!response.status.isSuccess()) {
                 return@withMirror AppError.Http(
-                    response.status.value
+                    response.status.value,
+                    blockedMessage(response.status) ?: "HTTP ${response.status.value}"
                 ).asFailure()
             }
 
             val html = response.bodyAsText()
+            if (AnnasSearchParser.isRedirectInterstitial(html)) {
+                throw MirrorUnavailableException("mirror only serves a redirect page")
+            }
             if (!AnnasSearchParser.looksLikeAnnasArchive(html)) {
                 throw MirrorUnavailableException(
                     "response does not look like Anna's Archive (parked domain or block page)"
@@ -179,6 +183,18 @@ class AnnasArchiveSource(
 
     private fun String.looksLikeQuota(): Boolean =
         contains("limit", ignoreCase = true) || contains("quota", ignoreCase = true)
+
+    /**
+     * Anna's Archive throttles scraping by IP and answers with a bare 403 or 429. Saying so beats
+     * "HTTP 403", because waiting or switching mirror is what actually helps.
+     */
+    private fun blockedMessage(status: HttpStatusCode): String? = when (status.value) {
+        HttpStatusCode.Forbidden.value, HttpStatusCode.TooManyRequests.value ->
+            "Anna's Archive is rate-limiting this connection. Wait a few minutes, " +
+                "or add another mirror in Settings."
+
+        else -> null
+    }
 
     private fun HttpResponse.failIfMirrorBroken() {
         if (status.value >= HttpStatusCode.InternalServerError.value) {

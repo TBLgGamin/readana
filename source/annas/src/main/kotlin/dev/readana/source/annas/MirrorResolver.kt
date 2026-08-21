@@ -10,8 +10,9 @@ class MirrorUnavailableException(message: String, cause: Throwable? = null) : Ex
 
 /**
  * Runs a request against the first mirror that works and remembers it for next time.
- * Transport exceptions, [MirrorUnavailableException] and 5xx results move on to the next mirror;
- * any other [AppResult.Failure] is returned as-is because retrying elsewhere would not help.
+ * Transport exceptions, [MirrorUnavailableException], 5xx and "we are blocking you" replies (403,
+ * 429, …) move on to the next mirror; any other [AppResult.Failure] is returned as-is because
+ * retrying elsewhere would not help.
  */
 class MirrorResolver {
     @Volatile
@@ -52,10 +53,22 @@ class MirrorResolver {
         ).asFailure()
     }
 
-    private fun AppError.isMirrorProblem(): Boolean =
-        this is AppError.Network || (this is AppError.Http && statusCode >= SERVER_ERROR_START)
+    private fun AppError.isMirrorProblem(): Boolean = when {
+        this is AppError.Network -> true
+
+        this !is AppError.Http -> false
+
+        statusCode >= SERVER_ERROR_START -> true
+
+        // Anna's Archive blocks scraping per IP and per domain: a mirror that is rate-limiting or
+        // refusing us right now says nothing about the next one, so keep going.
+        else -> statusCode in BLOCKED_STATUSES
+    }
 
     private companion object {
         const val SERVER_ERROR_START = 500
+
+        /** Forbidden, request timeout, rate-limited, and blocked-for-legal-reasons. */
+        val BLOCKED_STATUSES = setOf(403, 408, 429, 451)
     }
 }

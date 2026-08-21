@@ -9,19 +9,26 @@ import dev.readana.core.data.repository.SettingsRepository
 import dev.readana.source.annas.AnnasArchiveSource
 import dev.readana.source.annas.AnnasConfig
 import dev.readana.source.api.BookSource
-import dev.readana.source.gutenberg.GutendexSource
+import dev.readana.source.trending.OpenLibraryTrending
+import dev.readana.source.trending.TrendingBooks
 import io.ktor.client.HttpClient
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
 
-/** Every [BookSource] the app knows about. Add a new source by adding a new `@IntoSet` provider. */
+/**
+ * Every [BookSource] the app knows about. Add a new source by adding a new `@IntoSet` provider.
+ *
+ * Project Gutenberg is deliberately not registered: its catalogue is public-domain only, which
+ * mostly added noise to results. The `source:gutenberg` module is still there if it is ever wanted
+ * back — re-adding its provider here is all it takes.
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object SourcesModule {
+    /** Not a [BookSource]: it suggests what to search for, it cannot serve files. */
     @Provides
-    @IntoSet
     @Singleton
-    fun providesGutenberg(client: HttpClient): BookSource = GutendexSource(client)
+    fun providesTrendingBooks(client: HttpClient): TrendingBooks = OpenLibraryTrending(client)
 
     @Provides
     @IntoSet

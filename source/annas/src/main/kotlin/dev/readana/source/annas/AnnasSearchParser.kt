@@ -21,6 +21,7 @@ object AnnasSearchParser {
         Regex("\\.(epub|pdf|mobi|azw3|djvu|fb2|cbz|cbr|txt|doc|docx)\\b", RegexOption.IGNORE_CASE)
     private val SIZE = Regex("(\\d+(?:[.,]\\d+)?)\\s?(KB|MB|GB)", RegexOption.IGNORE_CASE)
     private val YEAR = Regex("\\b(1[5-9]\\d{2}|20\\d{2})\\b")
+    private val META_REFRESH = Regex("""http-equiv=["']?refresh""", RegexOption.IGNORE_CASE)
 
     // Deliberately NOT the bare domain: parked/for-sale pages echo "annas-archive.li" in their title.
     private val SITE_MARKERS =
@@ -33,6 +34,15 @@ object AnnasSearchParser {
     /** Heuristic guard against parked domains, DDoS challenge pages and ISP block notices. */
     fun looksLikeAnnasArchive(html: String): Boolean =
         SITE_MARKERS.any { html.contains(it, ignoreCase = true) } || MD5_PATH.containsMatchIn(html)
+
+    /**
+     * True for a gateway page that only bounces the browser somewhere else (`.li` answers every
+     * search with a `<meta http-equiv="refresh">` carrying a tracking id). It mentions the site, so
+     * [looksLikeAnnasArchive] accepts it, and it holds no results — without this check a search
+     * would quietly report "no results" instead of moving to the next mirror.
+     */
+    fun isRedirectInterstitial(html: String): Boolean =
+        !MD5_PATH.containsMatchIn(html) && META_REFRESH.containsMatchIn(html)
 
     fun parse(html: String, baseUrl: String, sourceId: SourceId): List<SearchResult> {
         val document = Jsoup.parse(html, baseUrl)

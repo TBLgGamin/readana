@@ -7,6 +7,7 @@
     <string name="feature_discover_empty_title">Find your next book</string>
     <string name="feature_discover_empty_description">Searches run across: %1$s</string>
     <string name="feature_discover_no_results_title">No results</string>
+    <string name="feature_discover_trending_title">Popular right now</string>
     <string name="feature_discover_source_error">%1$s: %2$s</string>
     <string name="feature_discover_message_queued">Downloading “%1$s”</string>
     <plurals name="feature_discover_message_queued_quota">

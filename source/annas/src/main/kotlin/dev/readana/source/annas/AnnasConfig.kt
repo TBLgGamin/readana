@@ -22,10 +22,18 @@ data class AnnasConfig(
         get() = !secretKey.isNullOrBlank()
 
     companion object {
+        /**
+         * Checked 2026-08-21 from a Dutch connection: `.gl` and `.pk` serve the site (and rate-limit
+         * hard), `.li` answers with a redirect interstitial, and `.org`/`.se` no longer resolve at
+         * all. Working mirrors go first so a search does not begin with two DNS failures; the dead
+         * ones stay as a fallback for connections where they do resolve.
+         */
         val DEFAULT_MIRRORS: List<String> = listOf(
+            "https://annas-archive.gl",
+            "https://annas-archive.pk",
+            "https://annas-archive.li",
             "https://annas-archive.org",
-            "https://annas-archive.se",
-            "https://annas-archive.gl"
+            "https://annas-archive.se"
         )
     }
 }

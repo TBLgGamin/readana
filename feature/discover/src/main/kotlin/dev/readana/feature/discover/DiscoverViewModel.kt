@@ -13,6 +13,8 @@ import dev.readana.core.model.BookFormat
 import dev.readana.core.model.BrowserDownload
 import dev.readana.source.api.SearchQuery
 import dev.readana.source.api.SearchResult
+import dev.readana.source.trending.TrendingBook
+import dev.readana.source.trending.TrendingBooks
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -29,7 +31,8 @@ import kotlinx.coroutines.launch
 class DiscoverViewModel @Inject constructor(
     private val sources: BookSourceRegistry,
     private val settingsRepository: SettingsRepository,
-    private val downloadManager: BookDownloadManager
+    private val downloadManager: BookDownloadManager,
+    private val trendingBooks: TrendingBooks
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DiscoverUiState())
     val uiState: StateFlow<DiscoverUiState> = _uiState.asStateFlow()
@@ -48,6 +51,25 @@ class DiscoverViewModel @Inject constructor(
                 }
             }
         }
+        loadTrending()
+    }
+
+    /**
+     * Fills the empty Discover screen with something to browse. Failing is not worth reporting:
+     * the search box works regardless, so the shelf just stays hidden.
+     */
+    private fun loadTrending() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingTrending = true) }
+            val books = (trendingBooks.trending() as? AppResult.Success)?.value.orEmpty()
+            _uiState.update { it.copy(trending = books, isLoadingTrending = false) }
+        }
+    }
+
+    /** Tapping a suggestion searches the book sources for it. */
+    fun searchFor(book: TrendingBook) {
+        _uiState.update { it.copy(query = book.searchQuery) }
+        search()
     }
 
     fun onQueryChange(query: String) {
@@ -149,6 +171,9 @@ data class DiscoverUiState(
     val isSearching: Boolean = false,
     val hasSearched: Boolean = false,
     val results: List<SearchResult> = emptyList(),
+    /** Suggestions shown until the user searches for something. */
+    val trending: List<TrendingBook> = emptyList(),
+    val isLoadingTrending: Boolean = false,
     val sourceErrors: List<SourceError> = emptyList(),
     val message: DiscoverMessage? = null,
     val effect: DiscoverEffect? = null

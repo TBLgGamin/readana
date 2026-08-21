@@ -50,6 +50,7 @@ include(":engine:pdf2epub")
 include(":source:api")
 include(":source:gutenberg")
 include(":source:annas")
+include(":source:trending")
 
 include(":feature:browser")
 include(":feature:library")

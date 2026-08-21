@@ -6,7 +6,28 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Anna's Archive searches no longer stop at the first mirror that refuses them. The site throttles
+  scraping per IP and answers 403 or 429; those replies now move on to the next mirror instead of
+  ending the search, and when every mirror is throttling, the message says so rather than "HTTP 403".
+  Mirrors that only serve a redirect page (`.li`) are skipped too, instead of quietly reading as
+  "no results".
+- Default mirrors reordered to ones that currently resolve: `.gl`, `.pk` and `.li` are tried before
+  `.org` and `.se`, which no longer resolve from some connections.
+
+### Changed
+
+- Discover shows results as a two-column cover grid, with the download button on the cover.
+- Project Gutenberg is no longer searched. Its public-domain-only catalogue mostly added noise; the
+  `source:gutenberg` module is still in the tree if it is ever wanted back.
+
 ### Added
+
+- Discover opens on a "Popular right now" shelf of cover art from Open Library, so the screen is
+  browsable before searching; tapping a book searches the enabled sources for it. Open Library is
+  used rather than Anna's Archive because Anna's throttles scraping and that budget belongs to real
+  searches.
 
 - PDF to EPUB: PDFs are converted on import and after a download so they reflow at your font size,
   keeping the original file. Figures are carried across, two-column pages are read column by column,

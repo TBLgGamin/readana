@@ -70,6 +70,60 @@ class AnnasArchiveSourceTest {
     }
 
     @Test
+    fun `a rate-limiting mirror is skipped rather than reported`() = runTest {
+        val hosts = mutableListOf<String>()
+        val source = source { request ->
+            hosts += request.url.host
+            // Anna's Archive throttles per IP and answers 403; the next mirror may still serve us.
+            if (request.url.host == "one.test") {
+                respond("blocked", HttpStatusCode.Forbidden)
+            } else {
+                respond(searchHtml, HttpStatusCode.OK, htmlHeaders)
+            }
+        }
+
+        val page = assertNotNull(source.search(SearchQuery("pride")).getOrNull())
+
+        assertEquals(2, page.results.size)
+        assertEquals(listOf("one.test", "two.test"), hosts)
+    }
+
+    @Test
+    fun `every mirror rate-limiting explains what to do about it`() = runTest {
+        val source = source { respond("blocked", HttpStatusCode.TooManyRequests) }
+
+        val error = assertIs<AppError.Http>(source.search(SearchQuery("pride")).errorOrNull())
+
+        assertEquals(429, error.statusCode)
+        assertTrue("rate-limiting" in error.message, "unhelpful message: ${error.message}")
+    }
+
+    @Test
+    fun `a mirror that only redirects is skipped`() = runTest {
+        val hosts = mutableListOf<String>()
+        val source = source { request ->
+            hosts += request.url.host
+            if (request.url.host == "one.test") {
+                // What .li serves: mentions the site, carries no results, just bounces the browser.
+                respond(
+                    """<html><head><title>annas-archive.li</title>""" +
+                        """<meta http-equiv="refresh" content="0; URL=http://annas-archive.li/search?q=x"/>""" +
+                        """</head><body>Anna's Archive</body></html>""",
+                    HttpStatusCode.OK,
+                    htmlHeaders
+                )
+            } else {
+                respond(searchHtml, HttpStatusCode.OK, htmlHeaders)
+            }
+        }
+
+        val page = assertNotNull(source.search(SearchQuery("pride")).getOrNull())
+
+        assertEquals(2, page.results.size, "the interstitial must not pass as an empty result page")
+        assertEquals(listOf("one.test", "two.test"), hosts)
+    }
+
+    @Test
     fun `all mirrors failing yields a Network failure`() = runTest {
         val source = source { throw IOException("offline") }
 
