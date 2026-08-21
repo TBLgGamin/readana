@@ -3,8 +3,6 @@ package dev.readana.feature.settings
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -17,12 +15,15 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,7 +31,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
@@ -46,36 +46,91 @@ import dev.readana.core.model.AiProviderConfig
 import dev.readana.core.model.AiProviderKind
 import dev.readana.core.model.AiSettings
 
-/** Everything the assistant needs: which provider answers, with which key and which model. */
+/**
+ * Everything the assistant needs: which provider answers, with which key and which model.
+ *
+ * The providers are a single-choice list, and the chosen one's own settings sit directly under it.
+ * Only one provider is ever in use, so only one set of fields is ever worth showing.
+ */
 @Composable
 internal fun AiSettingsSection(state: AiSettingsUiState, actions: AiSettingsActions, modifier: Modifier = Modifier) {
-    var expandedProvider by rememberSaveable { mutableStateOf<String?>(null) }
     var addingCustom by rememberSaveable { mutableStateOf(false) }
+    val settings = state.settings
+    val active = settings.active
 
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        state.settings.providers.forEach { provider ->
-            ProviderRow(
-                provider = provider,
-                probe = state.probes[provider.id] ?: ProviderProbe(),
-                isActive = provider.id == state.settings.activeProviderId,
-                expanded = expandedProvider == provider.id,
-                onToggleDetails = {
-                    expandedProvider = if (expandedProvider == provider.id) null else provider.id
-                },
+    SettingsSection(
+        title = stringResource(R.string.feature_settings_section_ai),
+        icon = ReadanaIcons.Assistant,
+        modifier = modifier
+    ) {
+        SettingsGroup {
+            settings.providers.forEach { provider ->
+                item { shapes ->
+                    ProviderItem(
+                        provider = provider,
+                        shapes = shapes,
+                        isActive = provider.id == settings.activeProviderId,
+                        onSelect = { actions.onSetActiveProvider(provider.id) },
+                        onRemove = { actions.onRemoveProvider(provider.id) }
+                    )
+                }
+            }
+        }
+        OutlinedButton(onClick = { addingCustom = true }) {
+            Icon(ReadanaIcons.Add, contentDescription = null)
+            Text(
+                text = stringResource(R.string.feature_settings_ai_add_custom),
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
+        if (active != null) {
+            ProviderDetails(
+                provider = active,
+                probe = state.probes[active.id] ?: ProviderProbe(),
                 actions = actions
             )
         }
-        OutlinedButton(onClick = { addingCustom = true }) {
-            Text(stringResource(R.string.feature_settings_ai_add_custom))
-        }
-        ContextSizeRow(state.settings.contextSize, actions.onContextSizeChange)
-        IllustrateRow(state.settings.illustrateFromWeb, actions.onIllustrateChange)
-        RecapRow(state.settings, actions)
-        Text(
-            text = stringResource(R.string.feature_settings_ai_privacy),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+        ChoiceRow(
+            label = stringResource(R.string.feature_settings_ai_context),
+            options = AiContextSize.entries,
+            selected = settings.contextSize,
+            optionLabel = { stringResource(it.labelRes()) },
+            onSelect = actions.onContextSizeChange,
+            help = stringResource(R.string.feature_settings_ai_context_help)
         )
+        SettingsGroup {
+            item { shapes ->
+                SwitchItem(
+                    shapes = shapes,
+                    label = stringResource(R.string.feature_settings_ai_illustrate),
+                    checked = settings.illustrateFromWeb,
+                    onCheckedChange = actions.onIllustrateChange,
+                    help = stringResource(R.string.feature_settings_ai_illustrate_help)
+                )
+            }
+            item { shapes ->
+                SwitchItem(
+                    shapes = shapes,
+                    label = stringResource(R.string.feature_settings_ai_recap),
+                    checked = settings.recapEnabled,
+                    onCheckedChange = actions.onRecapEnabledChange,
+                    help = pluralStringResource(
+                        R.plurals.feature_settings_ai_recap_days,
+                        settings.recapAfterDays,
+                        settings.recapAfterDays
+                    )
+                )
+            }
+        }
+        if (settings.recapEnabled) {
+            Slider(
+                value = settings.recapAfterDays.toFloat(),
+                onValueChange = { actions.onRecapAfterDaysChange(it.toInt()) },
+                valueRange = AiSettings.RECAP_DAYS_RANGE.first.toFloat()..AiSettings.RECAP_DAYS_RANGE.last.toFloat(),
+                steps = AiSettings.RECAP_DAYS_RANGE.last - AiSettings.RECAP_DAYS_RANGE.first - 1
+            )
+        }
+        SettingsNote(stringResource(R.string.feature_settings_ai_privacy))
     }
 
     if (addingCustom) {
@@ -89,53 +144,45 @@ internal fun AiSettingsSection(state: AiSettingsUiState, actions: AiSettingsActi
     }
 }
 
-/** One provider: a radio for "use this one", and its own settings when opened. */
+/**
+ * One provider in the list. The row picks it; the bin next to it is there whether or not the
+ * provider is in use, so a custom one can be removed without being selected first.
+ */
 @Composable
-private fun ProviderRow(
+private fun ProviderItem(
     provider: AiProviderConfig,
-    probe: ProviderProbe,
+    shapes: ListItemShapes,
     isActive: Boolean,
-    expanded: Boolean,
-    onToggleDetails: () -> Unit,
-    actions: AiSettingsActions,
+    onSelect: () -> Unit,
+    onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onToggleDetails)
-                .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Always tappable: a disabled radio gives the reader no way to tell a provider they
-            // have not finished setting up from one the app has silently refused.
-            RadioButton(
-                selected = isActive,
-                onClick = { actions.onSetActiveProvider(provider.id) }
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(provider.name, style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    text = provider.statusLine(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+    SegmentedListItem(
+        selected = isActive,
+        onClick = onSelect,
+        shapes = shapes,
+        modifier = modifier,
+        // Always tappable: a disabled radio gives the reader no way to tell a provider they have
+        // not finished setting up from one the app has silently refused.
+        leadingContent = { RadioButton(selected = isActive, onClick = null) },
+        supportingContent = { Text(provider.statusLine()) },
+        trailingContent = {
+            if (provider.kind == AiProviderKind.Custom) {
+                IconButton(onClick = onRemove) {
+                    Icon(
+                        ReadanaIcons.Delete,
+                        contentDescription = stringResource(R.string.feature_settings_ai_remove)
+                    )
+                }
             }
-            Icon(
-                imageVector = if (expanded) ReadanaIcons.ExpandLess else ReadanaIcons.ExpandMore,
-                contentDescription = stringResource(
-                    if (expanded) R.string.feature_settings_collapse else R.string.feature_settings_expand
-                )
-            )
-        }
-        AnimatedVisibility(visible = expanded) {
-            ProviderDetails(provider = provider, probe = probe, actions = actions)
-        }
+        },
+        colors = ListItemDefaults.segmentedColors()
+    ) {
+        Text(provider.name)
     }
 }
 
+/** The chosen provider's own settings, attached to the list above it. */
 @Composable
 private fun ProviderDetails(
     provider: AiProviderConfig,
@@ -144,69 +191,71 @@ private fun ProviderDetails(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    Column(
-        modifier = modifier.padding(start = 40.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
-        CommittingField(
-            value = provider.apiKey.orEmpty(),
-            label = stringResource(R.string.feature_settings_ai_key),
-            onCommit = { actions.onApiKeyChange(provider.id, it) },
-            isSecret = true
-        )
-        if (provider.kind.allowsCustomBaseUrl) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(text = provider.name, style = MaterialTheme.typography.titleSmall)
             CommittingField(
-                value = provider.baseUrl.orEmpty(),
-                label = stringResource(R.string.feature_settings_ai_base_url),
-                placeholder = provider.kind.defaultBaseUrl ?: OPENAI_COMPATIBLE_HINT,
-                onCommit = { actions.onBaseUrlChange(provider.id, it) }
+                value = provider.apiKey.orEmpty(),
+                label = stringResource(R.string.feature_settings_ai_key),
+                onCommit = { actions.onApiKeyChange(provider.id, it) },
+                isSecret = true
             )
-        }
-        CommittingField(
-            value = provider.model.orEmpty(),
-            label = stringResource(R.string.feature_settings_ai_model),
-            placeholder = provider.kind.defaultModel.orEmpty(),
-            onCommit = { actions.onModelChange(provider.id, it) }
-        )
-        if (probe.models.isNotEmpty()) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                probe.models.forEach { model ->
-                    FilterChip(
-                        selected = model == provider.effectiveModel,
-                        onClick = { actions.onModelChange(provider.id, model) },
-                        label = { Text(model) }
-                    )
+            if (provider.kind.allowsCustomBaseUrl) {
+                CommittingField(
+                    value = provider.baseUrl.orEmpty(),
+                    label = stringResource(R.string.feature_settings_ai_base_url),
+                    placeholder = provider.kind.defaultBaseUrl ?: OPENAI_COMPATIBLE_HINT,
+                    onCommit = { actions.onBaseUrlChange(provider.id, it) }
+                )
+            }
+            CommittingField(
+                value = provider.model.orEmpty(),
+                label = stringResource(R.string.feature_settings_ai_model),
+                placeholder = provider.kind.defaultModel.orEmpty(),
+                onCommit = { actions.onModelChange(provider.id, it) }
+            )
+            if (probe.models.isNotEmpty()) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    probe.models.forEach { model ->
+                        FilterChip(
+                            selected = model == provider.effectiveModel,
+                            onClick = { actions.onModelChange(provider.id, model) },
+                            label = { Text(model) }
+                        )
+                    }
                 }
             }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                onClick = { actions.onFetchModels(provider.id) },
-                enabled = !probe.isBusy
-            ) {
-                Text(stringResource(R.string.feature_settings_ai_fetch_models))
-            }
-            OutlinedButton(
-                onClick = { actions.onTestProvider(provider.id) },
-                enabled = !probe.isBusy
-            ) {
-                Text(stringResource(R.string.feature_settings_ai_test))
-            }
-            provider.kind.consoleUrl?.let { url ->
-                TextButton(onClick = { context.openUrl(url) }) {
-                    Text(stringResource(R.string.feature_settings_ai_get_key))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = { actions.onFetchModels(provider.id) },
+                    enabled = !probe.isBusy
+                ) {
+                    Text(stringResource(R.string.feature_settings_ai_fetch_models))
+                }
+                OutlinedButton(
+                    onClick = { actions.onTestProvider(provider.id) },
+                    enabled = !probe.isBusy
+                ) {
+                    Text(stringResource(R.string.feature_settings_ai_test))
+                }
+                provider.kind.consoleUrl?.let { url ->
+                    TextButton(onClick = { context.openUrl(url) }) {
+                        Text(stringResource(R.string.feature_settings_ai_get_key))
+                    }
                 }
             }
-            if (provider.kind == AiProviderKind.Custom) {
-                IconButton(onClick = { actions.onRemoveProvider(provider.id) }) {
-                    Icon(
-                        ReadanaIcons.Delete,
-                        contentDescription = stringResource(R.string.feature_settings_ai_remove)
-                    )
-                }
-            }
+            ProbeResult(probe)
         }
-        ProbeResult(probe)
     }
 }
 
@@ -236,7 +285,7 @@ private fun ProbeResult(probe: ProviderProbe, modifier: Modifier = Modifier) {
  * A settings text field that saves as it is typed.
  *
  * It deliberately does not wait for focus to be lost, the way the mirror list does: a key pasted
- * into a field that is then collapsed away — or a row whose radio button is waiting on that key —
+ * into a field that is then scrolled away — or a row whose radio button is waiting on that key —
  * left the assistant switched off with nothing on screen to say why.
  */
 @Composable
@@ -263,81 +312,6 @@ private fun CommittingField(
         keyboardActions = KeyboardActions(onDone = { onCommit(draft) }),
         visualTransformation = if (isSecret) PasswordVisualTransformation() else VisualTransformation.None
     )
-}
-
-@Composable
-private fun ContextSizeRow(selected: AiContextSize, onSelect: (AiContextSize) -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(stringResource(R.string.feature_settings_ai_context))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AiContextSize.entries.forEach { size ->
-                FilterChip(
-                    selected = size == selected,
-                    onClick = { onSelect(size) },
-                    label = { Text(stringResource(size.labelRes())) }
-                )
-            }
-        }
-        Text(
-            text = stringResource(R.string.feature_settings_ai_context_help),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-/**
- * Answers may ask for a picture of something they mention. Readana looks it up on Wikipedia and
- * shows it; the result never goes back to the model, so this cannot give away a plot.
- */
-@Composable
-private fun IllustrateRow(enabled: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(stringResource(R.string.feature_settings_ai_illustrate))
-            Switch(checked = enabled, onCheckedChange = onChange)
-        }
-        Text(
-            text = stringResource(R.string.feature_settings_ai_illustrate_help),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-private fun RecapRow(settings: AiSettings, actions: AiSettingsActions, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(stringResource(R.string.feature_settings_ai_recap))
-            Switch(checked = settings.recapEnabled, onCheckedChange = actions.onRecapEnabledChange)
-        }
-        if (settings.recapEnabled) {
-            Text(
-                text = pluralStringResource(
-                    R.plurals.feature_settings_ai_recap_days,
-                    settings.recapAfterDays,
-                    settings.recapAfterDays
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Slider(
-                value = settings.recapAfterDays.toFloat(),
-                onValueChange = { actions.onRecapAfterDaysChange(it.toInt()) },
-                valueRange = AiSettings.RECAP_DAYS_RANGE.first.toFloat()..AiSettings.RECAP_DAYS_RANGE.last.toFloat(),
-                steps = AiSettings.RECAP_DAYS_RANGE.last - AiSettings.RECAP_DAYS_RANGE.first - 1
-            )
-        }
-    }
 }
 
 @Composable

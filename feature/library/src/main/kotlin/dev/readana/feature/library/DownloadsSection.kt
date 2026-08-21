@@ -4,7 +4,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,6 +31,9 @@ import dev.readana.core.model.BookFormat
 import dev.readana.core.model.DownloadErrorKind
 import dev.readana.core.model.DownloadJob
 import dev.readana.core.model.DownloadStatus
+
+/** Roughly four rows: enough to see what is in flight without crowding out the library. */
+private val MaxQueueHeight = 240.dp
 
 /** The download queue, shown above the grid while anything is in flight or unacknowledged. */
 @Composable
@@ -67,14 +73,17 @@ internal fun DownloadsSection(
             )
         }
         if (expanded) {
-            downloads.forEach { job ->
-                DownloadRow(
-                    job = job,
-                    onOpenBook = onOpenBook,
-                    onRetry = onRetry,
-                    onCancel = onCancel,
-                    onDismiss = onDismiss
-                )
+            // Capped and scrolled: a long queue would otherwise push the book grid off the screen.
+            LazyColumn(modifier = Modifier.heightIn(max = MaxQueueHeight)) {
+                items(downloads, key = { it.id }) { job ->
+                    DownloadRow(
+                        job = job,
+                        onOpenBook = onOpenBook,
+                        onRetry = onRetry,
+                        onCancel = onCancel,
+                        onDismiss = onDismiss
+                    )
+                }
             }
         }
         HorizontalDivider()

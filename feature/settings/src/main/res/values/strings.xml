@@ -1,17 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="feature_settings_title">Settings</string>
-    <string name="feature_settings_expand">Show settings</string>
-    <string name="feature_settings_collapse">Hide settings</string>
-    <string name="feature_settings_summary_conversion_on">PDFs converted</string>
-    <string name="feature_settings_summary_conversion_off">PDFs kept as-is</string>
-    <string name="feature_settings_summary_no_sources">No sources enabled</string>
-    <string name="feature_settings_summary_member_key">member key set</string>
-    <string name="feature_settings_background_summary">Keep downloads alive on Xiaomi</string>
     <string name="feature_settings_section_storage">Storage</string>
     <string name="feature_settings_library_folder">Library folder</string>
     <string name="feature_settings_library_folder_default">App storage (private)</string>
-    <string name="feature_settings_library_folder_pick">Choose folder</string>
     <string name="feature_settings_library_folder_clear">Use app storage</string>
     <string name="feature_settings_library_folder_note">Books in app storage are deleted when Readana is uninstalled. Choosing a folder keeps new books outside the app; books already imported stay where they are.</string>
     <string name="feature_settings_section_sources">Book sources</string>
@@ -32,13 +24,7 @@
     <string name="feature_settings_conversion_headings_conservative">Fewer</string>
     <string name="feature_settings_conversion_headings_balanced">Balanced</string>
     <string name="feature_settings_conversion_headings_aggressive">More</string>
-    <string name="feature_settings_section_background">Downloads &amp; background</string>
-    <string name="feature_settings_background_help">Xiaomi\'s battery manager stops background downloads. Set Readana to “No restrictions” and turn Autostart on, or downloads will pause whenever you leave the app.</string>
-    <string name="feature_settings_background_battery">Battery settings</string>
-    <string name="feature_settings_background_autostart">Autostart</string>
-    <string name="feature_settings_background_note">A long download also survives better if you lock Readana in the Recents list. HyperOS updates can reset both settings.</string>
     <string name="feature_settings_section_ai">Reading assistant</string>
-    <string name="feature_settings_summary_ai_off">Off</string>
     <string name="feature_settings_ai_key">API key</string>
     <string name="feature_settings_ai_base_url">Server address</string>
     <string name="feature_settings_ai_model">Model</string>

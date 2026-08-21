@@ -55,6 +55,19 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Settings is one page again. The five collapsible cards are gone: every setting is visible by
+  scrolling, under a heading for each of sources, PDF conversion, the reading assistant and
+  storage. The rows are Material 3 expressive segmented list items — a group of settings rounds its
+  outer corners as one block — the either/or choices (heading detection, how much of the book to
+  send) are connected button groups instead of loose chips, the title is a large flexible app bar
+  that collapses as you scroll, and the whole column is capped at a readable width instead of
+  stretching across the tablet. The assistant's providers are a single-choice list whose chosen
+  provider shows its key, address and model directly beneath it, so nothing is behind a chevron;
+  a custom provider can still be deleted straight from its row.
+- The download queue on the library screen no longer grows without limit. It stops at about four
+  rows and scrolls, so a long queue can no longer push the book grid off the bottom of the screen.
+- Settings no longer has a "Downloads & background" group. Its shortcuts to Xiaomi's battery and
+  autostart screens are gone; the HyperOS advice lives in `docs/DEVICE.md`.
 - Vertical swipes no longer change the app brightness. The reader now leaves brightness entirely
   to Android and no longer places a gesture-capturing strip over the left edge of the page.
 - Fixed-layout EPUBs such as comics open one full-size page at a time by default, and the reader's
