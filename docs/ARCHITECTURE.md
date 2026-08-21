@@ -50,14 +50,14 @@ Green nodes are pure Kotlin/JVM modules: no Android dependency, millisecond unit
 |-------|----------------|----------|
 | `app` | `ReadanaApplication` (Hilt root), `MainActivity` (FragmentActivity for Readium), `ReadanaApp` (adaptive nav + `NavDisplay`), Konsist tests | yes |
 | `feature/*` | One screen family each: `XxxKey` (NavKey), `xxxEntry()` (entry provider), `XxxRoute` (wires ViewModel), `XxxScreen` (stateless UI), `XxxViewModel` | yes |
-| `core/data` | Room (`books`, `bookmarks`, `highlights`, `downloads`), DataStore (`SettingsKeys`), repositories, `BookSourceRegistry`, `ReadiumPublicationOpener`, the import pipeline (`BookStorage`, `BookImporter`, `BookImportManager`), the download pipeline (`BookDownloadManager`, `BookDownloader`, `DownloadWorker`), the conversion pipeline (`BookConverter`, `ConversionManager`), all Hilt modules | yes |
+| `core/data` | Room (`books`, `bookmarks`, `highlights`, `downloads`), DataStore (`SettingsKeys`), repositories, `BookSourceRegistry`, `ReadiumPublicationOpener`, the import pipeline (`BookStorage`, `BookImporter`, `BookImportManager`), the download pipeline (`BookDownloadManager`, `BookDownloader`, `DownloadWorker`), the shared browser identity (`WebViewCookieJar`, `BrowserIdentity`, `WebViewBrowserVerifier`), the conversion pipeline (`BookConverter`, `ConversionManager`), all Hilt modules | yes |
 | `core/designsystem` | `ReadanaTheme` (Material 3 Expressive), `ReadanaIcons`, `EmptyState`, `LoadingState`, `BookCover` (Coil) | yes |
 | `core/model` | `Book`, `BookFormat`, `ReadingProgress`, `Bookmark`, `Highlight`, `ReaderSettings`, `SourceSettings`, `ConversionSettings`, `ConversionInfo`, `DownloadJob`, `BrowserDownload` | no |
 | `core/common` | `AppResult`/`AppError`, `@Dispatcher`/`@ApplicationScope`, `suspendRunCatching`, `VolumeKeyRelay` | no |
 | `core/testing` | `MainDispatcherRule`, `FakeBookSource` | no |
-| `source/api` | `BookSource`, `SearchQuery/Page/Result`, `DownloadRequest`, `DownloadQuota`, `BrowserLogin`, `FileNames` | no |
+| `source/api` | `BookSource`, `SearchQuery/Page/Result`, `DownloadRequest`, `DownloadQuota`, `BrowserLogin`, `BrowserVerifier`, `FileNames` | no |
 | `source/gutenberg` | Gutendex JSON client — built, but not registered in `SourcesModule` | no |
-| `source/annas` | HTML search parser, member fast-download API, `MirrorResolver` | no |
+| `source/annas` | search-page parser, the browser-check gate (`DdosGuard`, `AnnasSession`), member fast-download API, the free download ladder (`LibgenDirectLinks`, `SlowDownloadParser`), `MirrorResolver` | no |
 | `source/trending` | Open Library trending feed for the Discover shelf; not a `BookSource` | no |
 | `engine/epub` | `EpubBook` model, `NavEntry`, `EpubWriter` (EPUB 3.3, epubcheck-validated) | no |
 | `engine/reflow` | `PageContent`/`PageText` models, `ReadingOrder` (column detection), `ReflowEngine` heuristics, `EpubAssembler` | no |

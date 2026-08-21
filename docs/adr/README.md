@@ -17,3 +17,4 @@ Short, dated records of the decisions that shape the project. Add a new file
 | [0010](0010-download-pipeline.md) | Download pipeline | accepted |
 | [0011](0011-single-row-conversion-model.md) | One library entry per converted book | accepted |
 | [0012](0012-conversion-golden-corpus.md) | Conversion corpus and golden snapshots | accepted |
+| [0013](0013-browser-equivalent-access.md) | Browser-equivalent access for shadow-library sources | accepted |

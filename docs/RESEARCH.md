@@ -58,29 +58,46 @@ still be read through Readium's pdfium navigator.
 
 ### Anna's Archive
 
-- **No public search API**; search is HTML (`/search?q=…&ext=epub&lang=en&page=n`). The markup's
-  Tailwind classes change regularly, so the parser anchors on `/md5/<32 hex>` links and regexes
-  over the surrounding text.
-- **Members** get a JSON fast-download API:
-  `GET /dyn/api/fast_download.json?md5=<md5>&key=<secret key>` →
-  `{"download_url": "...", "account_fast_download_info": {"downloads_left": n, …}}` or
-  `{"download_url": null, "error": "…"}`. Daily quotas depend on the membership tier.
-- **Non-members** use "slow" partner downloads behind wait-lists/verification pages that cannot be
-  scripted reliably → the app hands those to an in-app browser (`DownloadRequest.requiresBrowser`).
-- **A membership key does not unlock search.** `fast_download.json` is the *only* documented JSON
-  API, it takes an md5, and it returns a download URL. Every client (ours included) scrapes the
-  search page to find the md5, then calls the JSON API to fetch. Re-checked 2026-08-21.
-- **Scraping is throttled per IP.** Measured 2026-08-21: a handful of `/search` requests from one
-  address earn a `403` on every mirror at once, and it persists for minutes. It is not a
-  user-agent problem — a desktop Chrome UA succeeded once and then 403'd like the rest. So 403/429
-  must fail over to the next mirror rather than end the search, and the user needs to be told to
-  wait rather than shown "HTTP 403".
-- **Domains rotate and disappear.** On 2026-08-21 from a Dutch connection: `annas-archive.org` and
-  `.se` no longer resolve at all (`No such host`); `.gl` and `.pk` serve the site but throttle;
-  `.li` answers every search with a `<meta refresh>` interstitial carrying a tracking id — it
-  mentions the site, so the "is this the real site" check passes and it reads as an empty result
-  page unless the interstitial is detected explicitly. Hence a user-editable mirror list, failover
-  on blocked/5xx replies, and both guards before parsing.
+Verified 2026-08-21 against the site's own source (<https://software.annas-archive.gl>,
+`allthethings/utils.py` and `allthethings/page/views.py`) and by measurement from a Dutch
+connection. See ADR 0013 for what the app does about it.
+
+- **Everything worth reaching is behind a browser check.** `/search`, `/md5/<md5>` and
+  `/slow_download/...` all call `check_for_recent_ddg_cookie_or_membership()`. A request that is
+  neither a signed-in member nor recently checked is redirected to the same URL plus `check=1`,
+  which the front-end serves as a JavaScript challenge (`403`, `<title>DDoS-Guard`, scripts under
+  `/.well-known/ddos-guard/js-challenge/`). Passing it mints `aa_ddg_check` and `__ddg5_`, treated
+  as recent for **15 minutes** on search and **7** on slow downloads. A cookie-less client cannot
+  get through at all — this, not per-IP throttling, was behind the 400s and 403s.
+- **A membership does unlock search.** `POST /account/` with form field `key=<secret key>` sets
+  `aa_account_id2` (a 90-day JWT); `check_skip_browser_checks_and_get_account_id()` then waves that
+  session past the check, up to 180 searches an hour. Cookies are per host, so it is one login per
+  mirror.
+- **There is still no search API** ("We don't yet have a search API" — FAQ), so the result page is
+  scraped. Ask for `display=table`: the site's `aarecord_list.html` macro then emits one row per
+  record with fixed columns, which survives its frequent restyling of the card layout. Part of the
+  list ships inside HTML comment nodes that the page un-comments in JavaScript, so a parser has to
+  read those too. `MAX_DISPLAY_RESULTS = 50` per page; `ext`, `lang`, `content`, `src` and `acc` are
+  all repeatable filters.
+- **Members' downloads**: `GET /dyn/api/fast_download.json?md5=<md5>&key=<key>` — no browser check.
+  Documented failures: `400 Invalid md5`, `401 Invalid secret key`, `403 Not a member`,
+  `404 Record not found`, `429 No downloads left`, alongside
+  `account_fast_download_info.downloads_left`.
+- **Free downloads**: `/slow_download/<md5>/<path_index>/<domain_index>`. Domain indexes 0–3 are
+  quicker but may return a wait-list countdown; 4–7 never wait and run about three times slower.
+  The page either carries the signed partner URL (`https://<partner>/d3/…`, good for two hours,
+  plain GET, no cookies) or `let waitSeconds = N` and reloads itself. Past 20 downloads a day per
+  IP the waits double.
+- **Library Genesis is the better free route.** It holds most of what Anna's Archive indexes and
+  serves it by md5 with no check and no wait: `GET https://libgen.li/ads.php?md5=<md5>` yields
+  `<a href="get.php?md5=…&key=…">`, which 307s to a CDN that honours `Range`. Verified working
+  2026-08-21. Sibling hosts `libgen.la`, `libgen.vg`, `libgen.bz` share the same catalogue.
+- **Domains rotate.** The FAQ authorises `.gl`, `.pk` and `.gd`. On 2026-08-21 `.org` and `.se` no
+  longer resolved and `.li` served only a `<meta refresh>` interstitial that mentions the site — it
+  reads as an empty result page unless detected. Hence a user-editable list, a remembered choice,
+  and a cooldown rather than removal.
+- **Do not use third-party "Anna's Archive APIs".** They are other people's scrapers: they see the
+  user's searches and vanish without notice.
 - **Legal**: downloading copyrighted works without permission is unlawful in most countries; the
   app shows a notice in Settings and ships the source unconfigured.
 
