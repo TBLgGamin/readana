@@ -10,7 +10,9 @@ package dev.readana.source.annas
 data class AnnasConfig(
     val mirrors: List<String> = DEFAULT_MIRRORS,
     /** Member "secret key" that unlocks the JSON fast-download API. Null → browser download flow. */
-    val secretKey: String? = null
+    val secretKey: String? = null,
+    /** The mirror that last worked, remembered across restarts so searches do not re-probe. */
+    val preferredMirror: String? = null
 ) {
     /**
      * Mirrors ready to use. Typing `annas-archive.gl` is the obvious thing to do, so a missing
@@ -44,17 +46,14 @@ data class AnnasConfig(
         private val HOST = Regex("^https?://[^/\\s]+\\.[^/\\s]+")
 
         /**
-         * Checked 2026-08-21 from a Dutch connection: `.gl` and `.pk` serve the site (and rate-limit
-         * hard), `.li` answers with a redirect interstitial, and `.org`/`.se` no longer resolve at
-         * all. Working mirrors go first so a search does not begin with two DNS failures; the dead
-         * ones stay as a fallback for connections where they do resolve.
+         * The three domains the site's own FAQ listed as authorised on 2026-08-21. `.org` and `.se`
+         * were dropped because they no longer resolve, and `.li` because it only serves a redirect
+         * interstitial; the list is editable in Settings for when they rotate again.
          */
         val DEFAULT_MIRRORS: List<String> = listOf(
             "https://annas-archive.gl",
             "https://annas-archive.pk",
-            "https://annas-archive.li",
-            "https://annas-archive.org",
-            "https://annas-archive.se"
+            "https://annas-archive.gd"
         )
     }
 }

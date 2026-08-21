@@ -25,6 +25,7 @@ internal object SettingsKeys {
     val SOURCE_OVERRIDES = stringPreferencesKey("source_overrides")
     val ANNAS_MIRRORS = stringPreferencesKey("source_annas_mirrors")
     val ANNAS_SECRET_KEY = stringPreferencesKey("source_annas_secret_key")
+    val ANNAS_PREFERRED_MIRROR = stringPreferencesKey("source_annas_preferred_mirror")
     val ANNAS_DOWNLOADS_LEFT = intPreferencesKey("source_annas_downloads_left")
     val ANNAS_DOWNLOADS_PER_DAY = intPreferencesKey("source_annas_downloads_per_day")
 
@@ -88,6 +89,7 @@ internal fun Preferences.toSourceSettings(): SourceSettings = SourceSettings(
         ?.filter { it.isNotEmpty() }
         .orEmpty(),
     annasSecretKey = this[SettingsKeys.ANNAS_SECRET_KEY]?.takeIf { it.isNotBlank() },
+    annasPreferredMirror = this[SettingsKeys.ANNAS_PREFERRED_MIRROR]?.takeIf { it.isNotBlank() },
     annasDownloadsLeft = this[SettingsKeys.ANNAS_DOWNLOADS_LEFT],
     annasDownloadsPerDay = this[SettingsKeys.ANNAS_DOWNLOADS_PER_DAY]
 )
@@ -105,6 +107,12 @@ internal fun MutablePreferences.write(settings: SourceSettings) {
     } else {
         this[SettingsKeys.ANNAS_SECRET_KEY] =
             key
+    }
+    val mirror = settings.annasPreferredMirror?.trim()
+    if (mirror.isNullOrEmpty()) {
+        remove(SettingsKeys.ANNAS_PREFERRED_MIRROR)
+    } else {
+        this[SettingsKeys.ANNAS_PREFERRED_MIRROR] = mirror
     }
     writeOrRemove(SettingsKeys.ANNAS_DOWNLOADS_LEFT, settings.annasDownloadsLeft)
     writeOrRemove(SettingsKeys.ANNAS_DOWNLOADS_PER_DAY, settings.annasDownloadsPerDay)

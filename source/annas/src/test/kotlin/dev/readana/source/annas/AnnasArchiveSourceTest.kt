@@ -214,6 +214,64 @@ class AnnasArchiveSourceTest {
         assertIs<AppError.Unauthorized>(source.resolveDownload(result()).errorOrNull())
     }
 
+    @Test
+    fun `each fast-download refusal is reported as what it is, on one mirror only`() = runTest {
+        // The statuses the API's own documentation lists, and what the user can do about each.
+        val expected = mapOf<HttpStatusCode, (AppError) -> Unit>(
+            HttpStatusCode.BadRequest to { assertIs<AppError.Parse>(it) },
+            HttpStatusCode.Unauthorized to { assertIs<AppError.Unauthorized>(it) },
+            HttpStatusCode.Forbidden to { assertIs<AppError.Unauthorized>(it) },
+            HttpStatusCode.NotFound to { assertIs<AppError.NotFound>(it) }
+        )
+
+        expected.forEach { (status, assertion) ->
+            val hosts = mutableListOf<String>()
+            val source = source(config = AnnasConfig(mirrors, secretKey = "s3cr3t")) { request ->
+                hosts += request.url.host
+                respond("""{"download_url":null,"error":"${status.description}"}""", status)
+            }
+
+            val error = checkNotNull(source.resolveDownload(result()).errorOrNull()) {
+                "$status should not have produced a download"
+            }
+            assertion(error)
+            // None of these change with the mirror, so asking the others is pure noise.
+            assertEquals(listOf("one.test"), hosts, "$status should not have been retried elsewhere")
+        }
+    }
+
+    @Test
+    fun `a spent daily allowance is reported by status too`() = runTest {
+        val source = source(config = AnnasConfig(mirrors, secretKey = "s3cr3t")) {
+            respond(
+                """{"download_url":null,"error":"No downloads left"}""",
+                HttpStatusCode.TooManyRequests
+            )
+        }
+
+        val request = assertNotNull(source.resolveDownload(result()).getOrNull())
+
+        assertTrue(request.requiresBrowser)
+    }
+
+    @Test
+    fun `the mirror that answered is remembered and tried first next time`() = runTest {
+        val remembered = mutableListOf<String>()
+        val hosts = mutableListOf<String>()
+        val source = source(
+            config = AnnasConfig(mirrors, preferredMirror = "https://three.test"),
+            onWorkingMirror = { remembered += it }
+        ) { request ->
+            hosts += request.url.host
+            respond(searchHtml, HttpStatusCode.OK, htmlHeaders)
+        }
+
+        source.search(SearchQuery("pride"))
+
+        assertEquals(listOf("three.test"), hosts, "the remembered mirror was not tried first")
+        assertTrue(remembered.isEmpty(), "nothing changed, so nothing needed writing")
+    }
+
     private fun result() = SearchResult(
         sourceId = AnnasArchiveSource.ID,
         recordId = "0123456789abcdef0123456789abcdef",
@@ -225,8 +283,14 @@ class AnnasArchiveSourceTest {
     private fun source(
         resolver: MirrorResolver = MirrorResolver(),
         config: AnnasConfig = AnnasConfig(mirrors),
+        onWorkingMirror: suspend (String) -> Unit = {},
         handler: MockRequestHandler
-    ) = AnnasArchiveSource(HttpClient(MockEngine(handler)), config = { config }, mirrors = resolver)
+    ) = AnnasArchiveSource(
+        client = HttpClient(MockEngine(handler)),
+        config = { config },
+        mirrors = resolver,
+        onWorkingMirror = onWorkingMirror
+    )
 
     private val htmlHeaders = headersOf(HttpHeaders.ContentType, "text/html")
 }

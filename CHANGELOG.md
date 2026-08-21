@@ -8,6 +8,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Anna's Archive mirrors are the three the site currently authorises (`.gl`, `.pk`, `.gd`); `.org`,
+  `.se` and `.li` are gone because they no longer resolve or only serve a redirect page. The mirror
+  that answers is remembered across restarts, and one that just failed is tried last for five
+  minutes instead of costing a connect timeout on every search — it is demoted, never dropped, so a
+  connection that can reach it still does.
+- When every Anna's Archive mirror fails, the message is the one that explains most. A mirror that
+  answered "rate-limited" used to be hidden behind a later mirror's "no such host".
+- A refused fast download now says which refusal it was — key rejected, membership expired, record
+  gone, or today's allowance spent — instead of "HTTP 403", and stops asking the other mirrors the
+  same question, since none of those answers change with the domain.
+
 - Network requests now speak with the same identity as the in-app browser: they share the system
   WebView's cookie store and its user agent. Shadow-library front-ends only honour the cookie that
   clears their bot check for the exact client that earned it, so search and download requests could

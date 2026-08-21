@@ -38,7 +38,9 @@ import kotlinx.serialization.json.Json
 class AnnasArchiveSource(
     private val client: HttpClient,
     private val config: suspend () -> AnnasConfig,
-    private val mirrors: MirrorResolver = MirrorResolver()
+    private val mirrors: MirrorResolver = MirrorResolver(),
+    /** Called with the mirror that answered, so the choice survives a restart. */
+    private val onWorkingMirror: suspend (String) -> Unit = {}
 ) : BookSource {
     override val id: SourceId = ID
     override val displayName: String = "Anna's Archive"
@@ -50,7 +52,11 @@ class AnnasArchiveSource(
 
     override suspend fun search(query: SearchQuery): AppResult<SearchPage> {
         val settings = config()
-        return mirrors.withMirror(settings.normalizedMirrors) { base ->
+        return mirrors.withMirror(
+            mirrors = settings.normalizedMirrors,
+            preferred = settings.preferredMirror,
+            onWorkingMirror = onWorkingMirror
+        ) { base ->
             val response = client.get("$base/search") {
                 parameter("q", query.text)
                 // The table layout puts every field in a fixed column, which survives the site's
@@ -97,7 +103,11 @@ class AnnasArchiveSource(
         val fileName = FileNames.suggest(result.title, result.authors, format)
         val key = settings.secretKey?.trim()?.takeIf { it.isNotEmpty() }
 
-        return mirrors.withMirror(settings.normalizedMirrors) { base ->
+        return mirrors.withMirror(
+            mirrors = settings.normalizedMirrors,
+            preferred = settings.preferredMirror,
+            onWorkingMirror = onWorkingMirror
+        ) { base ->
             if (key == null) {
                 return@withMirror browserFallback(base, md5, format, fileName, key = null).asSuccess()
             }
@@ -148,47 +158,69 @@ class AnnasArchiveSource(
         fileName: String,
         expectedSize: Long?
     ): AppResult<DownloadRequest> {
-        val url = payload.downloadUrl
         val quota = payload.accountInfo?.let {
             DownloadQuota(remaining = it.downloadsLeft, perDay = it.downloadsPerDay)
         }
-        return when {
-            url != null -> DownloadRequest(
+        payload.downloadUrl?.let { url ->
+            return DownloadRequest(
                 url,
                 format,
                 fileName,
                 expectedSizeBytes = expectedSize,
                 quota = quota
             ).asSuccess()
-
-            status == HttpStatusCode.Unauthorized || status == HttpStatusCode.Forbidden ||
-                payload.error?.contains("key", ignoreCase = true) == true ->
-                AppError.Unauthorized(
-                    payload.error ?: "Anna's Archive rejected the secret key"
-                ).asFailure()
-
-            // The membership is fine, today's fast downloads are simply spent: offer the browser.
-            quota?.isExhausted == true || payload.error?.looksLikeQuota() == true ->
-                browserFallback(
-                    base,
-                    md5,
-                    format,
-                    fileName,
-                    key,
-                    quota ?: DownloadQuota(remaining = 0, perDay = null)
-                ).asSuccess()
-
-            !status.isSuccess() -> AppError.Http(
-                status.value,
-                payload.error ?: "HTTP ${status.value}"
-            ).asFailure()
-
-            else -> AppError.Unexpected(payload.error ?: "Fast download unavailable").asFailure()
         }
+        refusal(status, payload)?.let { return it.asFailure() }
+
+        // The membership is fine, today's fast downloads are simply spent: offer the browser.
+        if (payload.isQuotaSpent(status, quota)) {
+            return browserFallback(
+                base,
+                md5,
+                format,
+                fileName,
+                key,
+                quota ?: DownloadQuota(remaining = 0, perDay = null)
+            ).asSuccess()
+        }
+        return when {
+            !status.isSuccess() -> AppError.Http(status.value, payload.error ?: "HTTP ${status.value}")
+            else -> AppError.Unexpected(payload.error ?: "Fast download unavailable")
+        }.asFailure()
     }
 
+    /**
+     * The refusals the fast-download API documents, mapped to what the user can do about each.
+     * None of them change with the mirror or with a retry.
+     */
+    private fun refusal(status: HttpStatusCode, payload: FastDownloadResponse): AppError? = when {
+        // "Invalid md5": we sent something that is not a record id, so this one is our bug.
+        status == HttpStatusCode.BadRequest -> AppError.Parse(
+            "Anna's Archive did not recognise this record (${payload.error ?: "invalid md5"})"
+        )
+
+        status == HttpStatusCode.Unauthorized ||
+            payload.error?.contains("key", ignoreCase = true) == true ->
+            AppError.Unauthorized("Anna's Archive rejected the membership key. Check it in Settings.")
+
+        status == HttpStatusCode.Forbidden -> AppError.Unauthorized(
+            "This key has no active membership. Renew it, or clear the key in Settings to " +
+                "download at the free speed."
+        )
+
+        status == HttpStatusCode.NotFound -> AppError.NotFound("Anna's Archive no longer has this record")
+
+        else -> null
+    }
+
+    private fun FastDownloadResponse.isQuotaSpent(status: HttpStatusCode, quota: DownloadQuota?): Boolean =
+        status == HttpStatusCode.TooManyRequests ||
+            quota?.isExhausted == true ||
+            error?.looksLikeQuota() == true
+
     private fun String.looksLikeQuota(): Boolean =
-        contains("limit", ignoreCase = true) || contains("quota", ignoreCase = true)
+        contains("limit", ignoreCase = true) || contains("quota", ignoreCase = true) ||
+            contains("no downloads left", ignoreCase = true)
 
     /**
      * Anna's Archive throttles scraping by IP and answers with a bare 403 or 429. Saying so beats

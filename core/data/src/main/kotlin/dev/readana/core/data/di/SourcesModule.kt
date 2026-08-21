@@ -39,8 +39,14 @@ object SourcesModule {
             val stored = settings.sourceSettings.first()
             AnnasConfig(
                 mirrors = stored.annasMirrors.ifEmpty { AnnasConfig.DEFAULT_MIRRORS },
-                secretKey = stored.annasSecretKey
+                secretKey = stored.annasSecretKey,
+                preferredMirror = stored.annasPreferredMirror
             )
+        },
+        // Mirrors rotate and get blocked; remembering the one that answered saves the next search
+        // from walking the list again after a restart.
+        onWorkingMirror = { mirror ->
+            settings.updateSourceSettings { it.copy(annasPreferredMirror = mirror) }
         }
     )
 }

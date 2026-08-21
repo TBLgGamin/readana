@@ -11,6 +11,8 @@ data class SourceSettings(
     val annasMirrors: List<String> = emptyList(),
     /** Anna's Archive member key. Stored in app-private storage; never logged. */
     val annasSecretKey: String? = null,
+    /** The Anna's Archive mirror that last answered, so a search does not re-probe dead ones. */
+    val annasPreferredMirror: String? = null,
     /** Fast downloads the membership had left when it last answered; null until a download runs. */
     val annasDownloadsLeft: Int? = null,
     val annasDownloadsPerDay: Int? = null
