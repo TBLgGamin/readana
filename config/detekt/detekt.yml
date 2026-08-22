@@ -22,6 +22,9 @@ complexity:
     allowedLines: 80
     ignoreAnnotated: ['Composable']
   TooManyFunctions:
+    # A ViewModel gets one function per thing the screen can do, so its count tracks the size of
+    # the screen rather than any tangle worth splitting up.
+    ignoreAnnotated: ['HiltViewModel']
     allowedFunctionsPerClass: 15
     allowedFunctionsPerInterface: 15
     allowedFunctionsPerFile: 10

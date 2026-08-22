@@ -11,6 +11,7 @@ import dagger.assisted.AssistedInject
 import dev.readana.core.data.repository.DownloadsRepository
 import dev.readana.core.model.DownloadErrorKind
 import dev.readana.core.model.DownloadStatus
+import kotlin.coroutines.cancellation.CancellationException
 import timber.log.Timber
 
 /**
@@ -32,6 +33,10 @@ class DownloadWorker @AssistedInject constructor(
         // indistinguishable from a download that has not started yet, and waits forever.
         return try {
             download(id)
+        } catch (e: CancellationException) {
+            // Being stopped is not a failure: pausing and cancelling both come through here, and
+            // both have already written the status they want the row to keep.
+            throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
             Timber.e(e, "Download %s fell over", id)
             downloadsRepository.setStatus(

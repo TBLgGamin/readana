@@ -77,7 +77,10 @@ class BookDownloader @Inject constructor(
         val entity = downloadsRepository.getEntity(jobId) ?: return@withContext Outcome.Failure
         if (DownloadStatus.valueOf(entity.status) == DownloadStatus.Cancelled) return@withContext Outcome.Failure
 
-        downloadsRepository.setStatus(jobId, DownloadStatus.Downloading)
+        // Resolving is its own state: working out where a file lives can mean a browser check or
+        // a wait-list, and a queue that called all of that "downloading" was claiming bytes were
+        // moving when none were.
+        downloadsRepository.setStatus(jobId, DownloadStatus.Resolving)
         val part = partFile(jobId)
 
         // A browser-captured job carries its own cookies and cannot be resolved again; anything
@@ -207,6 +210,8 @@ class BookDownloader @Inject constructor(
     ): Transfer {
         val headers = entity.storedHeaders() + extraHeaders
         val alreadyHave = part.takeIf { it.isFile }?.length() ?: 0L
+        // A URL in hand means the resolving stage is over, whether it was stored or just fetched.
+        downloadsRepository.setStatus(entity.id, DownloadStatus.Downloading)
         return suspendRunCatching {
             client.prepareGet(url) {
                 // Books take as long as they take; the socket timeout is what catches dead streams
@@ -334,7 +339,9 @@ class BookDownloader @Inject constructor(
                     is ImportResult.Duplicate -> outcome.existing
                 }
                 convertIfPdf(entity.id, book)
-                downloadsRepository.markCompleted(entity.id, book.id)
+                // The row is dropped rather than marked done: the book is in the library now, and
+                // a queue that keeps finished work is a list the reader has to tidy for no reason.
+                downloadsRepository.remove(entity.id)
                 Outcome.Success
             }
         }
@@ -348,6 +355,9 @@ class BookDownloader @Inject constructor(
     private suspend fun convertIfPdf(jobId: String, book: Book) {
         if (book.format != BookFormat.PDF) return
         if (!settingsRepository.conversionSettings.first().autoConvertPdf) return
+        // Attached first: the queue matches the running conversion to this row by book id, and
+        // showing it under the download it belongs to only works if the link is there in time.
+        downloadsRepository.attachBook(jobId, book.id)
         downloadsRepository.setStatus(jobId, DownloadStatus.Converting)
         conversionManager.convertAndWait(book.id)
     }

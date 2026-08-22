@@ -7,30 +7,32 @@ import dev.readana.core.common.result.asFailure
 import dev.readana.core.common.result.asSuccess
 import dev.readana.core.data.conversion.ConversionEvent
 import dev.readana.core.data.conversion.ConversionManager
-import dev.readana.core.data.downloads.BookDownloadManager
-import dev.readana.core.data.downloads.CapturedDownload
-import dev.readana.core.data.downloads.EnqueueOutcome
-import dev.readana.core.data.downloads.RetryOutcome
 import dev.readana.core.data.importing.BookImportManager
 import dev.readana.core.data.importing.BookImporter
 import dev.readana.core.data.importing.ImportEvent
 import dev.readana.core.data.importing.ImportResult
+import dev.readana.core.data.messages.DefaultMessageBus
+import dev.readana.core.data.messages.MessageBus
+import dev.readana.core.data.messages.UiMessage
+import dev.readana.core.data.notes.NotesExporter
+import dev.readana.core.data.repository.CollectionsRepository
+import dev.readana.core.data.repository.HighlightsRepository
 import dev.readana.core.data.repository.LibraryRepository
+import dev.readana.core.data.repository.ReadingSessionsRepository
 import dev.readana.core.model.Book
+import dev.readana.core.model.BookCollection
 import dev.readana.core.model.BookFormat
 import dev.readana.core.model.BookOrigin
-import dev.readana.core.model.BrowserDownload
-import dev.readana.core.model.DownloadJob
-import dev.readana.core.model.DownloadStatus
+import dev.readana.core.model.Highlight
 import dev.readana.core.model.ReadingProgress
 import dev.readana.core.testing.MainDispatcherRule
 import dev.readana.engine.pdf2epub.ConversionPhase
 import dev.readana.engine.pdf2epub.ConversionProgress
-import dev.readana.source.api.SearchResult
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.Flow
@@ -38,8 +40,12 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -51,10 +57,121 @@ class LibraryViewModelTest {
     private val repository = FakeLibraryRepository()
     private val importManager = FakeBookImportManager()
     private val importer = FakeBookImporter()
-    private val downloadManager = FakeBookDownloadManager()
     private val conversionManager = FakeConversionManager()
 
-    private fun viewModel() = LibraryViewModel(repository, importManager, importer, downloadManager, conversionManager)
+    private val highlights = FakeHighlightsRepository()
+
+    private val collections = FakeCollectionsRepository()
+    private val messageBus = DefaultMessageBus()
+
+    private fun viewModel() = LibraryViewModel(
+        libraryRepository = repository,
+        importManager = importManager,
+        importer = importer,
+        conversionManager = conversionManager,
+        highlightsRepository = highlights,
+        collectionsRepository = collections,
+        readingSessionsRepository = FakeReadingSessionsRepository(),
+        notesExporter = FakeNotesExporter,
+        messages = messageBus
+    )
+
+    @Test
+    fun `the open details sheet follows the book it is showing`() = runTest {
+        repository.upsert(book("1"))
+        val viewModel = viewModel()
+        runCurrent()
+        viewModel.setDetails(viewModel.uiState.value.books.single())
+        assertNull(viewModel.uiState.value.detailsBook?.finishedAt)
+
+        viewModel.setFinished("1", finished = true)
+        runCurrent()
+
+        // Without this the sheet kept the book as it was when opened, so marking it finished
+        // wrote to the database and changed nothing the reader could see.
+        assertNotNull(viewModel.uiState.value.detailsBook?.finishedAt)
+    }
+
+    @Test
+    fun `a shelf made from the library offers the grid to fill it`() = runTest {
+        val viewModel = viewModel()
+        runCurrent()
+
+        viewModel.createCollection("Winter")
+        runCurrent()
+
+        val selection = assertNotNull(viewModel.uiState.value.shelfSelection)
+        assertEquals("Winter", selection.label)
+        assertTrue(selection.bookIds.isEmpty())
+    }
+
+    @Test
+    fun `a shelf made from a book's sheet puts that book on it and asks nothing more`() = runTest {
+        repository.upsert(book("1"))
+        val viewModel = viewModel()
+        runCurrent()
+        viewModel.setDetails(viewModel.uiState.value.books.single())
+
+        viewModel.createCollection("Winter")
+        runCurrent()
+
+        assertNull(viewModel.uiState.value.shelfSelection)
+        assertEquals(setOf("1"), collections.memberships.value.values.single())
+    }
+
+    @Test
+    fun `picking books for a shelf starts from what is already on it`() = runTest {
+        repository.upsert(book("1"))
+        repository.upsert(book("2"))
+        val viewModel = viewModel()
+        val shelf = collections.create("Winter")
+        collections.setMembership(shelf.id, "1", member = true)
+        runCurrent()
+
+        viewModel.startShelfSelection(Shelf.Collection(shelf.id, shelf.name))
+
+        assertEquals(setOf("1"), viewModel.uiState.value.shelfSelection?.bookIds)
+    }
+
+    @Test
+    fun `confirming a selection writes both the additions and the removals`() = runTest {
+        repository.upsert(book("1"))
+        repository.upsert(book("2"))
+        val viewModel = viewModel()
+        val shelf = collections.create("Winter")
+        collections.setMembership(shelf.id, "1", member = true)
+        runCurrent()
+
+        val sent = record(messageBus)
+        viewModel.startShelfSelection(Shelf.Collection(shelf.id, shelf.name))
+        viewModel.toggleShelfSelection("1")
+        viewModel.toggleShelfSelection("2")
+        viewModel.confirmShelfSelection()
+        runCurrent()
+
+        assertEquals(setOf("2"), collections.memberships.value.getValue(shelf.id))
+        assertNull(viewModel.uiState.value.shelfSelection)
+        assertEquals(
+            UiMessage.Quantity(R.plurals.feature_library_shelf_updated, 1, listOf("Winter", 1)),
+            sent.single()
+        )
+    }
+
+    @Test
+    fun `backing out of a selection writes nothing`() = runTest {
+        repository.upsert(book("1"))
+        val viewModel = viewModel()
+        val shelf = collections.create("Winter")
+        runCurrent()
+
+        viewModel.startShelfSelection(Shelf.Collection(shelf.id, shelf.name))
+        viewModel.toggleShelfSelection("1")
+        viewModel.cancelShelfSelection()
+        runCurrent()
+
+        assertNull(viewModel.uiState.value.shelfSelection)
+        assertTrue(collections.memberships.value[shelf.id].isNullOrEmpty())
+    }
 
     @Test
     fun `shows a loading state until the first books arrive`() {
@@ -135,20 +252,19 @@ class LibraryViewModelTest {
     }
 
     @Test
-    fun `surfaces import outcomes as messages until consumed`() = runTest {
+    fun `import outcomes go to the bus rather than to this screen`() = runTest {
         val viewModel = viewModel()
-        viewModel.uiState.test {
-            awaitItem()
+        val sent = record(messageBus)
 
-            importManager.emit(ImportEvent.Succeeded(book("1", title = "Moby Dick")))
-            assertEquals("Moby Dick", assertIs<LibraryMessage.Imported>(awaitItem().message).title)
+        importManager.emit(ImportEvent.Succeeded(book("1", title = "Moby Dick")))
+        runCurrent()
+        importManager.emit(ImportEvent.Failed(AppError.Parse("broken")))
+        runCurrent()
 
-            viewModel.consumeMessage()
-            assertNull(awaitItem().message)
-
-            importManager.emit(ImportEvent.Failed(AppError.Parse("broken")))
-            assertIs<LibraryMessage.ImportFailed>(awaitItem().message)
-        }
+        assertEquals(
+            listOf(R.string.feature_library_import_success, R.string.feature_library_import_failed),
+            sent.map { assertIs<UiMessage.Text>(it).id }
+        )
     }
 
     @Test
@@ -171,13 +287,18 @@ class LibraryViewModelTest {
         assertEquals(target, viewModel.uiState.value.pendingDelete)
         assertTrue(importer.deleted.isEmpty())
 
+        val sent = record(messageBus)
         viewModel.confirmDelete()
+        runCurrent()
 
         val state = viewModel.uiState.value
         assertEquals(listOf("1"), importer.deleted)
         assertNull(state.pendingDelete)
         assertNull(state.detailsBook)
-        assertEquals("Moby Dick", assertIs<LibraryMessage.Deleted>(state.message).title)
+        assertEquals(
+            UiMessage.Text(R.string.feature_library_deleted, listOf("Moby Dick")),
+            sent.single()
+        )
     }
 
     @Test
@@ -187,10 +308,12 @@ class LibraryViewModelTest {
         importer.failure = AppError.Unexpected("disk on fire")
         val viewModel = viewModel()
 
+        val sent = record(messageBus)
         viewModel.setPendingDelete(target)
         viewModel.confirmDelete()
+        runCurrent()
 
-        assertIs<LibraryMessage.DeleteFailed>(viewModel.uiState.value.message)
+        assertEquals(R.string.feature_library_delete_failed, assertIs<UiMessage.Text>(sent.single()).id)
     }
 
     @Test
@@ -206,67 +329,7 @@ class LibraryViewModelTest {
     }
 
     @Test
-    fun `shows the download queue`() = runTest {
-        val viewModel = viewModel()
-
-        downloadManager.setJobs(listOf(downloadJob("job-1", DownloadStatus.Downloading)))
-        runCurrent()
-
-        assertEquals(listOf("job-1"), viewModel.uiState.value.downloads.map { it.id })
-    }
-
-    @Test
-    fun `cancelling and dismissing reach the manager`() = runTest {
-        val viewModel = viewModel()
-
-        viewModel.cancelDownload("job-1")
-        viewModel.dismissDownload("job-2")
-        runCurrent()
-
-        assertEquals(listOf("job-1"), downloadManager.cancelled)
-        assertEquals(listOf("job-2"), downloadManager.dismissed)
-    }
-
-    @Test
-    fun `a retry that needs the browser becomes a navigation effect`() = runTest {
-        downloadManager.retryOutcome = RetryOutcome.NeedsBrowser(
-            BrowserDownload(
-                sourceId = "annas-archive",
-                recordId = "md5abc",
-                title = "Pride and Prejudice",
-                authors = listOf("Jane Austen"),
-                format = BookFormat.EPUB,
-                url = "https://one.test/md5/md5abc",
-                loginUrl = "https://one.test/account/",
-                loginFormBody = "key=s3cr3t"
-            )
-        )
-        val viewModel = viewModel()
-
-        viewModel.retryDownload("job-1")
-        runCurrent()
-
-        val effect = assertIs<LibraryEffect.OpenBrowser>(viewModel.uiState.value.effect)
-        assertEquals("https://one.test/md5/md5abc", effect.download.url)
-        assertEquals(listOf("job-1"), downloadManager.retried)
-
-        viewModel.consumeEffect()
-        assertNull(viewModel.uiState.value.effect)
-    }
-
-    @Test
-    fun `a plain retry leaves the screen alone`() = runTest {
-        val viewModel = viewModel()
-
-        viewModel.retryDownload("job-1")
-        runCurrent()
-
-        assertNull(viewModel.uiState.value.effect)
-        assertNull(viewModel.uiState.value.message)
-    }
-
-    @Test
-    fun `shows conversion progress with the book's title`() = runTest {
+    fun `a converting book is marked as busy`() = runTest {
         repository.upsert(book("1", title = "Moby Dick"))
         val viewModel = viewModel()
 
@@ -275,10 +338,9 @@ class LibraryViewModelTest {
         )
         runCurrent()
 
-        val conversion = viewModel.uiState.value.conversions.single()
-        assertEquals("Moby Dick", conversion.title)
-        assertEquals(4, conversion.currentPage)
-        assertEquals(20, conversion.totalPages)
+        // How far along is the download queue's business now; the library only needs to know
+        // that the book is busy, so its details sheet can say so.
+        assertEquals(setOf("1"), viewModel.uiState.value.converting)
     }
 
     @Test
@@ -295,31 +357,20 @@ class LibraryViewModelTest {
     }
 
     @Test
-    fun `conversion outcomes become messages`() = runTest {
+    fun `conversion outcomes go to the bus`() = runTest {
         val viewModel = viewModel()
+        val sent = record(messageBus)
 
-        viewModel.uiState.test {
-            awaitItem()
+        conversionManager.emit(ConversionEvent.Succeeded(book("1", title = "Moby Dick"), null))
+        runCurrent()
+        conversionManager.emit(ConversionEvent.Failed("1", AppError.Parse("broken")))
+        runCurrent()
 
-            conversionManager.emit(ConversionEvent.Succeeded(book("1", title = "Moby Dick"), report = null))
-            assertEquals("Moby Dick", assertIs<LibraryMessage.Converted>(awaitItem().message).title)
-
-            viewModel.consumeMessage()
-            assertNull(awaitItem().message)
-
-            conversionManager.emit(ConversionEvent.Failed("1", AppError.Parse("broken")))
-            assertIs<LibraryMessage.ConversionFailed>(awaitItem().message)
-        }
+        assertEquals(
+            listOf(R.string.feature_library_converted, R.string.feature_library_conversion_failed),
+            sent.map { assertIs<UiMessage.Text>(it).id }
+        )
     }
-
-    private fun downloadJob(id: String, status: DownloadStatus) = DownloadJob(
-        id = id,
-        sourceId = "annas-archive",
-        recordId = "md5abc",
-        title = "Pride and Prejudice",
-        format = BookFormat.EPUB,
-        status = status
-    )
 
     private fun book(
         id: String,
@@ -360,6 +411,11 @@ private class FakeLibraryRepository : LibraryRepository {
     }
 
     override suspend fun upsert(book: Book) = state.update { it + (book.id to book) }
+
+    override suspend fun setFinished(id: String, finished: Boolean) = state.update { books ->
+        val book = books[id] ?: return@update books
+        books + (id to book.copy(finishedAt = if (finished) Instant.EPOCH else null))
+    }
 
     override suspend fun remove(id: String) = state.update { it - id }
 
@@ -426,35 +482,85 @@ private class FakeConversionManager : ConversionManager {
     override suspend fun convertAndWait(bookId: String): AppResult<Book> = AppError.Unexpected("not used").asFailure()
 }
 
-private class FakeBookDownloadManager : BookDownloadManager {
-    val retried = mutableListOf<String>()
-    val cancelled = mutableListOf<String>()
-    val dismissed = mutableListOf<String>()
-    var retryOutcome: RetryOutcome = RetryOutcome.Requeued
-    private val _jobs = MutableStateFlow<List<DownloadJob>>(emptyList())
+private class FakeHighlightsRepository : HighlightsRepository {
+    private val state = MutableStateFlow<List<Highlight>>(emptyList())
+    private var nextId = 1L
 
-    override val jobs: Flow<List<DownloadJob>> = _jobs
+    override fun observeForBook(bookId: String): Flow<List<Highlight>> =
+        state.map { saved -> saved.filter { it.bookId == bookId } }
 
-    fun setJobs(value: List<DownloadJob>) {
-        _jobs.value = value
+    override suspend fun add(highlight: Highlight): Highlight {
+        val stored = highlight.copy(id = nextId++)
+        state.update { it + stored }
+        return stored
     }
 
-    override suspend fun enqueue(result: SearchResult): EnqueueOutcome =
-        EnqueueOutcome.Failed(AppError.Unexpected("not used"))
-
-    override suspend fun enqueueCaptured(capture: CapturedDownload): EnqueueOutcome =
-        EnqueueOutcome.Failed(AppError.Unexpected("not used"))
-
-    override suspend fun retry(jobId: String): RetryOutcome {
-        retried += jobId
-        return retryOutcome
+    override suspend fun update(highlight: Highlight) = state.update { saved ->
+        saved.map { if (it.id == highlight.id) highlight else it }
     }
 
-    override suspend fun cancel(jobId: String) {
-        cancelled += jobId
+    override suspend fun remove(id: Long) = state.update { saved -> saved.filterNot { it.id == id } }
+}
+
+private object FakeNotesExporter : NotesExporter {
+    override suspend fun export(book: Book, highlights: List<Highlight>): String? =
+        if (highlights.isEmpty()) null else "content://exported/${book.id}"
+}
+
+private class FakeCollectionsRepository : CollectionsRepository {
+    private val made = MutableStateFlow<List<BookCollection>>(emptyList())
+
+    override val collections: Flow<List<BookCollection>> = made
+
+    /** Exposed as the state flow it is, so a test can read the shelves back without collecting. */
+    override val memberships = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
+
+    override suspend fun create(name: String): BookCollection {
+        val collection = BookCollection(id = name, name = name, createdAt = Instant.EPOCH)
+        made.update { it + collection }
+        return collection
     }
 
-    override suspend fun dismiss(jobId: String) {
-        dismissed += jobId
+    override suspend fun rename(id: String, name: String) = made.update { saved ->
+        saved.map { if (it.id == id) it.copy(name = name) else it }
     }
+
+    override suspend fun delete(id: String) {
+        made.update { saved -> saved.filterNot { it.id == id } }
+        memberships.update { it - id }
+    }
+
+    override suspend fun setMembership(collectionId: String, bookId: String, member: Boolean) =
+        memberships.update { shelves ->
+            val on = shelves[collectionId].orEmpty()
+            shelves + (collectionId to if (member) on + bookId else on - bookId)
+        }
+
+    override suspend fun removeBook(bookId: String) = memberships.update { shelves ->
+        shelves.mapValues { (_, books) -> books - bookId }
+    }
+}
+
+private class FakeReadingSessionsRepository : ReadingSessionsRepository {
+    override suspend fun record(bookId: String, position: Int) = Unit
+
+    override fun observeRate(bookId: String): Flow<Double?> = flowOf(null)
+
+    override suspend fun removeForBook(bookId: String) = Unit
+}
+
+/**
+ * The real bus, recording what went through it.
+ *
+ * It has no dependencies of its own, so there is nothing to fake: collecting from it is exactly
+ * what the app shell does.
+ */
+private fun TestScope.record(bus: MessageBus): List<UiMessage> {
+    val seen = mutableListOf<UiMessage>()
+    // Unconfined so the collector is subscribed the moment this returns: the bus buffers rather
+    // than replays, and a message sent before anyone is listening is simply gone.
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+        bus.messages.collect { seen += it }
+    }
+    return seen
 }

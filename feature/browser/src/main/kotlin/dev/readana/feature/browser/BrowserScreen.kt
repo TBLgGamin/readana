@@ -14,8 +14,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -63,17 +61,15 @@ internal fun BrowserScreen(
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val snackbarHostState = remember { SnackbarHostState() }
-    val resultText = uiState.result?.let { resultText(it) }
     val currentOnDismissResult by rememberUpdatedState(onDismissResult)
     val currentOnClose by rememberUpdatedState(onClose)
     var webView by remember { mutableStateOf<WebView?>(null) }
 
-    LaunchedEffect(resultText) {
-        if (resultText != null) {
-            snackbarHostState.showSnackbar(resultText)
+    // Closing straight away is safe now that the message is the app shell's to show: it used to be
+    // announced by a screen that was in the middle of closing itself, and so was rarely seen.
+    LaunchedEffect(uiState.finished) {
+        if (uiState.finished) {
             currentOnDismissResult()
-            // The download now lives in the queue; the browser has done its job.
             currentOnClose()
         }
     }
@@ -92,8 +88,7 @@ internal fun BrowserScreen(
                     }
                 }
             )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        }
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             if (uiState.loadProgress in 1..99) {
@@ -179,12 +174,4 @@ private fun BrowserWebView(
         },
         onRelease = { it.destroy() }
     )
-}
-
-@Composable
-private fun resultText(result: BrowserResult): String = when (result) {
-    is BrowserResult.Queued -> stringResource(R.string.feature_browser_queued, result.title)
-    is BrowserResult.AlreadyInLibrary -> stringResource(R.string.feature_browser_in_library, result.title)
-    is BrowserResult.AlreadyQueued -> stringResource(R.string.feature_browser_already_queued, result.title)
-    is BrowserResult.Failed -> stringResource(R.string.feature_browser_failed, result.message)
 }

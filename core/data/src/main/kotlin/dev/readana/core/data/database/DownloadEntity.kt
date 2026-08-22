@@ -31,6 +31,8 @@ data class DownloadEntity(
     @ColumnInfo(name = "headers_json") val headersJson: String?,
     /** Record page for the in-app browser fallback. */
     @ColumnInfo(name = "browser_url") val browserUrl: String?,
+    /** Cover art from the search result, so the queue can show the book it is fetching. */
+    @ColumnInfo(name = "cover_url") val coverUrl: String? = null,
     @ColumnInfo(name = "book_id") val bookId: String?,
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long
@@ -41,6 +43,7 @@ fun DownloadEntity.toModel(): DownloadJob = DownloadJob(
     sourceId = sourceId,
     recordId = recordId,
     title = title,
+    authors = authors.split('|').filter { it.isNotBlank() },
     format = BookFormat.valueOf(format),
     status = DownloadStatus.valueOf(status),
     bytesDownloaded = bytesDownloaded,
@@ -49,5 +52,7 @@ fun DownloadEntity.toModel(): DownloadJob = DownloadJob(
     errorKind = errorKind?.let(DownloadErrorKind::valueOf),
     bookId = bookId,
     browserUrl = browserUrl,
-    createdAt = Instant.ofEpochMilli(createdAt)
+    coverUrl = coverUrl,
+    createdAt = Instant.ofEpochMilli(createdAt),
+    updatedAt = Instant.ofEpochMilli(updatedAt)
 )

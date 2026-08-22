@@ -148,6 +148,45 @@ internal class ReaderAssistantViewModel @Inject constructor(
         start(AiThreadKind.Explain, selection, progression, chapterTitle, askImmediately = true)
     }
 
+    /**
+     * Opens the assistant on the book itself, with no passage selected, and waits for a question.
+     *
+     * The same walk backwards a recap uses, so the spoiler guarantee is unchanged: with nothing
+     * selected the context builder never reads forward, and the conversation is given exactly the
+     * text above where the reader has got to.
+     */
+    fun askBook(anchor: suspend () -> Locator?, progression: Float?, chapterTitle: String?) {
+        val current = book ?: return
+        replyJob?.cancel()
+        _uiState.update {
+            it.copy(
+                visible = true,
+                kind = AiThreadKind.Ask,
+                quote = null,
+                threadId = null,
+                messages = emptyList(),
+                streaming = null,
+                phase = AssistantPhase.Gathering,
+                error = null,
+                coveredFraction = progression
+            )
+        }
+        replyJob = viewModelScope.launch {
+            val context = gather(anchor(), selectionText = null)
+            startAndReply(
+                book = current,
+                kind = AiThreadKind.Ask,
+                quote = null,
+                context = context,
+                chapterTitle = chapterTitle,
+                progression = progression,
+                question = null,
+                // Nothing has been asked yet; the reader types into the sheet's own field.
+                replyNow = false
+            )
+        }
+    }
+
     /** Answers the "catch me up" offer: reuses a recent recap, or writes a new one. */
     fun requestRecap(anchor: suspend () -> Locator?, progression: Float?, chapterTitle: String?) {
         val current = book ?: return

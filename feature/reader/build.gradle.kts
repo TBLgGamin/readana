@@ -18,6 +18,8 @@ dependencies {
     implementation(libs.readium.shared)
     implementation(libs.readium.navigator)
     implementation(libs.readium.adapter.pdfium)
+    // Read-aloud: Readium drives Android's TTS engine over the publication's own text.
+    implementation(libs.readium.navigator.media.tts)
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.fragment.compose)
     implementation(libs.androidx.activity.compose)

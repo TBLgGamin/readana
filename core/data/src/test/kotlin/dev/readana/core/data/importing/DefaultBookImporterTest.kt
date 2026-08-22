@@ -12,11 +12,16 @@ import dev.readana.core.common.result.asFailure
 import dev.readana.core.common.result.asSuccess
 import dev.readana.core.data.FakeSettingsRepository
 import dev.readana.core.data.database.ReadanaDatabase
+import dev.readana.core.data.repository.BookSettingsRepository
+import dev.readana.core.data.repository.CollectionsRepository
+import dev.readana.core.data.repository.ReadingSessionsRepository
 import dev.readana.core.data.repository.RoomLibraryRepository
 import dev.readana.core.data.storage.BookStorage
 import dev.readana.core.model.Book
+import dev.readana.core.model.BookCollection
 import dev.readana.core.model.BookFormat
 import dev.readana.core.model.BookOrigin
+import dev.readana.core.model.ReaderSettings
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,7 +30,12 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -158,6 +168,9 @@ class DefaultBookImporterTest {
         metadataExtractor = { extracted },
         storage = storage,
         libraryRepository = library,
+        bookSettingsRepository = FakeBookSettingsRepository(),
+        readingSessionsRepository = FakeReadingSessionsRepository(),
+        collectionsRepository = FakeCollectionsRepository(),
         ioDispatcher = UnconfinedTestDispatcher()
     )
 
@@ -174,4 +187,44 @@ class DefaultBookImporterTest {
     }
 
     private suspend fun RoomLibraryRepository.booksNow(): List<Book> = books.first()
+}
+
+/** Per-book reading settings are cleared alongside the book; nothing here asserts on them. */
+private class FakeBookSettingsRepository : BookSettingsRepository {
+    private val state = MutableStateFlow<Map<String, ReaderSettings>>(emptyMap())
+
+    override fun observeFor(bookId: String): Flow<ReaderSettings?> = state.map { it[bookId] }
+
+    override suspend fun set(bookId: String, settings: ReaderSettings) {
+        state.update { it + (bookId to settings) }
+    }
+
+    override suspend fun clear(bookId: String) = state.update { it - bookId }
+}
+
+/** Reading sessions go with the book too; nothing here asserts on them either. */
+private class FakeReadingSessionsRepository : ReadingSessionsRepository {
+    override suspend fun record(bookId: String, position: Int) = Unit
+
+    override fun observeRate(bookId: String): Flow<Double?> = flowOf(null)
+
+    override suspend fun removeForBook(bookId: String) = Unit
+}
+
+/** Shelf memberships go with the book too; nothing here asserts on them. */
+private class FakeCollectionsRepository : CollectionsRepository {
+    override val collections: Flow<List<BookCollection>> = flowOf(emptyList())
+
+    override val memberships: Flow<Map<String, Set<String>>> = flowOf(emptyMap())
+
+    override suspend fun create(name: String): BookCollection =
+        BookCollection(id = name, name = name, createdAt = java.time.Instant.EPOCH)
+
+    override suspend fun rename(id: String, name: String) = Unit
+
+    override suspend fun delete(id: String) = Unit
+
+    override suspend fun setMembership(collectionId: String, bookId: String, member: Boolean) = Unit
+
+    override suspend fun removeBook(bookId: String) = Unit
 }

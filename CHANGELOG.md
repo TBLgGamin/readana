@@ -6,7 +6,132 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Passing messages look the way Material 3 draws them, and turn up wherever you are. Material 3
+  still ships its old snackbar layout by default and keeps the corrected one behind a flag, which
+  is now on, so every message in the app has the same expressive shape. They are also raised
+  centrally rather than by each screen: a screen used to own its own host, so a message only
+  appeared if you happened to still be on the screen that raised it. A download queued from the
+  in-app browser was announced to a browser that was already closing itself and so was rarely seen
+  at all, and an import finishing while you were in Settings said nothing. One host now sits in the
+  app shell, above the page and clear of the navigation bar and rail.
+
+- Marking a book finished does something now. The details sheet was holding the book as it looked
+  when the sheet was opened, so the write landed in the database and nothing on screen moved. The
+  sheet now follows the book, and the button tracks the mark you set rather than the status derived
+  from it, which had already called a book read once the bar was within a couple of percent of the
+  end and so left the button looking stuck.
+
+- Rows of buttons wrap instead of being crushed. Five theme names sharing one row equally left each
+  one a sliver wide with its label broken or clipped, and three labelled buttons in a plain row ran
+  off the edge of a phone where the last was simply unreachable. The settings choice groups, the
+  reader's settings chips, the book details actions and the provider's own buttons all keep their
+  natural width and wrap onto another line.
+
+- A model that cannot read pictures no longer costs you the answer. The assistant attaches a
+  book's own figures to a question, but plenty of models take text only, and which ones is not
+  something a reader should have to know. A refusal over the pictures is now recognised for what it
+  is and the question is asked again without them, and the prompt stops describing figures the
+  model was never handed so it cannot point at one that is not there. Formats no provider decodes,
+  and pictures that came back empty, are left behind before the request is built rather than
+  breaking it.
+
 ### Added
+
+- A book you have finished wears a tick on its cover in the library, in the same corner and at the
+  same size as the download button on a search result, so the two read as one family of marks.
+
+- Every queued download shows its steps. A card carries the book's own cover in the top left rather
+  than an icon for whichever state it happens to be in, and a collapsible list underneath, indented
+  to sit under the title, walks through waiting its turn, finding the file, downloading, and
+  converting to EPUB for a PDF. The step in hand is highlighted and carries the wavy bar; the ones
+  behind it are ticked off and the ones ahead wait their turn. Closed, the card shows just that
+  step and its bar. Finding the file is now its own step rather than being counted as downloading,
+  which is what a long pause with nothing moving actually was.
+
+- Shelves can be made and filled from the library. A button pinned to the right of the shelf row,
+  below the search box, makes a new one without going through a book first, and holding any shelf
+  you made turns the grid into a picker for it: tap covers to add or remove, and the bar at the top
+  counts what you have picked. Only the difference is written, so a shelf of fifty leaves
+  forty-nine rows untouched.
+
+- Downloads and conversions share one queue. Turning a PDF into an EPUB used to draw a bare strip
+  over the library grid that said what was happening but not where it had got to; it is now a card
+  in the download queue like everything else, with the page it is on and a bar. The queue's own
+  summary lost its progress bar and became a line of text, so the only bars on the page are the
+  per-item ones, each with the percentage beside it.
+
+- Settings split into Basic and Advanced. Basic holds what gets touched while reading: how a book
+  looks, how pages turn, and which model answers questions. Advanced holds the typographic fine
+  tuning, book sources, PDF conversion, assistant tuning and storage. The explanatory text
+  throughout was cut back to a line where a line was needed and dropped where it was not.
+
+- Downloads have their own page, between Library and Discover. The queue used to be a strip that
+  the book grid pushed around; it is now a screen that can say what is actually happening. Each
+  download is a card with its title, author, format and size, a wavy bar while it moves, and the
+  speed and time left worked out from watching the byte count climb. Running downloads can be
+  **paused** and picked up again from the byte they stopped on rather than started over, and a
+  line at the top totals the whole queue: how many books are coming, how fast, and when the last of
+  them should land. Filter chips carry their own counts —
+  All, In progress, Needs you, Done — and the overflow retries everything that stopped short or
+  clears out the finished rows in one go. The navigation item wears a badge while anything is
+  queued or waiting on you, so a download that fails while you are reading does not go unnoticed.
+
+- Notes have somewhere to live. Selecting a passage now offers **Note** next to Highlight, which
+  marks it and opens the note in one gesture, and the contents button in the reader opens a sheet
+  with three tabs — Contents, Bookmarks, Notes — instead of one list with the bookmarks oddly
+  stacked on top of the chapters. The Notes tab lists every marked passage in reading order and
+  jumps back to any of them. The same notes appear in a book's details in the library, so a book
+  can be looked back over without opening it, and either place can send the lot out as Markdown:
+  the quote, the note beneath it and how far into the book it sits, in a file a notes app, a
+  document or a mail draft will take.
+
+- The reader knows how long you have left. Every settled page turn extends a reading session, and
+  from those Readana works out your pace in Readium positions per minute — about a kilobyte of
+  content each, so a pace learned from one book means something in the next. The bottom bar's
+  second line then says "About 8 min left in this chapter" instead of a position count, and the
+  library's shortcut says how much of the book is still to come. Nothing is promised until there is
+  enough reading to know: short glances, books left open on a table and drags of the slider are all
+  thrown out, a book uses its own pace once it has been read three times, and until any of that is
+  true the old position count is what shows.
+
+- **Define** in the selection menu. A word goes to Wiktionary — no key, no quota, and the same
+  answer on every device — and comes back as senses in a small sheet. It works on the first page of
+  a book, which is exactly where the assistant will not talk yet. Underneath sits "Ask the
+  assistant instead", which is also the whole answer when the reader has selected a phrase rather
+  than a word, so nothing has to guess in advance which of the two was wanted.
+
+- Readana reads aloud. The bottom bar gains a Listen button for books that have text to read;
+  while a voice is going a small floating toolbar appears over the page with previous, play, next,
+  speed and stop, and it leaves again when the reading does. The page follows the voice and marks
+  the sentence being spoken, in its own layer so it never disturbs the highlights. Reading aloud
+  stops when you leave the reader: doing it in the background needs a media session and a
+  foreground service, which is a piece of work of its own (ADR 0016).
+
+- The assistant is reachable without selecting anything first. The conversations button now opens
+  on **Ask about this book** and **Where was I?**, above the conversations already held. Both were
+  there before but neither could be reached on purpose — a recap only ever appeared by itself after
+  a few days away, and asking anything required finding a passage to select first. A question asked
+  this way is given exactly the text above where the reader has got to, the same walk backwards a
+  recap uses, so the no-spoilers guarantee is untouched.
+
+- The library opens on the book you were reading. A card at the top says which one, how far in and
+  roughly how long is left, and picks up where you were. It is a shortcut rather than a result, so
+  it steps out of the way the moment a search or a filter is on.
+
+- Collections, series and a reading filter. Books can go on shelves the reader names — a book can be
+  on several, which is what tags were for — and Readana adds a shelf for any series it finds more
+  than one book of in the publisher's own metadata. Both appear as one scrolling row of chips under
+  the search field, and only once there is a shelf to show. The top bar gains a filter beside the
+  sort, in the same shape, for All, Reading, Unread and Finished; a book can also be called finished
+  by hand from its details, which outranks how far the progress bar happens to have got.
+
+- Reading settings belong to the book. Change the margins in a comic and the next novel is
+  unaffected: a book keeps its own copy of every setting from the moment you adjust one while it is
+  open, with a line at the bottom of the sheet offering to hand it back to the defaults. Those
+  defaults moved to a new **Reading** section on the Settings screen, which is also the first time
+  they could be set without opening a book at all (ADR 0015).
 
 - The assistant can show pictures. Illustrations from the pages you have already read are attached
   to the question, so the model can see a plate and point at it, and an answer may also ask for a
@@ -54,6 +179,18 @@ All notable changes to this project are documented here. The format follows
   queued so a wrong edition is obvious.
 
 ### Changed
+
+- A PDF converting after a download no longer gets a card of its own beside the download that
+  started it. It is the same book one step later, so it appears as the converting step inside that
+  download's card, with the engine's own phases behind it. Only a conversion you start from a book
+  already in your library still stands alone.
+
+- The download queue keeps only what is still going. A finished download drops out the moment its
+  book reaches the library, which is where you would look for it anyway, and the "Done" filter went
+  with it. What is left is what still needs watching or deciding.
+
+- The reader's contents sheet is tabbed rather than one long list — Contents, Bookmarks, Notes —
+  where it used to be one scrolling column with the bookmarks stacked above the chapters.
 
 - Settings is one page again. The five collapsible cards are gone: every setting is visible by
   scrolling, under a heading for each of sources, PDF conversion, the reading assistant and

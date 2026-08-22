@@ -6,6 +6,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.readana.core.data.downloads.BookDownloadManager
 import dev.readana.core.data.downloads.CapturedDownload
 import dev.readana.core.data.downloads.EnqueueOutcome
+import dev.readana.core.data.messages.MessageBus
+import dev.readana.core.data.messages.UiMessage
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,7 +16,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @HiltViewModel
-class BrowserViewModel @Inject constructor(private val downloadManager: BookDownloadManager) : ViewModel() {
+class BrowserViewModel @Inject constructor(
+    private val downloadManager: BookDownloadManager,
+    private val messages: MessageBus
+) : ViewModel() {
     private val _uiState = MutableStateFlow(BrowserUiState())
     val uiState: StateFlow<BrowserUiState> = _uiState.asStateFlow()
 
@@ -36,7 +41,9 @@ class BrowserViewModel @Inject constructor(private val downloadManager: BookDown
                     expectedSizeBytes = file.sizeBytes?.takeIf { it > 0 }
                 )
             )
-            _uiState.update { it.copy(result = outcome.toResult()) }
+            messages.show(outcome.toMessage())
+            // The state now says only "done, close me"; the wording is the app shell's business.
+            _uiState.update { it.copy(finished = true) }
         }
     }
 
@@ -45,29 +52,25 @@ class BrowserViewModel @Inject constructor(private val downloadManager: BookDown
     }
 
     fun consumeResult() {
-        _uiState.update { it.copy(result = null) }
+        _uiState.update { it.copy(finished = false) }
     }
 
-    private fun EnqueueOutcome.toResult(): BrowserResult = when (this) {
-        is EnqueueOutcome.Enqueued -> BrowserResult.Queued(job.title)
-        is EnqueueOutcome.AlreadyInLibrary -> BrowserResult.AlreadyInLibrary(book.title)
-        is EnqueueOutcome.AlreadyQueued -> BrowserResult.AlreadyQueued(job.title)
-        is EnqueueOutcome.Failed -> BrowserResult.Failed(error.message)
+    private fun EnqueueOutcome.toMessage(): UiMessage = when (this) {
+        is EnqueueOutcome.Enqueued -> UiMessage.text(R.string.feature_browser_queued, job.title)
+
+        is EnqueueOutcome.AlreadyInLibrary ->
+            UiMessage.text(R.string.feature_browser_in_library, book.title)
+
+        is EnqueueOutcome.AlreadyQueued ->
+            UiMessage.text(R.string.feature_browser_already_queued, job.title)
+
+        is EnqueueOutcome.Failed -> UiMessage.text(R.string.feature_browser_failed, error.message)
     }
 }
 
 data class BrowserUiState(
     /** 0..100, as reported by the WebView. */
     val loadProgress: Int = 0,
-    val result: BrowserResult? = null
+    /** The capture has been handed to the queue, so the browser has nothing left to do. */
+    val finished: Boolean = false
 )
-
-sealed interface BrowserResult {
-    data class Queued(val title: String) : BrowserResult
-
-    data class AlreadyInLibrary(val title: String) : BrowserResult
-
-    data class AlreadyQueued(val title: String) : BrowserResult
-
-    data class Failed(val message: String) : BrowserResult
-}

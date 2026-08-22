@@ -60,7 +60,21 @@ data class ChatMessage(val role: ChatRole, val text: String)
  * already been through. [id] is the marker the answer refers to it by, so what the model writes
  * can be turned back into the picture on screen.
  */
-class ImageAttachment(val id: String, val mediaType: String, val bytes: ByteArray)
+class ImageAttachment(val id: String, val mediaType: String, val bytes: ByteArray) {
+    /**
+     * Whether this is worth putting on the wire at all.
+     *
+     * Providers decode a short list of formats. An SVG figure or a picture that came back empty
+     * would make the whole request unparseable, costing the reader their answer over a decoration,
+     * so anything outside that list is left behind before the request is built.
+     */
+    val isSendable: Boolean
+        get() = bytes.isNotEmpty() && mediaType.lowercase() in SENDABLE_MEDIA_TYPES
+
+    companion object {
+        val SENDABLE_MEDIA_TYPES = setOf("image/jpeg", "image/png", "image/gif", "image/webp")
+    }
+}
 
 data class LlmRequest(
     val system: List<PromptBlock>,

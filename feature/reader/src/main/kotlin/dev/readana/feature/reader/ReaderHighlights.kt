@@ -1,7 +1,5 @@
 package dev.readana.feature.reader
 
-import android.content.Context
-import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,12 +19,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.readana.core.designsystem.component.color
 import dev.readana.core.model.HighlightStyle
 import dev.readana.core.model.HighlightTint
 import org.readium.r2.navigator.DecorableNavigator
@@ -36,14 +33,6 @@ import org.readium.r2.shared.publication.Locator
 
 /** Decoration group the reader owns; Readium keeps groups independent of each other. */
 private const val HIGHLIGHTS_GROUP = "highlights"
-
-private val TintColors = mapOf(
-    HighlightTint.Yellow to Color(0xFFFFF176),
-    HighlightTint.Green to Color(0xFFA5D6A7),
-    HighlightTint.Blue to Color(0xFF90CAF9),
-    HighlightTint.Pink to Color(0xFFF48FB1),
-    HighlightTint.Purple to Color(0xFFCE93D8)
-)
 
 /** Draws the saved highlights over the page and opens the editor when one is tapped. */
 @Composable
@@ -150,5 +139,3 @@ private fun HighlightTint.toDecorationStyle(style: HighlightStyle): Decoration.S
         HighlightStyle.Underline -> Decoration.Style.Underline(tint = argb)
     }
 }
-
-private fun HighlightTint.color(): Color = TintColors.getValue(this)

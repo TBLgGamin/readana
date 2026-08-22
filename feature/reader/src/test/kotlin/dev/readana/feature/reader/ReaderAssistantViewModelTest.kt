@@ -360,6 +360,10 @@ private class AssistantLibraryRepository : LibraryRepository {
 
     override suspend fun upsert(book: Book) = Unit
 
+    override suspend fun setFinished(id: String, finished: Boolean) {
+        book = book.copy(finishedAt = if (finished) Instant.EPOCH else null)
+    }
+
     override suspend fun remove(id: String) = Unit
 
     override suspend fun updateProgress(id: String, progress: ReadingProgress, openedAt: Instant) = Unit

@@ -15,7 +15,7 @@ interface DownloadDao {
 
     @Query(
         "SELECT * FROM downloads WHERE source_id = :sourceId AND record_id = :recordId " +
-            "AND status IN ('Queued', 'Downloading', 'Converting') LIMIT 1"
+            "AND status IN ('Queued', 'Resolving', 'Downloading', 'Converting', 'Paused') LIMIT 1"
     )
     suspend fun findActive(sourceId: String, recordId: String): DownloadEntity?
 
@@ -40,12 +40,25 @@ interface DownloadDao {
     )
     suspend fun updateResolution(id: String, url: String?, browserUrl: String?, total: Long?, now: Long)
 
-    @Query(
-        "UPDATE downloads SET status = 'Completed', book_id = :bookId, error_kind = NULL, " +
-            "error_message = NULL, updated_at = :now WHERE id = :id"
-    )
-    suspend fun markCompleted(id: String, bookId: String, now: Long)
+    /**
+     * Records which library book this download became, once the importer has run. It is what lets
+     * the queue show a conversion under the download that started it rather than beside it.
+     */
+    @Query("UPDATE downloads SET book_id = :bookId, updated_at = :now WHERE id = :id")
+    suspend fun attachBook(id: String, bookId: String, now: Long)
 
     @Query("DELETE FROM downloads WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    /**
+     * Clears everything that is no longer going anywhere; anything in the queue is left alone.
+     *
+     * 'Completed' is still listed because a library set up before finished downloads started
+     * dropping themselves can hold rows in that state.
+     */
+    @Query("DELETE FROM downloads WHERE status IN ('Completed', 'Failed', 'Cancelled')")
+    suspend fun deleteFinished(): Int
+
+    @Query("SELECT * FROM downloads WHERE status IN ('Completed', 'Failed', 'Cancelled')")
+    suspend fun getFinished(): List<DownloadEntity>
 }

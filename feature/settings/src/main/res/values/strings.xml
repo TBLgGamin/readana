@@ -1,29 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="feature_settings_title">Settings</string>
-    <string name="feature_settings_section_storage">Storage</string>
-    <string name="feature_settings_library_folder">Library folder</string>
-    <string name="feature_settings_library_folder_default">App storage (private)</string>
-    <string name="feature_settings_library_folder_clear">Use app storage</string>
-    <string name="feature_settings_library_folder_note">Books in app storage are deleted when Readana is uninstalled. Choosing a folder keeps new books outside the app; books already imported stay where they are.</string>
-    <string name="feature_settings_section_sources">Book sources</string>
-    <string name="feature_settings_annas_notice">Anna\'s Archive indexes shadow libraries. Downloading copyrighted works without permission is illegal in most countries; mirrors are also blocked by some ISPs. You are responsible for what you download.</string>
-    <string name="feature_settings_annas_mirrors">Anna\'s Archive mirrors</string>
-    <string name="feature_settings_annas_mirrors_help">One URL per line, tried in order. Leave empty for the built-in defaults.</string>
-    <string name="feature_settings_annas_secret_key">Member secret key (optional)</string>
-    <string name="feature_settings_annas_secret_key_help">Members skip the browser check and get fast downloads. Without a key, Readana answers the check itself and downloads at the free speed.</string>
-    <string name="feature_settings_annas_quota">Fast downloads left today: %1$d of %2$d</string>
-    <string name="feature_settings_annas_quota_left">Fast downloads left today: %1$d</string>
-    <string name="feature_settings_section_conversion">PDF conversion</string>
-    <string name="feature_settings_conversion_auto">Convert PDFs to EPUB</string>
-    <string name="feature_settings_conversion_auto_help">Converted books reflow to your font size. The original PDF is always kept, and you can convert or re-convert any book from its details.</string>
-    <string name="feature_settings_conversion_headers">Remove repeated headers and footers</string>
-    <string name="feature_settings_conversion_images">Include figures and images</string>
-    <string name="feature_settings_conversion_headings">Heading detection</string>
-    <string name="feature_settings_conversion_headings_help">How readily larger or bold lines become chapter headings. Fewer headings means fewer, longer chapters.</string>
-    <string name="feature_settings_conversion_headings_conservative">Fewer</string>
-    <string name="feature_settings_conversion_headings_balanced">Balanced</string>
-    <string name="feature_settings_conversion_headings_aggressive">More</string>
+    <string name="feature_settings_tab_basic">Basic</string>
+    <string name="feature_settings_tab_advanced">Advanced</string>
+
+    <string name="feature_settings_section_reading">Reading</string>
+    <string name="feature_settings_reading_help">Defaults for new books. What you change while reading stays with that book.</string>
+    <string name="feature_settings_reading_theme">Theme</string>
+    <string name="feature_settings_reading_theme_system">System</string>
+    <string name="feature_settings_reading_theme_light">Light</string>
+    <string name="feature_settings_reading_theme_sepia">Sepia</string>
+    <string name="feature_settings_reading_theme_dark">Dark</string>
+    <string name="feature_settings_reading_theme_black">Black</string>
+    <string name="feature_settings_reading_font">Typeface</string>
+    <string name="feature_settings_reading_font_publisher">Publisher</string>
+    <string name="feature_settings_reading_font_serif">Serif</string>
+    <string name="feature_settings_reading_font_sans">Sans</string>
+    <string name="feature_settings_reading_font_mono">Mono</string>
+    <string name="feature_settings_reading_page_turn">Pages</string>
+    <string name="feature_settings_reading_page_turn_paginated">Turn</string>
+    <string name="feature_settings_reading_page_turn_scrolled">Scroll</string>
+    <string name="feature_settings_reading_font_size">Text size</string>
+    <string name="feature_settings_reading_tap_to_turn">Tap the edges to turn pages</string>
+    <string name="feature_settings_reading_volume_keys">Volume keys turn pages</string>
+    <string name="feature_settings_reading_keep_screen_on">Keep the screen on while reading</string>
+
+    <string name="feature_settings_section_layout">Text layout</string>
+    <string name="feature_settings_reading_columns">Columns</string>
+    <string name="feature_settings_reading_columns_auto">Auto</string>
+    <string name="feature_settings_reading_columns_one">One</string>
+    <string name="feature_settings_reading_columns_two">Two</string>
+    <string name="feature_settings_reading_line_height">Line spacing</string>
+    <string name="feature_settings_reading_paragraph_spacing">Paragraph spacing</string>
+    <string name="feature_settings_reading_margins">Margins</string>
+
     <string name="feature_settings_section_ai">Reading assistant</string>
     <string name="feature_settings_ai_key">API key</string>
     <string name="feature_settings_ai_base_url">Server address</string>
@@ -34,7 +44,7 @@
     <string name="feature_settings_ai_get_key">Get a key</string>
     <string name="feature_settings_ai_remove">Remove this provider</string>
     <string name="feature_settings_ai_add_custom">Add a provider</string>
-    <string name="feature_settings_ai_add_custom_help">Any server that speaks the OpenAI chat API: Ollama, LM Studio, a gateway, your own.</string>
+    <string name="feature_settings_ai_add_custom_help">Any server that speaks the OpenAI chat API, such as Ollama or LM Studio.</string>
     <string name="feature_settings_ai_custom_name">Name</string>
     <string name="feature_settings_ai_add">Add</string>
     <string name="feature_settings_ai_cancel">Cancel</string>
@@ -42,18 +52,47 @@
     <string name="feature_settings_ai_status_no_key">No key yet</string>
     <string name="feature_settings_ai_status_local">Ready</string>
     <string name="feature_settings_ai_status_incomplete">Needs an address and a model</string>
-    <string name="feature_settings_ai_context">How much of the book to send</string>
-    <string name="feature_settings_ai_context_help">Only what you have already read is ever sent. More of it means better answers about earlier chapters, and a bigger bill.</string>
-    <string name="feature_settings_ai_context_small">Recent</string>
-    <string name="feature_settings_ai_context_medium">Balanced</string>
-    <string name="feature_settings_ai_context_large">Generous</string>
-    <string name="feature_settings_ai_context_whole">Everything read</string>
+    <string name="feature_settings_ai_illustrate">Illustrate answers with pictures</string>
+    <string name="feature_settings_ai_illustrate_help">Looked up on Wikipedia. Never sent to your provider.</string>
     <string name="feature_settings_ai_recap">Offer a recap when I come back</string>
     <plurals name="feature_settings_ai_recap_days">
         <item quantity="one">After a day away</item>
         <item quantity="other">After %1$d days away</item>
     </plurals>
-    <string name="feature_settings_ai_privacy">Asking a question sends the part of the book you have read to the provider you picked. Nothing you have not reached is ever sent.</string>
-    <string name="feature_settings_ai_illustrate">Illustrate answers with pictures</string>
-    <string name="feature_settings_ai_illustrate_help">An answer may ask to show you a picture of something it mentions — a ship, a bird, a building. Readana looks it up on Wikipedia; what it finds is shown to you and never sent to the provider, so it cannot give away the plot. Pictures from the book itself are always available.</string>
+
+    <string name="feature_settings_section_ai_advanced">Assistant tuning</string>
+    <string name="feature_settings_ai_context">How much of the book to send</string>
+    <string name="feature_settings_ai_context_help">Only what you have already read. More of it costs more.</string>
+    <string name="feature_settings_ai_context_small">Recent</string>
+    <string name="feature_settings_ai_context_medium">Balanced</string>
+    <string name="feature_settings_ai_context_large">Generous</string>
+    <string name="feature_settings_ai_context_whole">Everything read</string>
+    <string name="feature_settings_ai_recap_delay">Days away before a recap is offered</string>
+    <string name="feature_settings_ai_privacy">Questions send the part of the book you have read to your provider. Nothing past your place is sent.</string>
+
+    <string name="feature_settings_section_sources">Book sources</string>
+    <string name="feature_settings_annas_notice">Anna\'s Archive indexes shadow libraries. Downloading copyrighted work without permission is illegal in most countries. You are responsible for what you download.</string>
+    <string name="feature_settings_annas_mirrors">Anna\'s Archive mirrors</string>
+    <string name="feature_settings_annas_mirrors_help">One URL per line, tried in order. Leave empty for the built-in list.</string>
+    <string name="feature_settings_annas_secret_key">Member secret key (optional)</string>
+    <string name="feature_settings_annas_secret_key_help">A member key gives fast downloads and skips the browser check.</string>
+    <string name="feature_settings_annas_quota">Fast downloads left today: %1$d of %2$d</string>
+    <string name="feature_settings_annas_quota_left">Fast downloads left today: %1$d</string>
+
+    <string name="feature_settings_section_conversion">PDF conversion</string>
+    <string name="feature_settings_conversion_auto">Convert PDFs to EPUB</string>
+    <string name="feature_settings_conversion_auto_help">Converted books reflow to your text size. The PDF is always kept.</string>
+    <string name="feature_settings_conversion_headers">Remove repeated headers and footers</string>
+    <string name="feature_settings_conversion_images">Include figures and images</string>
+    <string name="feature_settings_conversion_headings">Heading detection</string>
+    <string name="feature_settings_conversion_headings_help">How readily bold or larger lines become chapters.</string>
+    <string name="feature_settings_conversion_headings_conservative">Fewer</string>
+    <string name="feature_settings_conversion_headings_balanced">Balanced</string>
+    <string name="feature_settings_conversion_headings_aggressive">More</string>
+
+    <string name="feature_settings_section_storage">Storage</string>
+    <string name="feature_settings_library_folder">Library folder</string>
+    <string name="feature_settings_library_folder_default">App storage (private)</string>
+    <string name="feature_settings_library_folder_clear">Use app storage</string>
+    <string name="feature_settings_library_folder_note">App storage is cleared when Readana is uninstalled. A folder you pick keeps new books outside the app.</string>
 </resources>

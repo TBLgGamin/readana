@@ -17,9 +17,10 @@ import kotlinx.serialization.json.putJsonObject
 internal object MessageContent {
     /** Anthropic: `[{"type":"image","source":{...}}, {"type":"text","text":"…"}]`. */
     fun anthropic(text: String, images: List<ImageAttachment>): JsonElement {
-        if (images.isEmpty()) return JsonPrimitive(text)
+        val usable = images.filter { it.isSendable }
+        if (usable.isEmpty()) return JsonPrimitive(text)
         return buildJsonArray {
-            images.forEach { image ->
+            usable.forEach { image ->
                 add(
                     buildJsonObject {
                         put("type", "image")
@@ -37,9 +38,10 @@ internal object MessageContent {
 
     /** OpenAI-compatible: `[{"type":"image_url","image_url":{"url":"data:…;base64,…"}}, …]`. */
     fun openAi(text: String, images: List<ImageAttachment>): JsonElement {
-        if (images.isEmpty()) return JsonPrimitive(text)
+        val usable = images.filter { it.isSendable }
+        if (usable.isEmpty()) return JsonPrimitive(text)
         return buildJsonArray {
-            images.forEach { image ->
+            usable.forEach { image ->
                 add(
                     buildJsonObject {
                         put("type", "image_url")

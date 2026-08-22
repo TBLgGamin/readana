@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feature_downloads_title">Downloads</string>
+
+    <string name="feature_downloads_filter_all">All</string>
+    <string name="feature_downloads_filter_active">In progress</string>
+    <string name="feature_downloads_filter_failed">Needs you</string>
+    <string name="feature_downloads_filter_count">%1$s · %2$d</string>
+
+    <plurals name="feature_downloads_summary_title">
+        <item quantity="one">Downloading 1 book</item>
+        <item quantity="other">Downloading %d books</item>
+    </plurals>
+    <string name="feature_downloads_summary_progress">%1$s of %2$s</string>
+    <string name="feature_downloads_percent">%1$d%%</string>
+
+    <string name="feature_downloads_conversion_meta">Converting to EPUB</string>
+    <string name="feature_downloads_conversion_pages">Page %1$d of %2$d</string>
+
+    <string name="feature_downloads_stages_expand">Show every step</string>
+    <string name="feature_downloads_stages_collapse">Hide the steps</string>
+    <string name="feature_downloads_stage_queued">Waiting its turn</string>
+    <string name="feature_downloads_stage_finding">Finding the file</string>
+    <string name="feature_downloads_stage_downloading">Downloading</string>
+    <string name="feature_downloads_stage_converting">Converting to EPUB</string>
+    <string name="feature_downloads_phase_extracting">Reading the pages</string>
+    <string name="feature_downloads_phase_reflowing">Reflowing the text</string>
+    <string name="feature_downloads_phase_assembling">Building the chapters</string>
+    <string name="feature_downloads_phase_writing">Writing the book</string>
+
+    <string name="feature_downloads_empty_title">Nothing downloading</string>
+    <string name="feature_downloads_empty_description">Books you fetch from Discover queue up here, and leave for your library once they land.</string>
+    <string name="feature_downloads_empty_filter_title">Nothing under this filter</string>
+    <string name="feature_downloads_empty_filter_description">Switch back to All to see the rest of the queue.</string>
+
+    <string name="feature_downloads_status_queued">Waiting to start</string>
+    <string name="feature_downloads_status_resolving">Asking the source where the file is</string>
+    <string name="feature_downloads_status_retrying">Trying again — %s</string>
+    <string name="feature_downloads_status_progress">%1$s of %2$s</string>
+    <string name="feature_downloads_status_progress_unknown">%s so far</string>
+    <string name="feature_downloads_status_converting">Converting to EPUB</string>
+    <string name="feature_downloads_status_paused">Paused at %s</string>
+    <string name="feature_downloads_status_paused_unknown">Paused</string>
+    <!-- Only reachable for rows left over from a version that kept finished downloads. -->
+    <string name="feature_downloads_status_completed">In your library</string>
+    <string name="feature_downloads_status_cancelled">Cancelled</string>
+    <string name="feature_downloads_status_failed">Could not be downloaded</string>
+    <string name="feature_downloads_status_quota">Today\'s fast downloads are used up</string>
+    <string name="feature_downloads_status_needs_browser">The site wants a browser check</string>
+    <string name="feature_downloads_status_unauthorized">The source turned the request away</string>
+
+    <string name="feature_downloads_rate">%s/s</string>
+    <string name="feature_downloads_eta">%s left</string>
+    <string name="feature_downloads_finished">Finished %s</string>
+    <string name="feature_downloads_took">took %s</string>
+
+    <string name="feature_downloads_action_pause">Pause</string>
+    <string name="feature_downloads_action_resume">Resume</string>
+    <string name="feature_downloads_action_cancel">Cancel</string>
+    <string name="feature_downloads_action_retry">Try again</string>
+    <string name="feature_downloads_action_open">Open in library</string>
+    <string name="feature_downloads_action_dismiss">Remove from list</string>
+    <string name="feature_downloads_action_open_browser">Open in browser</string>
+    <string name="feature_downloads_action_retry_all">Retry everything</string>
+    <string name="feature_downloads_action_clear">Clear the list</string>
+    <string name="feature_downloads_more_actions">More actions</string>
+
+    <plurals name="feature_downloads_message_cleared">
+        <item quantity="one">Cleared 1 download</item>
+        <item quantity="other">Cleared %d downloads</item>
+    </plurals>
+    <plurals name="feature_downloads_message_retrying">
+        <item quantity="one">Retrying 1 download</item>
+        <item quantity="other">Retrying %d downloads</item>
+    </plurals>
+    <string name="feature_downloads_message_retry_failed">Could not retry: %s</string>
+
+    <string name="feature_downloads_duration_seconds">%d s</string>
+    <string name="feature_downloads_duration_minutes">%1$d m %2$d s</string>
+    <string name="feature_downloads_duration_hours">%1$d h %2$d m</string>
+</resources>

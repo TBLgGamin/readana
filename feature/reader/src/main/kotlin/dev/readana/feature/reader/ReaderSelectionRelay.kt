@@ -18,6 +18,12 @@ internal class ReaderSelectionRelay @Inject constructor() {
         /** Marks the current selection. */
         fun highlight()
 
+        /** Marks the current selection and opens its note straight away. */
+        fun note()
+
+        /** Looks the current selection up in the dictionary. */
+        fun define()
+
         /** Opens the assistant with a question about the current selection. */
         fun ask()
 
@@ -36,7 +42,13 @@ internal class ReaderSelectionRelay @Inject constructor() {
      */
     var assistantEnabled: Boolean = false
 
-    data class Labels(val highlight: String = "Highlight", val ask: String = "Ask", val explain: String = "Explain")
+    data class Labels(
+        val highlight: String = "Highlight",
+        val note: String = "Note",
+        val define: String = "Define",
+        val ask: String = "Ask",
+        val explain: String = "Explain"
+    )
 }
 
 /** Adds Readana's own items to the selection menu, keeping the platform ones (copy, share). */
@@ -57,12 +69,14 @@ internal class ReaderSelectionActionMode(private val relay: ReaderSelectionRelay
     }
 
     private fun Menu.putOurItems() {
-        listOf(ITEM_HIGHLIGHT, ITEM_ASK, ITEM_EXPLAIN).forEach { removeItem(it) }
-        // Our items go first; the platform's copy and share stay where they are.
-        addOurItem(ITEM_HIGHLIGHT, Menu.FIRST, relay.labels.highlight)
+        listOf(ITEM_HIGHLIGHT, ITEM_NOTE, ITEM_DEFINE, ITEM_ASK, ITEM_EXPLAIN).forEach { removeItem(it) }
+        // Our items go first, most-used first; the platform's copy and share stay where they are.
+        addOurItem(ITEM_HIGHLIGHT, ORDER_HIGHLIGHT, relay.labels.highlight)
+        addOurItem(ITEM_NOTE, ORDER_NOTE, relay.labels.note)
+        addOurItem(ITEM_DEFINE, ORDER_DEFINE, relay.labels.define)
         if (relay.assistantEnabled) {
-            addOurItem(ITEM_ASK, Menu.FIRST + 1, relay.labels.ask)
-            addOurItem(ITEM_EXPLAIN, Menu.FIRST + 2, relay.labels.explain)
+            addOurItem(ITEM_ASK, ORDER_ASK, relay.labels.ask)
+            addOurItem(ITEM_EXPLAIN, ORDER_EXPLAIN, relay.labels.explain)
         }
     }
 
@@ -70,6 +84,8 @@ internal class ReaderSelectionActionMode(private val relay: ReaderSelectionRelay
         val actions = relay.actions ?: return false
         when (item.itemId) {
             ITEM_HIGHLIGHT -> actions.highlight()
+            ITEM_NOTE -> actions.note()
+            ITEM_DEFINE -> actions.define()
             ITEM_ASK -> actions.ask()
             ITEM_EXPLAIN -> actions.explain()
             else -> return false
@@ -88,8 +104,17 @@ internal class ReaderSelectionActionMode(private val relay: ReaderSelectionRelay
     }
 
     private companion object {
+        /** The order they sit in, most-used first; the toolbar overflows the tail. */
+        val ORDER_HIGHLIGHT = Menu.FIRST
+        val ORDER_NOTE = Menu.FIRST + 1
+        val ORDER_DEFINE = Menu.FIRST + 2
+        val ORDER_ASK = Menu.FIRST + 3
+        val ORDER_EXPLAIN = Menu.FIRST + 4
+
         const val ITEM_HIGHLIGHT = 1
-        const val ITEM_ASK = 2
-        const val ITEM_EXPLAIN = 3
+        const val ITEM_NOTE = 2
+        const val ITEM_DEFINE = 3
+        const val ITEM_ASK = 4
+        const val ITEM_EXPLAIN = 5
     }
 }

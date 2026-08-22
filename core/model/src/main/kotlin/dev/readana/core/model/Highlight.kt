@@ -27,6 +27,11 @@ data class Highlight(
     val tint: HighlightTint,
     val style: HighlightStyle,
     val note: String?,
+    /**
+     * How far into the book the passage sits, when the locator knows. It orders the list, and it
+     * is what lets a note be shown with its place in the book without opening the publication.
+     */
+    val progression: Double? = null,
     val createdAt: Instant
 ) {
     companion object {

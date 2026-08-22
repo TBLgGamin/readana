@@ -9,6 +9,9 @@ import dev.readana.core.data.downloads.BookDownloadManager
 import dev.readana.core.data.downloads.CapturedDownload
 import dev.readana.core.data.downloads.EnqueueOutcome
 import dev.readana.core.data.downloads.RetryOutcome
+import dev.readana.core.data.messages.DefaultMessageBus
+import dev.readana.core.data.messages.MessageBus
+import dev.readana.core.data.messages.UiMessage
 import dev.readana.core.data.repository.BookSourceRegistry
 import dev.readana.core.data.repository.SettingsRepository
 import dev.readana.core.model.AiSettings
@@ -34,8 +37,11 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 
@@ -63,11 +69,14 @@ class DiscoverViewModelTest {
 
     private val verification = FakeVerificationStatus()
 
+    private val messageBus = DefaultMessageBus()
+
     private fun viewModel() = DiscoverViewModel(
         BookSourceRegistry(setOf(gutenberg, broken)),
         settings,
         downloads,
         trending,
+        messageBus,
         verification
     )
 
@@ -119,29 +128,35 @@ class DiscoverViewModelTest {
     fun `downloading queues the book and reports the remaining quota`() = runTest {
         downloads.outcome = { EnqueueOutcome.Enqueued(job(it.title), fastDownloadsLeft = 4) }
         val viewModel = searchedViewModel()
+        val sent = record(messageBus)
 
         viewModel.download(viewModel.uiState.value.results.single().best)
         advanceUntilIdle()
 
-        val message = assertIs<DiscoverMessage.Queued>(viewModel.uiState.value.message)
-        assertEquals("Pride and Prejudice", message.title)
-        assertEquals(4, message.fastDownloadsLeft)
+        assertEquals(
+            UiMessage.Quantity(
+                R.plurals.feature_discover_message_queued_quota,
+                4,
+                listOf("Pride and Prejudice", 4)
+            ),
+            sent.single()
+        )
         assertEquals(listOf("1342"), downloads.enqueued.map { it.recordId })
-
-        viewModel.consumeMessage()
-        assertEquals(null, viewModel.uiState.value.message)
     }
 
     @Test
     fun `a book already in the library is reported instead of queued`() = runTest {
         downloads.outcome = { EnqueueOutcome.AlreadyInLibrary(book()) }
         val viewModel = searchedViewModel()
+        val sent = record(messageBus)
 
         viewModel.download(viewModel.uiState.value.results.single().best)
         advanceUntilIdle()
 
-        val message = assertIs<DiscoverMessage.AlreadyInLibrary>(viewModel.uiState.value.message)
-        assertEquals("Pride and Prejudice", message.title)
+        assertEquals(
+            UiMessage.Text(R.string.feature_discover_message_in_library, listOf("Pride and Prejudice")),
+            sent.single()
+        )
     }
 
     @Test
@@ -181,11 +196,12 @@ class DiscoverViewModelTest {
     fun `a failing enqueue surfaces the error`() = runTest {
         downloads.outcome = { EnqueueOutcome.Failed(AppError.Unauthorized("bad key")) }
         val viewModel = searchedViewModel()
+        val sent = record(messageBus)
 
         viewModel.download(viewModel.uiState.value.results.single().best)
         advanceUntilIdle()
 
-        assertIs<DiscoverMessage.Failed>(viewModel.uiState.value.message)
+        assertEquals(R.string.feature_discover_message_failed, assertIs<UiMessage.Text>(sent.single()).id)
     }
 
     @Test
@@ -286,9 +302,15 @@ private class FakeBookDownloadManager : BookDownloadManager {
 
     override suspend fun retry(jobId: String): RetryOutcome = RetryOutcome.Requeued
 
+    override suspend fun pause(jobId: String) = Unit
+
+    override suspend fun resume(jobId: String) = Unit
+
     override suspend fun cancel(jobId: String) = Unit
 
     override suspend fun dismiss(jobId: String) = Unit
+
+    override suspend fun dismissFinished() = Unit
 }
 
 private class FakeSettingsRepository : SettingsRepository {
@@ -320,4 +342,20 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setLibraryFolderUri(uri: String?) {
         folder.value = uri
     }
+}
+
+/**
+ * The real bus, recording what went through it.
+ *
+ * It has no dependencies of its own, so there is nothing to fake: collecting from it is exactly
+ * what the app shell does.
+ */
+private fun TestScope.record(bus: MessageBus): List<UiMessage> {
+    val seen = mutableListOf<UiMessage>()
+    // Unconfined so the collector is subscribed the moment this returns: the bus buffers rather
+    // than replays, and a message sent before anyone is listening is simply gone.
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+        bus.messages.collect { seen += it }
+    }
+    return seen
 }

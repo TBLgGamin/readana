@@ -17,11 +17,8 @@ import kotlinx.coroutines.withContext
 interface HighlightsRepository {
     fun observeForBook(bookId: String): Flow<List<Highlight>>
 
-    /**
-     * Stores [highlight] and returns it with the id the database assigned. [progression] only
-     * orders the list, so it is kept out of the model.
-     */
-    suspend fun add(highlight: Highlight, progression: Double?): Highlight
+    /** Stores [highlight] and returns it with the id the database assigned. */
+    suspend fun add(highlight: Highlight): Highlight
 
     suspend fun update(highlight: Highlight)
 
@@ -36,8 +33,8 @@ class RoomHighlightsRepository @Inject constructor(
     override fun observeForBook(bookId: String): Flow<List<Highlight>> =
         highlightDao.observeForBook(bookId).map { entities -> entities.map { it.toModel() } }
 
-    override suspend fun add(highlight: Highlight, progression: Double?): Highlight = withContext(ioDispatcher) {
-        val id = highlightDao.insert(highlight.toEntity(progression))
+    override suspend fun add(highlight: Highlight): Highlight = withContext(ioDispatcher) {
+        val id = highlightDao.insert(highlight.toEntity())
         highlight.copy(id = id)
     }
 

@@ -6,6 +6,7 @@ import androidx.savedstate.serialization.SavedStateConfiguration
 import dev.readana.feature.browser.BrowserKey
 import dev.readana.feature.browser.BrowserVerifyKey
 import dev.readana.feature.discover.DiscoverKey
+import dev.readana.feature.downloads.DownloadsKey
 import dev.readana.feature.library.LibraryKey
 import dev.readana.feature.reader.ReaderKey
 import dev.readana.feature.settings.SettingsKey
@@ -22,6 +23,7 @@ val readanaSavedStateConfiguration: SavedStateConfiguration = SavedStateConfigur
         polymorphic(NavKey::class) {
             subclass(LibraryKey::class)
             subclass(DiscoverKey::class)
+            subclass(DownloadsKey::class)
             subclass(SettingsKey::class)
             subclass(ReaderKey::class)
             subclass(BrowserKey::class)

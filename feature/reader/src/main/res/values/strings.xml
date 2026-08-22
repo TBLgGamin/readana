@@ -13,6 +13,14 @@
     <string name="feature_reader_search">Search in book</string>
     <string name="feature_reader_highlight">Highlight</string>
     <string name="feature_reader_highlight_delete">Delete</string>
+    <string name="feature_reader_note_action">Note</string>
+    <string name="feature_reader_note_edit">Edit note</string>
+    <string name="feature_reader_notes">Notes</string>
+    <string name="feature_reader_notes_empty">Nothing marked yet.</string>
+    <string name="feature_reader_notes_empty_help">Select a passage and choose Highlight, or Note to write something against it.</string>
+    <string name="feature_reader_notes_share">Share notes</string>
+    <string name="feature_reader_bookmarks_empty">No saved places.</string>
+    <string name="feature_reader_bookmarks_empty_help">The bookmark at the top of the screen keeps the page you are on.</string>
     <string name="feature_reader_note">Note</string>
     <string name="feature_reader_note_hint">Your note</string>
     <string name="feature_reader_note_save">Save</string>
@@ -38,7 +46,6 @@
     <string name="feature_reader_ai_recap">Where was I?</string>
     <string name="feature_reader_ai_coverage">Only what you have read · up to %1$d%%</string>
     <string name="feature_reader_ai_coverage_unknown">Only what you have read</string>
-    <string name="feature_reader_ai_gathering">Reading back through the book…</string>
     <string name="feature_reader_ai_question">Ask about this passage</string>
     <string name="feature_reader_ai_send">Send</string>
     <string name="feature_reader_ai_retry">Try again</string>
@@ -54,4 +61,34 @@
     <string name="feature_reader_ai_conversations_empty_help">Select a passage and choose Ask or Explain, and the conversation will be kept here.</string>
     <string name="feature_reader_ai_picture_credit">%1$s · Wikipedia</string>
     <string name="feature_reader_ai_picture_missing">No picture of %1$s could be found.</string>
+    <plurals name="feature_reader_notes_count">
+        <item quantity="one">%1$d note</item>
+        <item quantity="other">%1$d notes</item>
+    </plurals>
+    <string name="feature_reader_settings_own">This book has its own settings. Changes here stay with it.</string>
+    <string name="feature_reader_settings_reset">Reset to my defaults</string>
+    <string name="feature_reader_chapter_almost_done">Nearly through this chapter</string>
+    <plurals name="feature_reader_chapter_minutes_left">
+        <item quantity="one">About %1$d minute left in this chapter</item>
+        <item quantity="other">About %1$d minutes left in this chapter</item>
+    </plurals>
+    <plurals name="feature_reader_chapter_hours_left">
+        <item quantity="one">About %1$d h %2$d min left in this chapter</item>
+        <item quantity="other">About %1$d h %2$d min left in this chapter</item>
+    </plurals>
+    <string name="feature_reader_ai_ask_book">Ask about this book</string>
+    <string name="feature_reader_ai_ask_book_help">Anything you like, about what you have read so far.</string>
+    <string name="feature_reader_ai_recap_help">A reminder of the story up to here, and no further.</string>
+    <string name="feature_reader_ai_conversations_past">Earlier</string>
+    <string name="feature_reader_define">Define</string>
+    <string name="feature_reader_define_nothing">The dictionary has no entry for “%1$s”.</string>
+    <string name="feature_reader_define_ask_assistant">Ask the assistant instead</string>
+    <string name="feature_reader_define_sense">%1$d. %2$s</string>
+    <string name="feature_reader_listen">Read aloud</string>
+    <string name="feature_reader_tts_play">Resume</string>
+    <string name="feature_reader_tts_pause">Pause</string>
+    <string name="feature_reader_tts_next">Next sentence</string>
+    <string name="feature_reader_tts_previous">Previous sentence</string>
+    <string name="feature_reader_tts_speed">%1$.2f×</string>
+    <string name="feature_reader_tts_stop">Stop reading aloud</string>
 </resources>

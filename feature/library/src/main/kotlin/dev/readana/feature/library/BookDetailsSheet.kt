@@ -2,18 +2,23 @@ package dev.readana.feature.library
 
 import android.text.format.Formatter
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -24,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
@@ -34,9 +40,12 @@ import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.BookDetailsHeader
 import dev.readana.core.designsystem.component.BookDetailsPadding
 import dev.readana.core.designsystem.component.BookFact
+import dev.readana.core.designsystem.component.NoteRow
 import dev.readana.core.model.Book
+import dev.readana.core.model.BookCollection
 import dev.readana.core.model.BookFormat
 import dev.readana.core.model.ConversionReport
+import dev.readana.core.model.Highlight
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -46,28 +55,46 @@ private val SheetPadding = BookDetailsPadding
 private val DetailValueWidth = 220.dp
 private const val PERCENT = 100
 
+/** "Book 2", not "Book 2.0"; half-numbers exist in series and should survive. */
+private fun Float.seriesLabel(): String = if (this == toInt().toFloat()) toInt().toString() else toString()
+
 private val AddedDateFormatter: DateTimeFormatter = DateTimeFormatter
     .ofLocalizedDate(FormatStyle.MEDIUM)
     .withZone(ZoneId.systemDefault())
 
-/** Everything known about one book, with the two actions that act on it. */
+/** What the details sheet can ask for, grouped so the sheet keeps one parameter. */
+internal data class BookDetailsActions(
+    val onDelete: () -> Unit,
+    val onConvert: () -> Unit,
+    val onShareNotes: () -> Unit,
+    val onSetCollectionMembership: (collectionId: String, member: Boolean) -> Unit,
+    val onCreateCollection: (String) -> Unit,
+    val onFinishedChange: (Boolean) -> Unit,
+    val onDismiss: () -> Unit
+)
+
+/** Everything known about one book, with the actions that act on it. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun BookDetailsSheet(
     book: Book,
     isConverting: Boolean,
-    onDelete: () -> Unit,
-    onConvert: () -> Unit,
-    onDismiss: () -> Unit,
+    notes: List<Highlight>,
+    collections: List<BookCollection>,
+    memberOf: Set<String>,
+    actions: BookDetailsActions,
     modifier: Modifier = Modifier
 ) {
     var showReport by rememberSaveable { mutableStateOf(false) }
     var confirmReconvert by rememberSaveable { mutableStateOf(false) }
+    var editCollections by rememberSaveable { mutableStateOf(false) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, modifier = modifier) {
+    ModalBottomSheet(onDismissRequest = actions.onDismiss, modifier = modifier) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                // Notes make this sheet as long as the reader has been busy.
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = SheetPadding)
                 .padding(bottom = SheetPadding)
         ) {
@@ -81,22 +108,43 @@ internal fun BookDetailsSheet(
             Spacer(Modifier.height(SheetPadding))
             // No "Read" here: tapping the book in the grid already opens it, and this sheet is
             // reached by long-pressing that same cover.
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Wrapping, not sharing the width out: "Convert to EPUB" beside two more labelled
+            // buttons is wider than a phone, and squeezed buttons read as broken ones.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 ConvertButton(
                     book = book,
                     isConverting = isConverting,
-                    onConvert = onConvert,
+                    onConvert = actions.onConvert,
                     onConfirmReconvert = { confirmReconvert = true }
                 )
-                OutlinedButton(onClick = onDelete) {
+                OutlinedButton(onClick = { editCollections = true }) {
+                    Icon(ReadanaIcons.Collection, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.feature_library_collections_edit))
+                }
+                OutlinedButton(onClick = actions.onDelete) {
                     Icon(ReadanaIcons.Delete, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.feature_library_details_delete))
                 }
             }
+            FinishedButton(book = book, onFinishedChange = actions.onFinishedChange)
+            NotesSection(notes = notes, onShare = actions.onShareNotes)
         }
     }
 
+    if (editCollections) {
+        CollectionsDialog(
+            collections = collections,
+            memberOf = memberOf,
+            onSetMembership = actions.onSetCollectionMembership,
+            onCreate = actions.onCreateCollection,
+            onDismiss = { editCollections = false }
+        )
+    }
     if (showReport) {
         book.conversion?.report?.let { report ->
             ConversionReportDialog(report = report, onDismiss = { showReport = false })
@@ -106,10 +154,74 @@ internal fun BookDetailsSheet(
         ReconvertDialog(
             onConfirm = {
                 confirmReconvert = false
-                onConvert()
+                actions.onConvert()
             },
             onDismiss = { confirmReconvert = false }
         )
+    }
+}
+
+/**
+ * The reader's own verdict on a book.
+ *
+ * A text button rather than a switch: it is a thing you do once, not a setting you keep. The label
+ * says what will happen, so nothing has to be read twice.
+ *
+ * It tracks the mark the reader actually set, not the status derived from it. Derived status also
+ * calls a book read once the bar is within a couple of percent of the end, so on a book you had
+ * finished anyway the button changed nothing when pressed and looked broken.
+ */
+@Composable
+private fun FinishedButton(book: Book, onFinishedChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    val finished = book.finishedAt != null
+    TextButton(onClick = { onFinishedChange(!finished) }, modifier = modifier) {
+        Icon(if (finished) ReadanaIcons.Refresh else ReadanaIcons.Done, contentDescription = null)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            stringResource(
+                if (finished) {
+                    R.string.feature_library_mark_unfinished
+                } else {
+                    R.string.feature_library_mark_finished
+                }
+            )
+        )
+    }
+}
+
+/**
+ * What the reader marked while reading, and one way to take it with them.
+ *
+ * Absent entirely until there is something to show: a book nobody has annotated should not carry an
+ * empty heading.
+ */
+@Composable
+private fun NotesSection(notes: List<Highlight>, onShare: () -> Unit, modifier: Modifier = Modifier) {
+    if (notes.isEmpty()) return
+    Column(modifier) {
+        Spacer(Modifier.height(SheetPadding))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = pluralStringResource(R.plurals.feature_library_notes_count, notes.size, notes.size),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = onShare) {
+                Icon(
+                    ReadanaIcons.Share,
+                    contentDescription = stringResource(R.string.feature_library_notes_share)
+                )
+            }
+        }
+        notes.forEach { note ->
+            NoteRow(
+                text = note.text,
+                tint = note.tint,
+                note = note.note,
+                progression = note.progression
+            )
+        }
     }
 }
 
@@ -214,6 +326,18 @@ private fun BookFacts(book: Book, onShowReport: () -> Unit, modifier: Modifier =
             value = AddedDateFormatter.format(book.addedAt)
         )
         BookFact(stringResource(R.string.feature_library_details_language), book.language ?: unknown)
+        book.series?.let { series ->
+            BookFact(
+                label = stringResource(R.string.feature_library_details_series),
+                value = series.index?.let { index ->
+                    stringResource(
+                        R.string.feature_library_details_series_value,
+                        series.name,
+                        index.seriesLabel()
+                    )
+                } ?: series.name
+            )
+        }
         book.progress?.let { progress ->
             BookFact(
                 label = stringResource(R.string.feature_library_details_progress),

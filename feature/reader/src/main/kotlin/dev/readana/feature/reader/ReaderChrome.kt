@@ -23,12 +23,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import dev.readana.core.data.reading.ReadingSpeed
 import dev.readana.core.designsystem.ReadanaIcons
 import kotlin.math.roundToInt
 
 private const val PERCENT = 100
+private const val MILLIS_PER_MINUTE = 60_000L
+private const val MINUTES_PER_HOUR = 60
 
 /**
  * Bottom half of the reader chrome: where you are in the book, a slider to move, and the way into
@@ -41,8 +45,11 @@ internal fun ReaderBottomBar(
     onShowContents: () -> Unit,
     onShowSettings: () -> Unit,
     onShowConversations: () -> Unit,
+    onListen: () -> Unit,
     /** The assistant's button is only there once there is an assistant to talk to. */
     conversationsAvailable: Boolean,
+    /** Read-aloud's button is only there for books that have text to read. */
+    listenAvailable: Boolean,
     modifier: Modifier = Modifier
 ) {
     AnimatedVisibility(
@@ -76,6 +83,14 @@ internal fun ReaderBottomBar(
                                 ReadanaIcons.Library,
                                 contentDescription = stringResource(R.string.feature_reader_contents)
                             )
+                        }
+                        if (listenAvailable) {
+                            IconButton(onClick = onListen) {
+                                Icon(
+                                    ReadanaIcons.Listen,
+                                    contentDescription = stringResource(R.string.feature_reader_listen)
+                                )
+                            }
                         }
                         if (conversationsAvailable) {
                             IconButton(onClick = onShowConversations) {
@@ -133,9 +148,28 @@ private fun ProgressSlider(progression: Float, onSeek: (Float) -> Unit, modifier
     }
 }
 
+/**
+ * How much of the chapter is left, once enough reading has been done to know how fast that is —
+ * and where in the book you are until then. One line either way, so the bar never grows.
+ */
 @Composable
-private fun positionLabel(state: ReaderUiState.Ready): String = stringResource(
-    R.string.feature_reader_position,
-    state.currentPosition.coerceAtLeast(1),
-    state.positionCount.coerceAtLeast(1)
-)
+private fun positionLabel(state: ReaderUiState.Ready): String {
+    val millis = ReadingSpeed.timeLeftMillis(state.positionsLeftInChapter, state.readingRate)
+        ?: return stringResource(
+            R.string.feature_reader_position,
+            state.currentPosition.coerceAtLeast(1),
+            state.positionCount.coerceAtLeast(1)
+        )
+    val minutes = (millis / MILLIS_PER_MINUTE).toInt()
+    if (minutes < 1) return stringResource(R.string.feature_reader_chapter_almost_done)
+    if (minutes < MINUTES_PER_HOUR) {
+        return pluralStringResource(R.plurals.feature_reader_chapter_minutes_left, minutes, minutes)
+    }
+    val hours = minutes / MINUTES_PER_HOUR
+    return pluralStringResource(
+        R.plurals.feature_reader_chapter_hours_left,
+        hours,
+        hours,
+        minutes % MINUTES_PER_HOUR
+    )
+}

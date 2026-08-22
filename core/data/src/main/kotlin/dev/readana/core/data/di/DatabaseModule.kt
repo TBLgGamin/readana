@@ -9,10 +9,13 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dev.readana.core.data.database.AiThreadDao
 import dev.readana.core.data.database.BookDao
+import dev.readana.core.data.database.BookSettingsDao
 import dev.readana.core.data.database.BookmarkDao
+import dev.readana.core.data.database.CollectionDao
 import dev.readana.core.data.database.DownloadDao
 import dev.readana.core.data.database.HighlightDao
 import dev.readana.core.data.database.ReadanaDatabase
+import dev.readana.core.data.database.ReadingSessionDao
 import javax.inject.Singleton
 
 @Module
@@ -37,4 +40,13 @@ object DatabaseModule {
 
     @Provides
     fun providesAiThreadDao(database: ReadanaDatabase): AiThreadDao = database.aiThreadDao()
+
+    @Provides
+    fun providesBookSettingsDao(database: ReadanaDatabase): BookSettingsDao = database.bookSettingsDao()
+
+    @Provides
+    fun providesReadingSessionDao(database: ReadanaDatabase): ReadingSessionDao = database.readingSessionDao()
+
+    @Provides
+    fun providesCollectionDao(database: ReadanaDatabase): CollectionDao = database.collectionDao()
 }

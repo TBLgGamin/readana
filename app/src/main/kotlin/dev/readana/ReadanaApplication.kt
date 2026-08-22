@@ -1,6 +1,8 @@
 package dev.readana
 
 import android.app.Application
+import androidx.compose.material3.ComposeMaterial3Flags
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import coil3.ImageLoader
@@ -66,8 +68,13 @@ class ReadanaApplication :
         .crossfade(true)
         .build()
 
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate() {
         super.onCreate()
+        // Material 3 still ships the old snackbar layout by default and gates the corrected,
+        // expressive one behind this flag. Set before anything composes, so every message in the
+        // app gets the same shape.
+        ComposeMaterial3Flags.isSnackbarStylingFixEnabled = true
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }

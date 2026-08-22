@@ -1,5 +1,6 @@
 package dev.readana.feature.reader
 
+import android.app.Application
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -12,6 +13,9 @@ import dev.readana.core.model.BookFormat
 import dev.readana.core.model.ReaderSettings
 import javax.inject.Inject
 import org.readium.adapter.pdfium.navigator.PdfiumEngineProvider
+import org.readium.navigator.media.tts.TtsNavigator
+import org.readium.navigator.media.tts.TtsNavigatorFactory
+import org.readium.navigator.media.tts.android.AndroidTtsPreferences
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.pdf.PdfNavigatorFactory
@@ -37,7 +41,8 @@ internal interface ReaderSessionFactory {
 
 internal class ReadiumReaderSessionFactory @Inject constructor(
     private val publicationOpener: ReadiumPublicationOpener,
-    private val selectionRelay: ReaderSelectionRelay
+    private val selectionRelay: ReaderSelectionRelay,
+    private val application: Application
 ) : ReaderSessionFactory {
     override suspend fun create(
         book: Book,
@@ -102,21 +107,64 @@ internal class ReadiumReaderSessionFactory @Inject constructor(
         navigatorClass: Class<out androidx.fragment.app.Fragment>,
         factory: androidx.fragment.app.FragmentFactory,
         isFixedLayout: Boolean = false
-    ) = ReaderSession(
-        bookId = book.id,
-        title = publication.metadata.title ?: book.title,
-        navigatorClass = navigatorClass,
-        fragmentFactory = factory,
-        toc = publication.tableOfContents.flatten(publication, depth = 0),
-        positions = publication.positions(),
-        isSearchable = publication.isSearchable,
-        hasText = publication.hasText(),
-        textWalker = { anchor -> publication.textWalkerAt(anchor) },
-        loadFigure = { href -> Url(href)?.let { publication.readBytes(it) } },
-        isFixedLayout = isFixedLayout,
-        search = { query -> publication.search(query) },
-        onClose = { publication.close() }
-    )
+    ): ReaderSession {
+        val toc = publication.tableOfContents.flatten(publication, depth = 0)
+        val positions = publication.positions()
+        return ReaderSession(
+            bookId = book.id,
+            title = publication.metadata.title ?: book.title,
+            navigatorClass = navigatorClass,
+            fragmentFactory = factory,
+            toc = toc,
+            positions = positions,
+            tocPositions = toc.positionIndices(positions),
+            isSearchable = publication.isSearchable,
+            hasText = publication.hasText(),
+            textWalker = { anchor -> publication.textWalkerAt(anchor) },
+            createTts = { from, speed, onStopRequested -> ttsNavigator(publication, from, speed, onStopRequested) },
+            loadFigure = { href -> Url(href)?.let { publication.readBytes(it) } },
+            isFixedLayout = isFixedLayout,
+            search = { query -> publication.search(query) },
+            onClose = { publication.close() }
+        )
+    }
+
+    /**
+     * Read-aloud over [publication], or null when Readium cannot speak it — a PDF opened through
+     * pdfium has no text service, and there is nothing to read.
+     *
+     * The navigator belongs to whoever asked for it: it holds a synthesis engine and an audio
+     * focus request, and must be closed when the reader stops listening rather than when the book
+     * closes.
+     */
+    private suspend fun ttsNavigator(
+        publication: Publication,
+        from: Locator?,
+        speed: Double,
+        onStopRequested: () -> Unit
+    ): ReadanaTtsNavigator? {
+        val factory = TtsNavigatorFactory(application, publication) ?: return null
+        return factory.createNavigator(
+            listener = object : TtsNavigator.Listener {
+                override fun onStopRequested() = onStopRequested()
+            },
+            initialLocator = from,
+            initialPreferences = AndroidTtsPreferences(speed = speed)
+        ).getOrNull()
+    }
+
+    /**
+     * Places each chapter in the position list. A chapter whose locator matches no position — the
+     * table of contents can point at anchors the position list does not enumerate — gets -1 and is
+     * simply not used for estimates.
+     */
+    private fun List<TocEntry>.positionIndices(positions: List<Locator>): List<Int> = map { entry ->
+        val locator = entry.locator ?: return@map UNPLACED
+        positions.indexOfFirst { candidate ->
+            candidate.href == locator.href &&
+                (candidate.locations.progression ?: 0.0) >= (locator.locations.progression ?: 0.0)
+        }
+    }
 
     private fun List<Link>.flatten(publication: Publication, depth: Int): List<TocEntry> = flatMap { link ->
         val entry = link.title?.trim()?.takeIf { it.isNotEmpty() }?.let { title ->
@@ -131,6 +179,9 @@ internal class ReadiumReaderSessionFactory @Inject constructor(
         entry + link.children.flatten(publication, depth + 1)
     }
 }
+
+/** A chapter the position list cannot place. */
+internal const val UNPLACED = -1
 
 @Module
 @InstallIn(ViewModelComponent::class)

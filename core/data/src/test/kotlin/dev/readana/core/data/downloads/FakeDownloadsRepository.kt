@@ -52,11 +52,15 @@ class FakeDownloadsRepository : DownloadsRepository {
         it.copy(status = status.name, errorKind = errorKind?.name, errorMessage = errorMessage)
     }
 
-    override suspend fun markCompleted(id: String, bookId: String) = edit(id) {
-        it.copy(status = DownloadStatus.Completed.name, bookId = bookId, errorKind = null, errorMessage = null)
-    }
+    override suspend fun attachBook(id: String, bookId: String) = edit(id) { it.copy(bookId = bookId) }
 
     override suspend fun remove(id: String) = state.update { it - id }
+
+    override suspend fun removeFinished(): List<String> {
+        val ids = state.value.values.filterNot { it.toModel().isPending }.map { it.id }
+        state.update { entities -> entities - ids.toSet() }
+        return ids
+    }
 
     private fun edit(id: String, block: (DownloadEntity) -> DownloadEntity) = state.update { entities ->
         val entity = entities[id] ?: return@update entities

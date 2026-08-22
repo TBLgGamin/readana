@@ -42,9 +42,13 @@ interface DownloadsRepository {
         errorMessage: String? = null
     )
 
-    suspend fun markCompleted(id: String, bookId: String)
+    /** Ties the row to the library book it produced. */
+    suspend fun attachBook(id: String, bookId: String)
 
     suspend fun remove(id: String)
+
+    /** Drops every row that has stopped for good, and reports which ones went. */
+    suspend fun removeFinished(): List<String>
 }
 
 @Singleton
@@ -87,11 +91,18 @@ class RoomDownloadsRepository @Inject constructor(
         downloadDao.updateStatus(id, status.name, errorKind?.name, errorMessage, now())
     }
 
-    override suspend fun markCompleted(id: String, bookId: String) = withContext(ioDispatcher) {
-        downloadDao.markCompleted(id, bookId, now())
+    override suspend fun attachBook(id: String, bookId: String) = withContext(ioDispatcher) {
+        downloadDao.attachBook(id, bookId, now())
     }
 
     override suspend fun remove(id: String) = withContext(ioDispatcher) { downloadDao.deleteById(id) }
+
+    override suspend fun removeFinished(): List<String> = withContext(ioDispatcher) {
+        // Read first: the caller has partial files to clean up and needs the ids to find them.
+        val ids = downloadDao.getFinished().map { it.id }
+        downloadDao.deleteFinished()
+        ids
+    }
 
     private fun now(): Long = Instant.now().toEpochMilli()
 }

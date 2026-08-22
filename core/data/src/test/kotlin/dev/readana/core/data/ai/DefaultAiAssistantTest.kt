@@ -1,5 +1,6 @@
 package dev.readana.core.data.ai
 
+import dev.readana.ai.client.ImageAttachment
 import dev.readana.ai.client.LlmClient
 import dev.readana.ai.client.LlmClientFactory
 import dev.readana.ai.client.LlmEvent
@@ -12,6 +13,7 @@ import dev.readana.core.common.result.AppResult
 import dev.readana.core.common.result.asSuccess
 import dev.readana.core.data.FakeSettingsRepository
 import dev.readana.core.data.repository.AiThreadsRepository
+import dev.readana.core.model.AiFigure
 import dev.readana.core.model.AiMessage
 import dev.readana.core.model.AiProviderConfig
 import dev.readana.core.model.AiProviderKind
@@ -149,6 +151,50 @@ class DefaultAiAssistantTest {
     }
 
     @Test
+    fun `a model that will not take pictures is asked again without them`() = runTest {
+        val textOnly = TextOnlyLlmClient()
+        client = textOnly
+        val thread = startThread(figures = listOf(whaleFigure()))
+
+        val events = assistant().reply(thread, question = "Why?", images = listOf(figure())).toList()
+
+        assertEquals("An answer.", assertIs<AssistantEvent.Done>(events.last()).text)
+        assertEquals(2, textOnly.requests.size)
+        assertTrue(textOnly.requests.first().images.isNotEmpty())
+        assertTrue(textOnly.requests.last().images.isEmpty())
+    }
+
+    @Test
+    fun `the second try stops telling the model about figures it will not receive`() = runTest {
+        val textOnly = TextOnlyLlmClient()
+        client = textOnly
+        val thread = startThread(figures = listOf(whaleFigure()))
+
+        assistant().reply(thread, question = "Why?", images = listOf(figure())).toList()
+
+        assertTrue(textOnly.requests.first().system.any { it.text.contains("figure:1") })
+        assertTrue(textOnly.requests.last().system.none { it.text.contains("figure:1") })
+    }
+
+    @Test
+    fun `a figure in a format nothing decodes never reaches the request`() = runTest {
+        val recording = RecordingLlmClient()
+        client = recording
+        val thread = startThread(figures = listOf(whaleFigure()))
+
+        assistant().reply(
+            thread,
+            question = "Why?",
+            images = listOf(figure(mediaType = "image/svg+xml"))
+        ).toList()
+
+        val request = recording.requests.single()
+        assertTrue(request.images.isEmpty())
+        // And nothing in the prompt promises a picture the model was never handed.
+        assertTrue(request.system.none { it.text.contains("figure:1") })
+    }
+
+    @Test
     fun `a failed request reports the provider's error`() = runTest {
         client = FailingLlmClient(AppError.Unauthorized("bad key"))
         val thread = startThread()
@@ -184,17 +230,28 @@ class DefaultAiAssistantTest {
         assertEquals(null, assistant().reusableRecap(book, 0.9f))
     }
 
-    private suspend fun startThread(): AiThread {
+    private suspend fun startThread(figures: List<AiFigure> = emptyList()): AiThread {
         val result = assistant().startThread(
             book = book,
             kind = AiThreadKind.Ask,
             quote = "Call me Ishmael.",
             context = ReadingContext("Call me Ishmael.", truncatedAtStart = false),
             chapterTitle = "Chapter 3",
-            coveredFraction = 0.4f
+            coveredFraction = 0.4f,
+            figures = figures
         )
         return assertIs<AppResult.Success<AiThread>>(result).value
     }
+
+    private fun whaleFigure() = AiFigure(
+        id = "figure:1",
+        href = "img/whale.jpg",
+        caption = "A whale",
+        mediaType = "image/jpeg"
+    )
+
+    private fun figure(mediaType: String = "image/jpeg") =
+        ImageAttachment(id = "figure:1", mediaType = mediaType, bytes = byteArrayOf(1, 2, 3))
 
     private fun assistant() = DefaultAiAssistant(
         settingsRepository = settings,
@@ -267,6 +324,24 @@ private class FussyCeilingLlmClient : LlmClient {
         ceilings += request.maxOutputTokens
         return if (ceilings.size == 1) {
             flow { throw LlmException(AppError.Http(400, "max_tokens: 32000 > 8192, the maximum")) }
+        } else {
+            flowOf(LlmEvent.Delta("An answer."), LlmEvent.Done(stopReason = "end_turn"))
+        }
+    }
+
+    override suspend fun listModels(): AppResult<List<LlmModel>> = emptyList<LlmModel>().asSuccess()
+
+    override suspend fun ping(): AppResult<Long> = 1L.asSuccess()
+}
+
+/** Refuses the pictures the way a text-only model does, then answers the question without them. */
+private class TextOnlyLlmClient : LlmClient {
+    val requests = mutableListOf<LlmRequest>()
+
+    override fun stream(request: LlmRequest): Flow<LlmEvent> {
+        requests += request
+        return if (request.images.isNotEmpty()) {
+            flow { throw LlmException(AppError.Http(400, "This model does not support image input.")) }
         } else {
             flowOf(LlmEvent.Delta("An answer."), LlmEvent.Done(stopReason = "end_turn"))
         }

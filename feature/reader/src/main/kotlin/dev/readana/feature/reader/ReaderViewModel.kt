@@ -7,12 +7,17 @@ import dev.readana.core.common.coroutines.ApplicationScope
 import dev.readana.core.common.input.VolumeKeyRelay
 import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
+import dev.readana.core.data.dictionary.DictionaryLookup
+import dev.readana.core.data.notes.NotesExporter
+import dev.readana.core.data.repository.BookSettingsRepository
 import dev.readana.core.data.repository.BookmarksRepository
 import dev.readana.core.data.repository.HighlightsRepository
 import dev.readana.core.data.repository.LibraryRepository
+import dev.readana.core.data.repository.ReadingSessionsRepository
 import dev.readana.core.data.repository.SettingsRepository
 import dev.readana.core.model.Book
 import dev.readana.core.model.Bookmark
+import dev.readana.core.model.DictionaryEntry
 import dev.readana.core.model.Highlight
 import dev.readana.core.model.HighlightStyle
 import dev.readana.core.model.HighlightTint
@@ -25,9 +30,11 @@ import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -37,7 +44,10 @@ import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.services.search.SearchIterator
 
 /** Which sheet, if any, is covering the page. */
-internal enum class ReaderSheet { None, Contents, Settings, Search, Conversations }
+internal enum class ReaderSheet { None, Contents, Settings, Search, Conversations, Definition }
+
+/** A word being looked up, and what came back. */
+internal data class DefinitionState(val word: String, val isLoading: Boolean = true, val entry: DictionaryEntry? = null)
 
 /** A marked passage as the reader shows it. */
 internal data class HighlightItem(
@@ -45,7 +55,8 @@ internal data class HighlightItem(
     val text: String,
     val note: String?,
     val tint: HighlightTint,
-    val style: HighlightStyle
+    val style: HighlightStyle,
+    val progression: Double?
 )
 
 /** A saved place, as the sheet shows it. */
@@ -98,9 +109,23 @@ internal sealed interface ReaderUiState {
         val search: SearchState = SearchState(),
         val highlights: List<HighlightItem> = emptyList(),
         /** The highlight whose note is being edited, if any. */
-        val editingHighlight: HighlightItem? = null
+        val editingHighlight: HighlightItem? = null,
+        /** A written-out notes file waiting to be handed to another app; one shot. */
+        val notesExportUri: String? = null,
+        /** True once this book has settings of its own, which is what offers the way back. */
+        val hasOwnSettings: Boolean = false,
+        /** Reading positions between here and the end of the chapter, and of the book. */
+        val positionsLeftInChapter: Int = 0,
+        val positionsLeftInBook: Int = 0,
+        /** Positions per minute, once enough reading has been done to know. Null until then. */
+        val readingRate: Double? = null,
+        /** The word the reader asked about, while the definition sheet is up. */
+        val definition: DefinitionState? = null
     ) : ReaderUiState
 }
+
+/** Reading settings for one book, and whether they are the book's own or the app's defaults. */
+private data class BookReaderSettings(val settings: ReaderSettings, val isOwn: Boolean)
 
 /** A table-of-contents row, addressed by index so the UI never touches Readium types. */
 internal data class TocItem(val index: Int, val title: String, val depth: Int)
@@ -126,6 +151,10 @@ internal class ReaderViewModel @Inject constructor(
     private val bookmarksRepository: BookmarksRepository,
     private val highlightsRepository: HighlightsRepository,
     private val settingsRepository: SettingsRepository,
+    private val bookSettingsRepository: BookSettingsRepository,
+    private val readingSessionsRepository: ReadingSessionsRepository,
+    private val dictionary: DictionaryLookup,
+    private val notesExporter: NotesExporter,
     private val sessionFactory: ReaderSessionFactory,
     private val sessionStore: ReaderSessionStore,
     /** Exposed so the reading surface can claim the volume keys while it is on screen. */
@@ -147,21 +176,10 @@ internal class ReaderViewModel @Inject constructor(
     private var searchIterator: SearchIterator? = null
     private var searchHits: List<Locator> = emptyList()
     private var highlightsJob: Job? = null
+    private var settingsJob: Job? = null
+    private var rateJob: Job? = null
+    private var definitionJob: Job? = null
     private var highlights: List<Highlight> = emptyList()
-
-    init {
-        viewModelScope.launch {
-            settingsRepository.readerSettings.collect { settings ->
-                _uiState.update { state ->
-                    if (state is ReaderUiState.Ready) {
-                        state.copy(settings = settings.forLayout(state.isFixedLayout))
-                    } else {
-                        state
-                    }
-                }
-            }
-        }
-    }
 
     /** Opens [bookId] once; later calls for the same book are ignored. */
     fun open(bookId: String, systemInDarkTheme: Boolean) {
@@ -174,7 +192,9 @@ internal class ReaderViewModel @Inject constructor(
                 _uiState.value = ReaderUiState.NotFound
                 return@launch
             }
-            val settings = settingsRepository.readerSettings.first()
+            val settings = settingsFor(bookId).first().settings
+            observeSettings(bookId)
+            observeReadingRate(bookId)
             val created = sessionFactory.create(
                 book = book,
                 initialLocator = book.progress?.let { parseLocator(it.locatorJson) },
@@ -195,8 +215,50 @@ internal class ReaderViewModel @Inject constructor(
     /** Shows a sheet, or dismisses whatever is showing when passed [ReaderSheet.None]. */
     fun showSheet(sheet: ReaderSheet) = updateReady { it.copy(sheet = sheet) }
 
+    /**
+     * Adjusts how the open book reads. The change is kept against that book, not against the app:
+     * a comic set to two full-width pages should not turn the next novel into a broadsheet. The
+     * global defaults are edited from the Settings screen instead.
+     */
     fun updateSettings(transform: (ReaderSettings) -> ReaderSettings) {
-        viewModelScope.launch { settingsRepository.updateReaderSettings(transform) }
+        val bookId = openedBookId ?: return
+        val current = (_uiState.value as? ReaderUiState.Ready)?.settings ?: return
+        viewModelScope.launch { bookSettingsRepository.set(bookId, transform(current)) }
+    }
+
+    /** Hands the open book back to the global defaults. */
+    fun resetSettings() {
+        val bookId = openedBookId ?: return
+        viewModelScope.launch { bookSettingsRepository.clear(bookId) }
+    }
+
+    /** The book's own settings when it has any, and the app's defaults until then. */
+    private fun settingsFor(bookId: String): Flow<BookReaderSettings> = combine(
+        settingsRepository.readerSettings,
+        bookSettingsRepository.observeFor(bookId)
+    ) { defaults, own -> BookReaderSettings(own ?: defaults, isOwn = own != null) }
+
+    private fun observeReadingRate(bookId: String) {
+        rateJob?.cancel()
+        rateJob = viewModelScope.launch {
+            readingSessionsRepository.observeRate(bookId).collect { rate ->
+                updateReady { it.copy(readingRate = rate) }
+            }
+        }
+    }
+
+    private fun observeSettings(bookId: String) {
+        settingsJob?.cancel()
+        settingsJob = viewModelScope.launch {
+            settingsFor(bookId).collect { resolved ->
+                updateReady {
+                    it.copy(
+                        settings = resolved.settings.forLayout(it.isFixedLayout),
+                        hasOwnSettings = resolved.isOwn
+                    )
+                }
+            }
+        }
     }
 
     /** Bookmarks the current page, or removes the bookmark that is already on it. */
@@ -224,13 +286,14 @@ internal class ReaderViewModel @Inject constructor(
 
     /**
      * Marks [locator] with the text the reader selected. Colour, a note and deletion live in the
-     * editor, which opens by tapping the highlight itself.
+     * editor, which opens by tapping the highlight itself — or straight away when [thenEdit] is
+     * set, which is what separates "Note" from "Highlight" in the selection menu.
      */
-    fun addHighlight(locator: Locator, text: String) {
+    fun addHighlight(locator: Locator, text: String, thenEdit: Boolean = false) {
         val bookId = openedBookId ?: return
         viewModelScope.launch {
-            highlightsRepository.add(
-                highlight = Highlight(
+            val saved = highlightsRepository.add(
+                Highlight(
                     id = Highlight.UNSAVED_ID,
                     bookId = bookId,
                     locatorJson = locator.toJSON().toString(),
@@ -238,12 +301,51 @@ internal class ReaderViewModel @Inject constructor(
                     tint = HighlightTint.Yellow,
                     style = HighlightStyle.Highlight,
                     note = null,
+                    progression = locator.locations.totalProgression,
                     createdAt = Instant.now()
-                ),
-                progression = locator.locations.totalProgression
+                )
             )
+            if (thenEdit) updateReady { it.copy(editingHighlight = saved.toItem()) }
         }
     }
+
+    /**
+     * Looks [word] up and shows what the dictionary says.
+     *
+     * The sheet opens before the answer arrives: a lookup that takes a moment should not leave the
+     * reader wondering whether they hit the button.
+     */
+    fun define(word: String) {
+        val trimmed = word.trim().ifEmpty { return }
+        definitionJob?.cancel()
+        updateReady { it.copy(sheet = ReaderSheet.Definition, definition = DefinitionState(trimmed)) }
+        definitionJob = viewModelScope.launch {
+            val entry = dictionary.define(trimmed)
+            updateReady { state ->
+                // Ignore an answer for a word the reader has already moved on from.
+                if (state.definition?.word != trimmed) {
+                    state
+                } else {
+                    state.copy(definition = state.definition.copy(isLoading = false, entry = entry))
+                }
+            }
+        }
+    }
+
+    /**
+     * Writes the book's notes out as Markdown and offers the file to whatever the reader wants to
+     * send it to. Does nothing when there is nothing marked yet.
+     */
+    fun shareNotes() {
+        val book = (_uiState.value as? ReaderUiState.Ready)?.book ?: return
+        viewModelScope.launch {
+            val uri = notesExporter.export(book, highlights) ?: return@launch
+            updateReady { it.copy(notesExportUri = uri) }
+        }
+    }
+
+    /** Clears the export once the share sheet has been shown. */
+    fun consumeNotesExport() = updateReady { it.copy(notesExportUri = null) }
 
     /** Opens the editor for the highlight with [id], or closes it when passed null. */
     fun editHighlight(id: Long?) = updateReady { state ->
@@ -331,15 +433,29 @@ internal class ReaderViewModel @Inject constructor(
         val positions = session?.positions.orEmpty()
         val progression = locator.locations.totalProgression?.toFloat() ?: 0f
         updateReady { state ->
+            val current = locator.locations.position ?: (progression * positions.size).toInt()
             state.copy(
                 progression = progression.coerceIn(0f, 1f),
                 chapterTitle = locator.title ?: state.chapterTitle,
-                currentPosition = locator.locations.position
-                    ?: (progression * positions.size).toInt(),
+                currentPosition = current,
+                positionsLeftInChapter = positionsLeftInChapter(current, positions.size),
+                positionsLeftInBook = (positions.size - current).coerceAtLeast(0),
                 currentIsBookmarked = bookmarks.any { it.matches(locator) }
             )
         }
         scheduleProgressSave(locator)
+    }
+
+    /**
+     * How far it is to the next chapter that the position list could place. Falls back to the end
+     * of the book, which is the right answer for a book with no usable table of contents.
+     */
+    private fun positionsLeftInChapter(current: Int, total: Int): Int {
+        val next = session?.tocPositions
+            ?.filter { it != UNPLACED && it > current }
+            ?.minOrNull()
+            ?: total
+        return (next - current).coerceAtLeast(0)
     }
 
     override fun onCleared() = release()
@@ -349,6 +465,9 @@ internal class ReaderViewModel @Inject constructor(
         progressJob?.cancel()
         bookmarksJob?.cancel()
         highlightsJob?.cancel()
+        settingsJob?.cancel()
+        rateJob?.cancel()
+        definitionJob?.cancel()
         searchJob?.cancel()
         searchIterator = null
         val bookId = openedBookId
@@ -443,7 +562,8 @@ internal class ReaderViewModel @Inject constructor(
         text = text,
         note = note,
         tint = tint,
-        style = style
+        style = style,
+        progression = progression
     )
 
     private fun scheduleProgressSave(locator: Locator) {
@@ -462,6 +582,11 @@ internal class ReaderViewModel @Inject constructor(
             id = bookId,
             progress = ReadingProgress(locatorJson = locator.toJSON().toString(), fraction = fraction)
         )
+        // The same settled beat is what a reading session is measured in: written down as it
+        // happens, so a sitting survives HyperOS deciding the app has had enough.
+        val positions = session?.positions?.size ?: 0
+        val position = locator.locations.position ?: (fraction * positions).toInt()
+        readingSessionsRepository.record(bookId, position)
     }
 
     private fun updateReady(transform: (ReaderUiState.Ready) -> ReaderUiState.Ready) {

@@ -42,7 +42,7 @@ class RoomHighlightsRepositoryTest {
 
     @Test
     fun `stores a highlight and gives it an id`() = runTest {
-        val stored = repository.add(highlight(), progression = 0.3)
+        val stored = repository.add(highlight(progression = 0.3))
 
         assertTrue(stored.id > 0)
         assertEquals("call me Ishmael", stored.text)
@@ -54,18 +54,18 @@ class RoomHighlightsRepositoryTest {
         repository.observeForBook("book-1").test {
             assertEquals(emptyList(), awaitItem())
 
-            repository.add(highlight(text = "later"), progression = 0.9)
+            repository.add(highlight(text = "later", progression = 0.9))
             assertEquals(listOf("later"), awaitItem().map { it.text })
 
-            repository.add(highlight(text = "earlier"), progression = 0.1)
+            repository.add(highlight(text = "earlier", progression = 0.1))
             assertEquals(listOf("earlier", "later"), awaitItem().map { it.text })
         }
     }
 
     @Test
     fun `updating the note and tint keeps the reading order`() = runTest {
-        repository.add(highlight(text = "first"), progression = 0.1)
-        val second = repository.add(highlight(text = "second"), progression = 0.9)
+        repository.add(highlight(text = "first", progression = 0.1))
+        val second = repository.add(highlight(text = "second", progression = 0.9))
 
         repository.update(second.copy(note = "why this matters", tint = HighlightTint.Green))
 
@@ -80,7 +80,7 @@ class RoomHighlightsRepositoryTest {
 
     @Test
     fun `removes a highlight`() = runTest {
-        val stored = repository.add(highlight(), progression = null)
+        val stored = repository.add(highlight(progression = null))
 
         repository.remove(stored.id)
 
@@ -89,7 +89,7 @@ class RoomHighlightsRepositoryTest {
         }
     }
 
-    private fun highlight(text: String = "call me Ishmael") = Highlight(
+    private fun highlight(text: String = "call me Ishmael", progression: Double? = null) = Highlight(
         id = Highlight.UNSAVED_ID,
         bookId = "book-1",
         locatorJson = """{"href":"ch1.xhtml"}""",
@@ -97,6 +97,7 @@ class RoomHighlightsRepositoryTest {
         tint = HighlightTint.Yellow,
         style = HighlightStyle.Highlight,
         note = null,
+        progression = progression,
         createdAt = Instant.ofEpochMilli(1_000)
     )
 }

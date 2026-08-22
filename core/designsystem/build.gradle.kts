@@ -7,6 +7,10 @@ android {
 }
 
 dependencies {
+    // Shared components speak in domain terms where a primitive would lose meaning — a highlight
+    // tint, for instance, has to look the same in the reader and in the library.
+    api(projects.core.model)
+
     api(libs.androidx.compose.foundation)
     api(libs.androidx.compose.material3)
     api(libs.androidx.compose.material3.adaptive)

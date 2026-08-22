@@ -3,6 +3,7 @@ package dev.readana.feature.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -103,8 +104,12 @@ internal fun SwitchItem(
 }
 
 /**
- * One choice out of a handful, as a connected button group: the options sit shoulder to shoulder
- * and the chosen one swells, so the row reads as a single control rather than loose chips.
+ * One choice out of a handful, as a group of toggle buttons.
+ *
+ * Every button takes the width its own label needs and the group wraps onto a second line when the
+ * window is too narrow for all of them. Sharing the width out equally instead would squeeze five
+ * theme names into five slivers on a phone, which is how a label ends up broken across three lines
+ * or clipped to a letter and a half.
  */
 @Composable
 internal fun <T> ChoiceRow(
@@ -122,17 +127,14 @@ internal fun <T> ChoiceRow(
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.padding(start = 4.dp)
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
-            options.forEachIndexed { index, option ->
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            options.forEach { option ->
                 ToggleButton(
                     checked = option == selected,
-                    onCheckedChange = { onSelect(option) },
-                    modifier = Modifier.weight(1f),
-                    shapes = when (index) {
-                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                        options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                    }
+                    onCheckedChange = { onSelect(option) }
                 ) {
                     Text(text = optionLabel(option), maxLines = 1, textAlign = TextAlign.Center)
                 }

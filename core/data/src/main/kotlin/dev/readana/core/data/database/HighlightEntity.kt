@@ -30,10 +30,11 @@ fun HighlightEntity.toModel(): Highlight = Highlight(
     tint = HighlightTint.entries.firstOrNull { it.name == tint } ?: HighlightTint.Yellow,
     style = HighlightStyle.entries.firstOrNull { it.name == style } ?: HighlightStyle.Highlight,
     note = note,
+    progression = progression,
     createdAt = Instant.ofEpochMilli(createdAt)
 )
 
-fun Highlight.toEntity(progression: Double? = null): HighlightEntity = HighlightEntity(
+fun Highlight.toEntity(): HighlightEntity = HighlightEntity(
     id = id,
     bookId = bookId,
     locatorJson = locatorJson,

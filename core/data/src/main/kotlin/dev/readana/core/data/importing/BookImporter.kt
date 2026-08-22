@@ -12,7 +12,10 @@ import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
 import dev.readana.core.common.result.asFailure
 import dev.readana.core.common.result.asSuccess
+import dev.readana.core.data.repository.BookSettingsRepository
+import dev.readana.core.data.repository.CollectionsRepository
 import dev.readana.core.data.repository.LibraryRepository
+import dev.readana.core.data.repository.ReadingSessionsRepository
 import dev.readana.core.data.storage.BookStorage
 import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
@@ -48,6 +51,9 @@ class DefaultBookImporter @Inject constructor(
     private val metadataExtractor: BookMetadataExtractor,
     private val storage: BookStorage,
     private val libraryRepository: LibraryRepository,
+    private val bookSettingsRepository: BookSettingsRepository,
+    private val readingSessionsRepository: ReadingSessionsRepository,
+    private val collectionsRepository: CollectionsRepository,
     @Dispatcher(ReadanaDispatchers.IO) private val ioDispatcher: CoroutineDispatcher
 ) : BookImporter {
     override suspend fun import(uri: String, origin: BookOrigin?): AppResult<ImportResult> =
@@ -89,7 +95,8 @@ class DefaultBookImporter @Inject constructor(
             addedAt = Instant.now(),
             lastOpenedAt = null,
             progress = null,
-            origin = origin?.copy(originalFormat = format)
+            origin = origin?.copy(originalFormat = format),
+            series = metadata.series
         )
         libraryRepository.upsert(book)
         return ImportResult.Imported(book).asSuccess()
@@ -101,6 +108,10 @@ class DefaultBookImporter @Inject constructor(
         // Files are best effort: one we cannot delete must not keep the entry alive.
         suspendRunCatching { storage.delete(book.fileUri) }
         book.coverUri?.let { cover -> suspendRunCatching { storage.delete(cover) } }
+        // No foreign keys anywhere in this schema, so what hangs off a book goes explicitly.
+        bookSettingsRepository.clear(bookId)
+        readingSessionsRepository.removeForBook(bookId)
+        collectionsRepository.removeBook(bookId)
         libraryRepository.remove(bookId)
         return Unit.asSuccess()
     }

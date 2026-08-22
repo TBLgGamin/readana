@@ -6,15 +6,20 @@ import dev.readana.core.common.result.AppError
 import dev.readana.core.common.result.AppResult
 import dev.readana.core.common.result.asFailure
 import dev.readana.core.common.result.asSuccess
+import dev.readana.core.data.dictionary.DictionaryLookup
+import dev.readana.core.data.notes.NotesExporter
+import dev.readana.core.data.repository.BookSettingsRepository
 import dev.readana.core.data.repository.BookmarksRepository
 import dev.readana.core.data.repository.HighlightsRepository
 import dev.readana.core.data.repository.LibraryRepository
+import dev.readana.core.data.repository.ReadingSessionsRepository
 import dev.readana.core.data.repository.SettingsRepository
 import dev.readana.core.model.AiSettings
 import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
 import dev.readana.core.model.Bookmark
 import dev.readana.core.model.ConversionSettings
+import dev.readana.core.model.DictionaryEntry
 import dev.readana.core.model.Highlight
 import dev.readana.core.model.HighlightTint
 import dev.readana.core.model.PageTurnMode
@@ -34,6 +39,7 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.advanceTimeBy
@@ -57,6 +63,7 @@ class ReaderViewModelTest {
     private val bookmarks = FakeBookmarksRepository()
     private val highlights = FakeHighlightsRepository()
     private val settings = FakeSettingsRepository()
+    private val bookSettings = FakeBookSettingsRepository()
     private val sessionStore = ReaderSessionStore()
     private val sessionFactory = FakeReaderSessionFactory()
 
@@ -65,6 +72,10 @@ class ReaderViewModelTest {
         bookmarksRepository = bookmarks,
         highlightsRepository = highlights,
         settingsRepository = settings,
+        bookSettingsRepository = bookSettings,
+        readingSessionsRepository = FakeReadingSessionsRepository(),
+        dictionary = FakeDictionary,
+        notesExporter = FakeNotesExporter,
         sessionFactory = sessionFactory,
         sessionStore = sessionStore,
         volumeKeyRelay = VolumeKeyRelay(),
@@ -407,6 +418,11 @@ private class FakeLibraryRepository : LibraryRepository {
 
     override suspend fun upsert(book: Book) = state.update { it + (book.id to book) }
 
+    override suspend fun setFinished(id: String, finished: Boolean) = state.update { books ->
+        val book = books[id] ?: return@update books
+        books + (id to book.copy(finishedAt = if (finished) Instant.EPOCH else null))
+    }
+
     override suspend fun remove(id: String) = state.update { it - id }
 
     override suspend fun updateProgress(id: String, progress: ReadingProgress, openedAt: Instant) {
@@ -430,6 +446,34 @@ private class FakeBookmarksRepository : BookmarksRepository {
     override suspend fun remove(id: Long) = state.update { saved -> saved.filterNot { it.id == id } }
 }
 
+private class FakeBookSettingsRepository : BookSettingsRepository {
+    private val state = MutableStateFlow<Map<String, ReaderSettings>>(emptyMap())
+
+    override fun observeFor(bookId: String): Flow<ReaderSettings?> = state.map { it[bookId] }
+
+    override suspend fun set(bookId: String, settings: ReaderSettings) {
+        state.update { it + (bookId to settings) }
+    }
+
+    override suspend fun clear(bookId: String) = state.update { it - bookId }
+}
+
+private class FakeReadingSessionsRepository : ReadingSessionsRepository {
+    override suspend fun record(bookId: String, position: Int) = Unit
+
+    override fun observeRate(bookId: String): Flow<Double?> = flowOf(null)
+
+    override suspend fun removeForBook(bookId: String) = Unit
+}
+
+private object FakeDictionary : DictionaryLookup {
+    override suspend fun define(word: String): DictionaryEntry? = null
+}
+
+private object FakeNotesExporter : NotesExporter {
+    override suspend fun export(book: Book, highlights: List<Highlight>): String? = null
+}
+
 private class FakeHighlightsRepository : HighlightsRepository {
     private val state = MutableStateFlow<List<Highlight>>(emptyList())
     private var nextId = 1L
@@ -437,7 +481,7 @@ private class FakeHighlightsRepository : HighlightsRepository {
     override fun observeForBook(bookId: String): Flow<List<Highlight>> =
         state.map { saved -> saved.filter { it.bookId == bookId } }
 
-    override suspend fun add(highlight: Highlight, progression: Double?): Highlight {
+    override suspend fun add(highlight: Highlight): Highlight {
         val stored = highlight.copy(id = nextId++)
         state.update { it + stored }
         return stored
@@ -502,9 +546,11 @@ private class FakeReaderSessionFactory : ReaderSessionFactory {
             fragmentFactory = androidx.fragment.app.FragmentFactory(),
             toc = emptyList(),
             positions = positions,
+            tocPositions = emptyList(),
             isSearchable = true,
             hasText = true,
             textWalker = { null },
+            createTts = { _, _, _ -> null },
             loadFigure = { null },
             isFixedLayout = isFixedLayout,
             search = { FakeSearchIterator(searchPages) },

@@ -8,6 +8,7 @@ import dev.readana.core.data.conversion.encodeToJson
 import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
 import dev.readana.core.model.BookOrigin
+import dev.readana.core.model.BookSeries
 import dev.readana.core.model.ConversionInfo
 import dev.readana.core.model.ReadingProgress
 import java.time.Instant
@@ -34,7 +35,11 @@ data class BookEntity(
     @ColumnInfo(name = "original_file_uri") val originalFileUri: String? = null,
     @ColumnInfo(name = "converted_at") val convertedAt: Long? = null,
     /** JSON of the conversion report, for the details sheet. */
-    @ColumnInfo(name = "conversion_report") val conversionReport: String? = null
+    @ColumnInfo(name = "conversion_report") val conversionReport: String? = null,
+    /** When the reader called this one done; null while it is unread or still going. */
+    @ColumnInfo(name = "finished_at") val finishedAt: Long? = null,
+    @ColumnInfo(name = "series_name") val seriesName: String? = null,
+    @ColumnInfo(name = "series_index") val seriesIndex: Float? = null
 )
 
 private const val AUTHOR_SEPARATOR = "|"
@@ -67,7 +72,9 @@ fun BookEntity.toModel(): Book = Book(
             convertedAt = Instant.ofEpochMilli(convertedAt ?: 0),
             report = conversionReport.decodeConversionReport()
         )
-    }
+    },
+    finishedAt = finishedAt?.let(Instant::ofEpochMilli),
+    series = seriesName?.let { name -> BookSeries(name = name, index = seriesIndex) }
 )
 
 fun Book.toEntity(): BookEntity = BookEntity(
@@ -88,5 +95,8 @@ fun Book.toEntity(): BookEntity = BookEntity(
     originalFormat = origin?.originalFormat?.name,
     originalFileUri = conversion?.originalFileUri,
     convertedAt = conversion?.convertedAt?.toEpochMilli(),
-    conversionReport = conversion?.report?.encodeToJson()
+    conversionReport = conversion?.report?.encodeToJson(),
+    finishedAt = finishedAt?.toEpochMilli(),
+    seriesName = series?.name,
+    seriesIndex = series?.index
 )

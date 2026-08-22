@@ -22,6 +22,7 @@ internal object SettingsKeys {
     val TAP_TO_TURN = booleanPreferencesKey("reader_tap_to_turn")
     val VOLUME_KEYS = booleanPreferencesKey("reader_volume_keys")
     val KEEP_SCREEN_ON = booleanPreferencesKey("reader_keep_screen_on")
+    val TTS_SPEED = floatPreferencesKey("reader_tts_speed")
 
     val SOURCE_OVERRIDES = stringPreferencesKey("source_overrides")
     val ANNAS_MIRRORS = stringPreferencesKey("source_annas_mirrors")
@@ -58,7 +59,8 @@ internal fun Preferences.toReaderSettings(): ReaderSettings {
         columns = enumOrDefault(this[SettingsKeys.COLUMNS], defaults.columns),
         tapToTurnPages = this[SettingsKeys.TAP_TO_TURN] ?: defaults.tapToTurnPages,
         volumeKeysTurnPages = this[SettingsKeys.VOLUME_KEYS] ?: defaults.volumeKeysTurnPages,
-        keepScreenOn = this[SettingsKeys.KEEP_SCREEN_ON] ?: defaults.keepScreenOn
+        keepScreenOn = this[SettingsKeys.KEEP_SCREEN_ON] ?: defaults.keepScreenOn,
+        ttsSpeed = this[SettingsKeys.TTS_SPEED] ?: defaults.ttsSpeed
     )
 }
 
@@ -74,6 +76,7 @@ internal fun MutablePreferences.write(settings: ReaderSettings) {
     this[SettingsKeys.TAP_TO_TURN] = settings.tapToTurnPages
     this[SettingsKeys.VOLUME_KEYS] = settings.volumeKeysTurnPages
     this[SettingsKeys.KEEP_SCREEN_ON] = settings.keepScreenOn
+    this[SettingsKeys.TTS_SPEED] = settings.ttsSpeed
 }
 
 internal fun Preferences.toSourceSettings(): SourceSettings = SourceSettings(

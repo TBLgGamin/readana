@@ -107,8 +107,8 @@ class BookDownloaderTest {
         assertEquals(BookDownloader.Outcome.Success, outcome)
         assertEquals(EPUB_BYTES, importer.importedText)
         assertEquals(BookOrigin("annas-archive", "0123456789abcdef0123456789abcdef", BookFormat.EPUB), importer.origin)
-        assertEquals(DownloadStatus.Completed, downloads.getJob("job-1")?.status)
-        assertEquals("book-1", downloads.getJob("job-1")?.bookId)
+        // The row goes with it: the book is in the library, so the queue has nothing left to say.
+        assertNull(downloads.getJob("job-1"))
         assertTrue(partsDir.listFiles().orEmpty().isEmpty(), "the partial file is cleaned up")
     }
 

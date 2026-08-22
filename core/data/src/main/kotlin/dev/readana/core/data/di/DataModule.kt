@@ -18,15 +18,21 @@ import dev.readana.core.data.importing.BookMetadataExtractor
 import dev.readana.core.data.importing.DefaultBookImportManager
 import dev.readana.core.data.importing.DefaultBookImporter
 import dev.readana.core.data.importing.ReadiumMetadataExtractor
+import dev.readana.core.data.repository.BookSettingsRepository
 import dev.readana.core.data.repository.BookmarksRepository
+import dev.readana.core.data.repository.CollectionsRepository
 import dev.readana.core.data.repository.DataStoreSettingsRepository
 import dev.readana.core.data.repository.DownloadsRepository
 import dev.readana.core.data.repository.HighlightsRepository
 import dev.readana.core.data.repository.LibraryRepository
+import dev.readana.core.data.repository.ReadingSessionsRepository
+import dev.readana.core.data.repository.RoomBookSettingsRepository
 import dev.readana.core.data.repository.RoomBookmarksRepository
+import dev.readana.core.data.repository.RoomCollectionsRepository
 import dev.readana.core.data.repository.RoomDownloadsRepository
 import dev.readana.core.data.repository.RoomHighlightsRepository
 import dev.readana.core.data.repository.RoomLibraryRepository
+import dev.readana.core.data.repository.RoomReadingSessionsRepository
 import dev.readana.core.data.repository.SettingsRepository
 
 @Module
@@ -43,6 +49,15 @@ abstract class DataModule {
 
     @Binds
     abstract fun bindsHighlightsRepository(impl: RoomHighlightsRepository): HighlightsRepository
+
+    @Binds
+    abstract fun bindsBookSettingsRepository(impl: RoomBookSettingsRepository): BookSettingsRepository
+
+    @Binds
+    abstract fun bindsReadingSessionsRepository(impl: RoomReadingSessionsRepository): ReadingSessionsRepository
+
+    @Binds
+    abstract fun bindsCollectionsRepository(impl: RoomCollectionsRepository): CollectionsRepository
 
     @Binds
     abstract fun bindsDownloadsRepository(impl: RoomDownloadsRepository): DownloadsRepository

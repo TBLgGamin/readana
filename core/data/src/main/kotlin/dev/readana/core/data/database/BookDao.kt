@@ -25,6 +25,9 @@ interface BookDao {
     @Upsert
     suspend fun upsert(book: BookEntity)
 
+    @Query("UPDATE books SET finished_at = :finishedAt WHERE id = :id")
+    suspend fun updateFinishedAt(id: String, finishedAt: Long?)
+
     @Query("DELETE FROM books WHERE id = :id")
     suspend fun deleteById(id: String)
 

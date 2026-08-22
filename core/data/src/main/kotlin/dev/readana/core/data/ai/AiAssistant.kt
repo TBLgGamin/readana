@@ -126,10 +126,20 @@ class DefaultAiAssistant @Inject constructor(
             val userText = AiPrompts.question(question)
             threadsRepository.addMessage(userMessage(thread, userText))
 
-            val request = requestFor(thread, history, userText, images, settings.illustrateFromWeb)
+            var request = requestFor(thread, history, userText, images, settings.illustrateFromWeb)
             val answer = StringBuilder()
             val stop = StringBuilder()
             var failure = collectAnswer(client, request, answer, stop)
+
+            // Plenty of models take text only, and which ones is not something the reader should
+            // have to know. A refusal over the pictures means asking again without them: an answer
+            // that cannot point at a figure beats no answer at all.
+            if (failure.isImageRefusal() && answer.isEmpty() && request.images.isNotEmpty()) {
+                Timber.d("Provider would not take %d image(s); asking again without them", request.images.size)
+                stop.clear()
+                request = requestFor(thread, history, userText, emptyList(), settings.illustrateFromWeb)
+                failure = collectAnswer(client, request, answer, stop)
+            }
 
             // A small or older model refuses a ceiling above what it can produce. Rather than make
             // every reader discover their model's limit by hand, ask again within a safe one.
@@ -167,18 +177,24 @@ class DefaultAiAssistant @Inject constructor(
         userText: String,
         images: List<ImageAttachment>,
         mayIllustrate: Boolean
-    ) = LlmRequest(
-        system = listOfNotNull(
-            PromptBlock(AiPrompts.rules(thread.kind)),
-            PromptBlock(thread.contextText, cacheable = true),
-            AiPrompts.selection(thread.quote)?.let { PromptBlock(it) },
-            AiPrompts.pictures(thread.figures, mayIllustrate)?.let { PromptBlock(it) },
-            AiPrompts.position(thread.chapterTitle)?.let { PromptBlock(it) }
-        ),
-        messages = history + ChatMessage(ChatRole.User, userText),
-        maxOutputTokens = maxTokensFor(thread.kind),
-        images = images
-    )
+    ): LlmRequest {
+        // Only the figures whose bytes are actually going out get described. Listing one the model
+        // was never handed invites a marker pointing at a picture that is not there.
+        val attached = images.filter { it.isSendable }
+        val described = thread.figures.filter { figure -> attached.any { it.id == figure.id } }
+        return LlmRequest(
+            system = listOfNotNull(
+                PromptBlock(AiPrompts.rules(thread.kind)),
+                PromptBlock(thread.contextText, cacheable = true),
+                AiPrompts.selection(thread.quote)?.let { PromptBlock(it) },
+                AiPrompts.pictures(described, mayIllustrate)?.let { PromptBlock(it) },
+                AiPrompts.position(thread.chapterTitle)?.let { PromptBlock(it) }
+            ),
+            messages = history + ChatMessage(ChatRole.User, userText),
+            maxOutputTokens = maxTokensFor(thread.kind),
+            images = attached
+        )
+    }
 
     /** Streams into [answer] and returns what went wrong, or null. */
     private suspend fun FlowCollector<AssistantEvent>.collectAnswer(
@@ -211,6 +227,21 @@ class DefaultAiAssistant @Inject constructor(
         llm.error
     } catch (io: IOException) {
         AppError.Network(io.message ?: "The connection dropped.", io)
+    }
+
+    /**
+     * Whether the provider baulked at the pictures rather than at the question.
+     *
+     * Every dialect words it differently — "does not support image input", "image_url is not
+     * supported", "no endpoints support image input" — so the check is the shape of the failure
+     * plus a mention of pictures. A body that is simply too large counts on its own: the images
+     * are the only part of the request big enough to be the cause.
+     */
+    private fun AppError?.isImageRefusal(): Boolean {
+        val http = this as? AppError.Http ?: return false
+        if (http.statusCode == PAYLOAD_TOO_LARGE) return true
+        if (http.statusCode !in IMAGE_REFUSAL_STATUSES) return false
+        return IMAGE_COMPLAINTS.any { http.message.contains(it, ignoreCase = true) }
     }
 
     /** A 400 that names the output ceiling; every dialect words it differently. */
@@ -297,6 +328,11 @@ class DefaultAiAssistant @Inject constructor(
         /** Within the reach of an older model, or one running on the reader's own machine. */
         const val MODEST_MAX_TOKENS = 4_096
         const val BAD_REQUEST = 400
+        const val PAYLOAD_TOO_LARGE = 413
         val BUDGET_COMPLAINTS = listOf("max_tokens", "max_completion_tokens", "max output")
+
+        /** Bad request, unsupported media type, and unprocessable content. */
+        val IMAGE_REFUSAL_STATUSES = setOf(400, 415, 422)
+        val IMAGE_COMPLAINTS = listOf("image", "vision", "multimodal", "multi-modal")
     }
 }

@@ -44,12 +44,22 @@ class ReadanaDatabaseMigrationTest {
             )
         }
 
-        helper.runMigrationsAndValidate(version = 7).use { connection ->
+        helper.runMigrationsAndValidate(version = 11).use { connection ->
             connection.prepare("SELECT title FROM books").use { statement ->
                 assertTrue(statement.step())
                 assertEquals("Moby Dick", statement.getText(0))
             }
-            listOf("bookmarks", "highlights", "downloads", "ai_threads", "ai_messages").forEach { table ->
+            listOf(
+                "bookmarks",
+                "highlights",
+                "downloads",
+                "ai_threads",
+                "ai_messages",
+                "book_reader_settings",
+                "reading_sessions",
+                "collections",
+                "collection_books"
+            ).forEach { table ->
                 connection.prepare("SELECT COUNT(*) FROM $table").use { statement ->
                     assertTrue(statement.step())
                     assertEquals(0, statement.getLong(0).toInt())

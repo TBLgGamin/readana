@@ -34,6 +34,12 @@ interface LibraryRepository {
     suspend fun remove(id: String)
 
     suspend fun updateProgress(id: String, progress: ReadingProgress, openedAt: Instant = Instant.now())
+
+    /**
+     * Marks a book read, or puts it back among the unfinished. The reader's own judgement, which
+     * is why it is stored rather than inferred from the progress bar.
+     */
+    suspend fun setFinished(id: String, finished: Boolean)
 }
 
 @Singleton
@@ -63,6 +69,10 @@ class RoomLibraryRepository @Inject constructor(
 
     override suspend fun upsert(book: Book) = withContext(ioDispatcher) {
         bookDao.upsert(book.toEntity())
+    }
+
+    override suspend fun setFinished(id: String, finished: Boolean) = withContext(ioDispatcher) {
+        bookDao.updateFinishedAt(id, if (finished) Instant.now().toEpochMilli() else null)
     }
 
     override suspend fun remove(id: String) = withContext(ioDispatcher) { bookDao.deleteById(id) }

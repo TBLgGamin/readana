@@ -19,3 +19,5 @@ Short, dated records of the decisions that shape the project. Add a new file
 | [0012](0012-conversion-golden-corpus.md) | Conversion corpus and golden snapshots | accepted |
 | [0013](0013-browser-equivalent-access.md) | Browser-equivalent access for shadow-library sources | accepted |
 | [0014](0014-provider-agnostic-reading-assistant.md) | Provider-agnostic reading assistant that cannot spoil the book | accepted |
+| [0015](0015-per-book-reader-settings.md) | Reading settings belong to the book | accepted |
+| [0016](0016-read-aloud.md) | Read-aloud through Readium, in the foreground only | accepted |

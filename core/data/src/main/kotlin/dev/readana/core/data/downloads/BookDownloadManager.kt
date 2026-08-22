@@ -36,7 +36,8 @@ data class CapturedDownload(
     val format: BookFormat,
     val url: String,
     val headers: Map<String, String>,
-    val expectedSizeBytes: Long? = null
+    val expectedSizeBytes: Long? = null,
+    val coverUrl: String? = null
 )
 
 /** What happened when the user asked for a book. */
@@ -74,10 +75,22 @@ interface BookDownloadManager {
      */
     suspend fun retry(jobId: String): RetryOutcome
 
+    /**
+     * Holds a running job without throwing away what it has already fetched, so [resume] can ask
+     * the server to carry on from that byte rather than start again.
+     */
+    suspend fun pause(jobId: String)
+
+    /** Puts a paused job back in the queue. */
+    suspend fun resume(jobId: String)
+
     suspend fun cancel(jobId: String)
 
     /** Forgets a finished or failed row (and any partial file). */
     suspend fun dismiss(jobId: String)
+
+    /** Forgets every row that has stopped for good, leaving the queue itself alone. */
+    suspend fun dismissFinished()
 }
 
 @Singleton
@@ -144,6 +157,7 @@ class DefaultBookDownloadManager @Inject constructor(
             // Present headers mark this as already resolved: the worker must not ask the source again.
             headersJson = capture.headers.encodeToJson() ?: "{}",
             browserUrl = null,
+            coverUrl = capture.coverUrl,
             bookId = null,
             createdAt = Instant.now().toEpochMilli(),
             updatedAt = Instant.now().toEpochMilli()
@@ -201,6 +215,21 @@ class DefaultBookDownloadManager @Inject constructor(
         scheduler.schedule(jobId, uniqueName(sourceId, recordId))
     }
 
+    override suspend fun pause(jobId: String) {
+        val job = downloadsRepository.getJob(jobId) ?: return
+        if (!job.isActive) return
+        // The partial file deliberately survives: it is the whole point of pausing rather than
+        // cancelling, and the transfer sends a Range header for whatever is already on disk.
+        scheduler.cancel(uniqueName(job.sourceId, job.recordId))
+        downloadsRepository.setStatus(jobId, DownloadStatus.Paused)
+    }
+
+    override suspend fun resume(jobId: String) {
+        val job = downloadsRepository.getJob(jobId) ?: return
+        if (job.status != DownloadStatus.Paused) return
+        requeue(jobId, job.sourceId, job.recordId)
+    }
+
     override suspend fun cancel(jobId: String) {
         val job = downloadsRepository.getJob(jobId) ?: return
         scheduler.cancel(uniqueName(job.sourceId, job.recordId))
@@ -215,6 +244,10 @@ class DefaultBookDownloadManager @Inject constructor(
         scheduler.cancel(uniqueName(job.sourceId, job.recordId))
         downloader.discardPart(jobId)
         downloadsRepository.remove(jobId)
+    }
+
+    override suspend fun dismissFinished() {
+        downloadsRepository.removeFinished().forEach { downloader.discardPart(it) }
     }
 
     private suspend fun rememberQuota(remaining: Int?, perDay: Int?) {
@@ -240,6 +273,7 @@ class DefaultBookDownloadManager @Inject constructor(
         resolvedUrl = null,
         headersJson = null,
         browserUrl = result.detailUrl,
+        coverUrl = result.coverUrl,
         bookId = null,
         createdAt = Instant.now().toEpochMilli(),
         updatedAt = Instant.now().toEpochMilli()
@@ -250,12 +284,15 @@ class DefaultBookDownloadManager @Inject constructor(
         sourceId = sourceId,
         recordId = recordId,
         title = title,
+        authors = authors.split('|').filter { it.isNotBlank() },
         format = BookFormat.valueOf(format),
         status = DownloadStatus.valueOf(status),
         totalBytes = totalBytes,
         errorKind = errorKind?.let(DownloadErrorKind::valueOf),
         browserUrl = browserUrl,
-        createdAt = Instant.ofEpochMilli(createdAt)
+        coverUrl = coverUrl,
+        createdAt = Instant.ofEpochMilli(createdAt),
+        updatedAt = Instant.ofEpochMilli(updatedAt)
     )
 
     private fun uniqueName(sourceId: String, recordId: String) = "download:$sourceId:$recordId"

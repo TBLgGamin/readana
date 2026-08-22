@@ -17,13 +17,16 @@ data class ReaderSettings(
     val columns: ReaderColumns = ReaderColumns.Auto,
     val tapToTurnPages: Boolean = true,
     val volumeKeysTurnPages: Boolean = false,
-    val keepScreenOn: Boolean = true
+    val keepScreenOn: Boolean = true,
+    /** How fast the reading voice speaks. A preference of the reader's, not of the book. */
+    val ttsSpeed: Float = 1.0f
 ) {
     companion object {
         val FONT_SCALE_RANGE = 0.6f..2.5f
         val LINE_HEIGHT_RANGE = 1.0f..2.2f
         val PAGE_MARGIN_RANGE = 0.0f..3.0f
         val PARAGRAPH_SPACING_RANGE = 0.0f..2.0f
+        val TTS_SPEED_RANGE = 0.5f..3.0f
     }
 }
 

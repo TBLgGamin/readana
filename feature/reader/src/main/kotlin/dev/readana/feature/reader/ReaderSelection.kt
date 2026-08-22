@@ -30,17 +30,21 @@ internal fun SelectionActions(
     relay: ReaderSelectionRelay,
     navigator: Navigator?,
     assistantEnabled: Boolean,
-    onHighlight: (Locator, String) -> Unit,
+    onHighlight: (Locator, String, Boolean) -> Unit,
+    onDefine: (ReaderSelection) -> Unit,
     onAsk: (ReaderSelection) -> Unit,
     onExplain: (ReaderSelection) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val labels = ReaderSelectionRelay.Labels(
         highlight = stringResource(R.string.feature_reader_highlight),
+        note = stringResource(R.string.feature_reader_note_action),
+        define = stringResource(R.string.feature_reader_define),
         ask = stringResource(R.string.feature_reader_ai_ask),
         explain = stringResource(R.string.feature_reader_ai_explain)
     )
     val currentOnHighlight by rememberUpdatedState(onHighlight)
+    val currentOnDefine by rememberUpdatedState(onDefine)
     val currentOnAsk by rememberUpdatedState(onAsk)
     val currentOnExplain by rememberUpdatedState(onExplain)
 
@@ -49,8 +53,14 @@ internal fun SelectionActions(
         relay.assistantEnabled = assistantEnabled
         relay.actions = object : ReaderSelectionRelay.Actions {
             override fun highlight() = scope.withSelection(navigator) { selection ->
-                currentOnHighlight(selection.locator, selection.text)
+                currentOnHighlight(selection.locator, selection.text, false)
             }
+
+            override fun note() = scope.withSelection(navigator) { selection ->
+                currentOnHighlight(selection.locator, selection.text, true)
+            }
+
+            override fun define() = scope.withSelection(navigator) { currentOnDefine(it) }
 
             override fun ask() = scope.withSelection(navigator) { currentOnAsk(it) }
 

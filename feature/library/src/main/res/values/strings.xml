@@ -31,26 +31,6 @@
     <string name="feature_library_delete_dialog_message">This removes the book from your library and deletes its file.</string>
     <string name="feature_library_delete_dialog_confirm">Delete</string>
     <string name="feature_library_delete_dialog_cancel">Cancel</string>
-    <string name="feature_library_downloads_title">Downloads (%1$d)</string>
-    <string name="feature_library_downloads_collapse">Collapse downloads</string>
-    <string name="feature_library_downloads_expand">Expand downloads</string>
-    <string name="feature_library_download_queued">Waiting to start…</string>
-    <string name="feature_library_download_retrying">Trying again — %1$s</string>
-    <string name="feature_library_download_progress">%1$s of %2$s MB</string>
-    <string name="feature_library_download_progress_unknown">%1$s MB</string>
-    <string name="feature_library_download_converting">Converting to EPUB…</string>
-    <string name="feature_library_download_completed">Added to your library</string>
-    <string name="feature_library_download_cancelled">Cancelled</string>
-    <string name="feature_library_download_failed">Download failed</string>
-    <string name="feature_library_download_quota">No fast downloads left today — finish it in the browser</string>
-    <string name="feature_library_download_needs_browser">This one needs the in-app browser</string>
-    <string name="feature_library_download_unauthorized">Check your membership key in Settings</string>
-    <string name="feature_library_download_cancel">Cancel download</string>
-    <string name="feature_library_download_retry">Try again</string>
-    <string name="feature_library_download_open_browser">Open in browser</string>
-    <string name="feature_library_download_open">Read</string>
-    <string name="feature_library_download_dismiss">Remove from list</string>
-    <string name="feature_library_download_error">Download failed: %1$s</string>
     <string name="feature_library_details_convert">Convert to EPUB</string>
     <string name="feature_library_details_reconvert">Re-convert</string>
     <string name="feature_library_details_converting">Converting…</string>
@@ -70,8 +50,6 @@
     <string name="feature_library_reconvert_title">Convert this book again?</string>
     <string name="feature_library_reconvert_message">The original PDF is converted again with your current settings. Your reading position is reset; bookmarks and highlights are kept.</string>
     <string name="feature_library_reconvert_confirm">Convert</string>
-    <string name="feature_library_converting">Converting “%1$s”…</string>
-    <string name="feature_library_converting_pages">Converting “%1$s” · page %2$d of %3$d</string>
     <string name="feature_library_converted">Converted “%1$s”</string>
     <string name="feature_library_conversion_failed">Could not convert: %1$s</string>
     <plurals name="feature_library_conversion_chapter_count">
@@ -86,4 +64,50 @@
         <item quantity="one">%1$d note</item>
         <item quantity="other">%1$d notes</item>
     </plurals>
+    <string name="feature_library_notes_share">Share notes</string>
+    <plurals name="feature_library_notes_count">
+        <item quantity="one">%1$d note</item>
+        <item quantity="other">%1$d notes</item>
+    </plurals>
+    <string name="feature_library_continue">Continue reading</string>
+    <string name="feature_library_continue_line">%1$s · %2$s</string>
+    <string name="feature_library_progress">%1$d%% read</string>
+    <string name="feature_library_left_almost_done">nearly finished</string>
+    <plurals name="feature_library_left_minutes">
+        <item quantity="one">about %1$d min left</item>
+        <item quantity="other">about %1$d min left</item>
+    </plurals>
+    <plurals name="feature_library_left_hours">
+        <item quantity="one">about %1$d h %2$d min left</item>
+        <item quantity="other">about %1$d h %2$d min left</item>
+    </plurals>
+    <string name="feature_library_filter">Show</string>
+    <string name="feature_library_filter_all">All books</string>
+    <string name="feature_library_filter_reading">Reading</string>
+    <string name="feature_library_filter_unread">Unread</string>
+    <string name="feature_library_filter_finished">Finished</string>
+    <string name="feature_library_shelf_clear">Show every book again</string>
+    <string name="feature_library_collections">Collections</string>
+    <string name="feature_library_collections_none">No collections yet. Name one below to start.</string>
+    <string name="feature_library_collections_new">New collection</string>
+    <string name="feature_library_collections_create">Create collection</string>
+    <string name="feature_library_collections_done">Done</string>
+    <string name="feature_library_collections_edit">Collections</string>
+    <string name="feature_library_details_series">Series</string>
+    <string name="feature_library_details_series_value">%1$s, book %2$s</string>
+    <string name="feature_library_mark_finished">Mark as finished</string>
+    <string name="feature_library_mark_unfinished">Not finished after all</string>
+    <string name="feature_library_shelf_add_books">Add books to this shelf</string>
+    <string name="feature_library_shelf_cancel">Stop picking books</string>
+    <string name="feature_library_shelf_save">Save this shelf</string>
+    <plurals name="feature_library_shelf_selected">
+        <item quantity="one">1 book picked</item>
+        <item quantity="other">%1$d books picked</item>
+    </plurals>
+    <plurals name="feature_library_shelf_updated">
+        <item quantity="one">%1$s now holds 1 book</item>
+        <item quantity="other">%1$s now holds %2$d books</item>
+    </plurals>
+    <string name="feature_library_collection_created">Made \"%1$s\". Pick the books that belong on it.</string>
+    <string name="feature_library_finished_mark">Finished</string>
 </resources>

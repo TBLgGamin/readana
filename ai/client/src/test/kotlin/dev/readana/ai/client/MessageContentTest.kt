@@ -24,6 +24,33 @@ class MessageContentTest {
     }
 
     @Test
+    fun `a picture in a format no provider decodes is left behind`() {
+        val svg = ImageAttachment(id = "figure:2", mediaType = "image/svg+xml", bytes = byteArrayOf(9))
+
+        assertEquals(JsonPrimitive("hello"), MessageContent.anthropic("hello", listOf(svg)))
+        assertEquals(JsonPrimitive("hello"), MessageContent.openAi("hello", listOf(svg)))
+    }
+
+    @Test
+    fun `a picture that came back empty is left behind`() {
+        val empty = ImageAttachment(id = "figure:3", mediaType = "image/png", bytes = ByteArray(0))
+
+        assertEquals(JsonPrimitive("hello"), MessageContent.anthropic("hello", listOf(empty)))
+        assertEquals(JsonPrimitive("hello"), MessageContent.openAi("hello", listOf(empty)))
+    }
+
+    @Test
+    fun `the sendable pictures go out even when an unusable one sits beside them`() {
+        val svg = ImageAttachment(id = "figure:2", mediaType = "image/svg+xml", bytes = byteArrayOf(9))
+
+        val parts = assertIsArray(MessageContent.openAi("what is this?", listOf(svg, figure)))
+
+        assertEquals(2, parts.size)
+        assertEquals("image_url", parts[0].jsonObject["type"]?.jsonPrimitive?.content)
+        assertEquals("what is this?", parts[1].jsonObject["text"]?.jsonPrimitive?.content)
+    }
+
+    @Test
     fun `anthropic gets base64 image blocks before the text`() {
         val content = MessageContent.anthropic("what is this?", listOf(figure))
 

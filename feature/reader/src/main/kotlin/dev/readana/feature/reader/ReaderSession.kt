@@ -25,6 +25,11 @@ internal class ReaderSession(
     val toc: List<TocEntry>,
     /** Every reading position, used to map the progress slider onto locators. */
     val positions: List<Locator>,
+    /**
+     * Where each [toc] entry starts, as an index into [positions], or -1 where it cannot be
+     * placed. This is what turns "how far to the end of the chapter" into a number.
+     */
+    val tocPositions: List<Int>,
     /** False for formats Readium cannot search, such as PDFs opened through pdfium. */
     val isSearchable: Boolean,
     /** False when the publication exposes no text, which is what the assistant reads. */
@@ -36,6 +41,14 @@ internal class ReaderSession(
     val textWalker: (Locator?) -> TextWalker?,
     /** Reads one of the book's own illustrations back out, by the href a figure was recorded with. */
     val loadFigure: suspend (String) -> ByteArray?,
+    /**
+     * Builds a read-aloud navigator over the same publication, from a starting locator.
+     *
+     * A closure rather than a navigator, for the same reason [search] is one: the session hands
+     * out what the publication can do without ever handing out the publication. Null for anything
+     * Readium cannot speak — a PDF opened through pdfium, for instance.
+     */
+    val createTts: suspend (Locator?, Double, () -> Unit) -> ReadanaTtsNavigator?,
     /** Fixed-layout EPUBs (for example comics) are page-based and cannot switch to scrolling. */
     val isFixedLayout: Boolean = false,
     val search: suspend (String) -> SearchIterator?,

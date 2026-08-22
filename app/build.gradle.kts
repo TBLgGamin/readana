@@ -69,6 +69,7 @@ dependencies {
     implementation(projects.feature.browser)
     implementation(projects.feature.library)
     implementation(projects.feature.discover)
+    implementation(projects.feature.downloads)
     implementation(projects.feature.reader)
     implementation(projects.feature.settings)
 
@@ -80,6 +81,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.fragment.ktx)
+    implementation(libs.androidx.hilt.lifecycle.viewModelCompose)
     implementation(libs.androidx.lifecycle.runtimeCompose)
     implementation(libs.androidx.lifecycle.viewModelNavigation3)
     implementation(libs.androidx.navigation3.runtime)

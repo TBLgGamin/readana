@@ -30,8 +30,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -106,7 +104,6 @@ internal fun DiscoverRoute(
             viewModel.download(result)
         },
         onSelectTrending = viewModel::searchFor,
-        onDismissMessage = viewModel::consumeMessage,
         onVerify = viewModel::verifyInBrowser,
         onDownloadTrending = { book ->
             askForNotifications()
@@ -165,7 +162,6 @@ internal fun DiscoverScreen(
     onSearch: () -> Unit,
     onDownload: (SearchResult) -> Unit,
     onSelectTrending: (TrendingBook) -> Unit,
-    onDismissMessage: () -> Unit,
     onVerify: (SourceError) -> Unit,
     onDownloadTrending: (TrendingBook) -> Unit,
     modifier: Modifier = Modifier
@@ -173,20 +169,9 @@ internal fun DiscoverScreen(
     // Long-pressing a cover opens what the source knows about it, the way the library does.
     var details by remember { mutableStateOf<SearchResult?>(null) }
     var editions by remember { mutableStateOf<ResultGroup?>(null) }
-    val snackbarHostState = remember { SnackbarHostState() }
-    val messageText = uiState.message?.let { messageText(it) }
-    val currentOnMessageShown by rememberUpdatedState(onDismissMessage)
-    LaunchedEffect(messageText) {
-        if (messageText != null) {
-            snackbarHostState.showSnackbar(messageText)
-            currentOnMessageShown()
-        }
-    }
-
     Scaffold(
         modifier = modifier,
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.feature_discover_title)) }) },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.feature_discover_title)) }) }
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             OutlinedTextField(
@@ -489,33 +474,6 @@ private fun TrendingGrid(
     }
 }
 
-@Composable
-private fun messageText(message: DiscoverMessage): String = when (message) {
-    is DiscoverMessage.Queued -> message.fastDownloadsLeft?.let { left ->
-        pluralStringResource(R.plurals.feature_discover_message_queued_quota, left, message.title, left)
-    } ?: stringResource(R.string.feature_discover_message_queued, message.title)
-
-    is DiscoverMessage.AlreadyInLibrary -> stringResource(
-        R.string.feature_discover_message_in_library,
-        message.title
-    )
-
-    is DiscoverMessage.NothingFound -> stringResource(
-        R.string.feature_discover_message_not_found,
-        message.title
-    )
-
-    is DiscoverMessage.AlreadyQueued -> stringResource(
-        R.string.feature_discover_message_already_queued,
-        message.title
-    )
-
-    is DiscoverMessage.Failed -> stringResource(
-        R.string.feature_discover_message_failed,
-        message.error.message
-    )
-}
-
 private const val BYTES_PER_KIB = 1024.0
 
 /** Two across, as covers are the point of this screen. */
@@ -557,7 +515,6 @@ private fun DiscoverScreenPreview() {
             onSearch = {},
             onDownload = {},
             onSelectTrending = {},
-            onDismissMessage = {},
             onVerify = {},
             onDownloadTrending = {}
         )
@@ -580,7 +537,6 @@ private fun DiscoverTrendingPreview() {
             onSearch = {},
             onDownload = {},
             onSelectTrending = {},
-            onDismissMessage = {},
             onVerify = {},
             onDownloadTrending = {}
         )

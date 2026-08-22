@@ -7,6 +7,7 @@ import dev.readana.core.data.repository.BookSourceRegistry
 import dev.readana.core.data.repository.SettingsRepository
 import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.HeadingSensitivity
+import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.SourceSettings
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,11 +25,13 @@ class SettingsViewModel @Inject constructor(
         combine(
             settingsRepository.sourceSettings,
             settingsRepository.conversionSettings,
+            settingsRepository.readerSettings,
             settingsRepository.libraryFolderUri
-        ) { sourceSettings, conversionSettings, libraryFolderUri ->
+        ) { sourceSettings, conversionSettings, readerSettings, libraryFolderUri ->
             SettingsUiState.Loaded(
                 sources = sourceSettings,
                 conversion = conversionSettings,
+                reading = readerSettings,
                 libraryFolderUri = libraryFolderUri,
                 sourceToggles = sources.all.map { source ->
                     SourceToggle(
@@ -71,6 +74,11 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** The defaults every book starts from; a book that has been adjusted keeps its own copy. */
+    fun updateReadingDefaults(transform: (ReaderSettings) -> ReaderSettings) {
+        viewModelScope.launch { settingsRepository.updateReaderSettings(transform) }
+    }
+
     fun setAutoConvertPdf(enabled: Boolean) = updateConversion { it.copy(autoConvertPdf = enabled) }
 
     fun setRemoveHeadersAndFooters(enabled: Boolean) = updateConversion {
@@ -104,6 +112,7 @@ sealed interface SettingsUiState {
     data class Loaded(
         val sources: SourceSettings,
         val conversion: ConversionSettings,
+        val reading: ReaderSettings,
         val sourceToggles: List<SourceToggle>,
         val libraryFolderUri: String? = null
     ) : SettingsUiState

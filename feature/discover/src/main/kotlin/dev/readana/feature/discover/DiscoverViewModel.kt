@@ -8,6 +8,8 @@ import dev.readana.core.common.result.AppResult
 import dev.readana.core.data.browser.BrowserVerificationStatus
 import dev.readana.core.data.downloads.BookDownloadManager
 import dev.readana.core.data.downloads.EnqueueOutcome
+import dev.readana.core.data.messages.MessageBus
+import dev.readana.core.data.messages.UiMessage
 import dev.readana.core.data.repository.BookSourceRegistry
 import dev.readana.core.data.repository.SettingsRepository
 import dev.readana.source.api.SearchQuery
@@ -32,6 +34,7 @@ class DiscoverViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val downloadManager: BookDownloadManager,
     private val trendingBooks: TrendingBooks,
+    private val messages: MessageBus,
     verification: BrowserVerificationStatus
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DiscoverUiState())
@@ -139,7 +142,7 @@ class DiscoverViewModel @Inject constructor(
             val match = firstMatch(book.searchQuery)
             _uiState.update { it.copy(isSearching = false) }
             if (match == null) {
-                show(DiscoverMessage.NothingFound(book.title))
+                show(UiMessage.text(R.string.feature_discover_message_not_found, book.title))
                 return@launch
             }
             enqueue(match)
@@ -164,18 +167,26 @@ class DiscoverViewModel @Inject constructor(
     private suspend fun enqueue(result: SearchResult) {
         when (val outcome = downloadManager.enqueue(result)) {
             is EnqueueOutcome.Enqueued -> show(
-                DiscoverMessage.Queued(result.title, outcome.fastDownloadsLeft)
+                outcome.fastDownloadsLeft?.let { left ->
+                    UiMessage.quantity(
+                        R.plurals.feature_discover_message_queued_quota,
+                        left,
+                        result.title,
+                        left
+                    )
+                } ?: UiMessage.text(R.string.feature_discover_message_queued, result.title)
             )
 
             is EnqueueOutcome.AlreadyInLibrary -> show(
-                DiscoverMessage.AlreadyInLibrary(outcome.book.title)
+                UiMessage.text(R.string.feature_discover_message_in_library, outcome.book.title)
             )
 
             is EnqueueOutcome.AlreadyQueued -> show(
-                DiscoverMessage.AlreadyQueued(outcome.job.title)
+                UiMessage.text(R.string.feature_discover_message_already_queued, outcome.job.title)
             )
 
-            is EnqueueOutcome.Failed -> show(DiscoverMessage.Failed(outcome.error))
+            is EnqueueOutcome.Failed ->
+                show(UiMessage.text(R.string.feature_discover_message_failed, outcome.error.message))
         }
     }
 
@@ -193,17 +204,11 @@ class DiscoverViewModel @Inject constructor(
         if (_uiState.value.hasSearched) search()
     }
 
-    fun consumeMessage() {
-        _uiState.update { it.copy(message = null) }
-    }
-
     fun consumeEffect() {
         _uiState.update { it.copy(effect = null) }
     }
 
-    private fun show(message: DiscoverMessage) {
-        _uiState.update { it.copy(message = message) }
-    }
+    private fun show(message: UiMessage) = messages.show(message)
 }
 
 data class DiscoverUiState(
@@ -220,28 +225,12 @@ data class DiscoverUiState(
     /** Starts true so the shelf opens on skeletons rather than flashing the empty state. */
     val isLoadingTrending: Boolean = true,
     val sourceErrors: List<SourceError> = emptyList(),
-    val message: DiscoverMessage? = null,
     val effect: DiscoverEffect? = null
 )
 
 /** [verifyUrl] is set when the source could not get past a bot check on its own. */
 data class SourceError(val sourceName: String, val error: AppError, val verifyUrl: String? = null)
 
-sealed interface DiscoverMessage {
-    /** [fastDownloadsLeft] is the source's remaining allowance, when it reports one. */
-    data class Queued(val title: String, val fastDownloadsLeft: Int?) : DiscoverMessage
-
-    data class AlreadyInLibrary(val title: String) : DiscoverMessage
-
-    data class AlreadyQueued(val title: String) : DiscoverMessage
-
-    /** A popular-shelf book no enabled source could find. */
-    data class NothingFound(val title: String) : DiscoverMessage
-
-    data class Failed(val error: AppError) : DiscoverMessage
-}
-
-/** A one-shot navigation request. */
 sealed interface DiscoverEffect {
     /** Open [url] in a browser the user can see, so they can answer the site's check themselves. */
     data class Verify(val url: String, val sourceName: String) : DiscoverEffect

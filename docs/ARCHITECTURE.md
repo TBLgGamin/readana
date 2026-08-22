@@ -9,15 +9,18 @@ that are unique to this app — `engine` (document processing) and `source` (whe
 ```mermaid
 graph TD
     app --> feature_library[feature:library]
+    app --> feature_downloads[feature:downloads]
     app --> feature_discover[feature:discover]
     app --> feature_reader[feature:reader]
     app --> feature_settings[feature:settings]
 
     feature_library --> core_data[core:data]
+    feature_downloads --> core_data
     feature_discover --> core_data
     feature_reader --> core_data
     feature_settings --> core_data
     feature_library --> core_designsystem[core:designsystem]
+    feature_downloads --> core_designsystem
     feature_discover --> core_designsystem
     feature_reader --> core_designsystem
     feature_settings --> core_designsystem
@@ -50,9 +53,9 @@ Green nodes are pure Kotlin/JVM modules: no Android dependency, millisecond unit
 |-------|----------------|----------|
 | `app` | `ReadanaApplication` (Hilt root), `MainActivity` (FragmentActivity for Readium), `ReadanaApp` (adaptive nav + `NavDisplay`), Konsist tests | yes |
 | `feature/*` | One screen family each: `XxxKey` (NavKey), `xxxEntry()` (entry provider), `XxxRoute` (wires ViewModel), `XxxScreen` (stateless UI), `XxxViewModel` | yes |
-| `core/data` | Room (`books`, `bookmarks`, `highlights`, `downloads`, `ai_threads`, `ai_messages`), DataStore (`SettingsKeys`), repositories, `BookSourceRegistry`, `ReadiumPublicationOpener`, the import pipeline (`BookStorage`, `BookImporter`, `BookImportManager`), the download pipeline (`BookDownloadManager`, `BookDownloader`, `DownloadWorker`), the shared browser identity (`WebViewCookieJar`, `BrowserIdentity`, `WebViewBrowserVerifier`), the conversion pipeline (`BookConverter`, `ConversionManager`), the reading assistant (`AiAssistant`, `AiPrompts`, `AiProviderProbe`), all Hilt modules | yes |
-| `core/designsystem` | `ReadanaTheme` (Material 3 Expressive), `ReadanaIcons`, `EmptyState`, `LoadingState`, `BookCover` (Coil) | yes |
-| `core/model` | `Book`, `BookFormat`, `ReadingProgress`, `Bookmark`, `Highlight`, `ReaderSettings`, `SourceSettings`, `ConversionSettings`, `ConversionInfo`, `DownloadJob`, `BrowserDownload`, `AiSettings`, `AiProviderConfig`, `AiThread`, `AiMessage` | no |
+| `core/data` | Room (`books`, `bookmarks`, `highlights`, `downloads`, `ai_threads`, `ai_messages`, `book_reader_settings`, `reading_sessions`, `collections`, `collection_books`), DataStore (`SettingsKeys`), repositories, `BookSourceRegistry`, `ReadiumPublicationOpener`, the import pipeline (`BookStorage`, `BookImporter`, `BookImportManager`), the download pipeline (`BookDownloadManager`, `BookDownloader`, `DownloadWorker`), the shared browser identity (`WebViewCookieJar`, `BrowserIdentity`, `WebViewBrowserVerifier`), the conversion pipeline (`BookConverter`, `ConversionManager`), the reading assistant (`AiAssistant`, `AiPrompts`, `AiProviderProbe`), the reading aids (`WiktionaryDictionary`, `NotesExporter`, `ReadingSpeed`), all Hilt modules | yes |
+| `core/designsystem` | `ReadanaTheme` (Material 3 Expressive), `ReadanaIcons`, `EmptyState`, `LoadingState`, `BookCover` (Coil), `NoteRow`, `HighlightTint.color()` | yes |
+| `core/model` | `Book`, `BookFormat`, `ReadingProgress`, `Bookmark`, `Highlight`, `ReaderSettings`, `SourceSettings`, `ConversionSettings`, `ConversionInfo`, `DownloadJob`, `BrowserDownload`, `AiSettings`, `AiProviderConfig`, `AiThread`, `AiMessage`, `BookSeries`, `ReadingStatus`, `BookCollection`, `DictionaryEntry` | no |
 | `core/common` | `AppResult`/`AppError`, `@Dispatcher`/`@ApplicationScope`, `suspendRunCatching`, `VolumeKeyRelay` | no |
 | `core/testing` | `MainDispatcherRule`, `FakeBookSource` | no |
 | `source/api` | `BookSource`, `SearchQuery/Page/Result`, `DownloadRequest`, `DownloadQuota`, `BrowserLogin`, `BrowserVerifier`, `FileNames` | no |
@@ -104,7 +107,7 @@ DiscoverViewModel ── SearchQuery ──▶ BookSourceRegistry ──▶ each
                                    ▼
                           BookImporter.import(part, BookOrigin)  ──▶ the M1 pipeline above
                                    ▼
-                          downloads row Completed ──▶ Library queue offers "Read"
+                          downloads row Completed ──▶ feature:downloads offers "Open in library"
 ```
 
 ### PDF → EPUB (M4)
@@ -143,6 +146,34 @@ list. `ReaderNavigatorHostFragment` owns a child fragment manager whose factory 
 `PdfiumPreferences` and submitted on every change. The current `Locator` flows back to the
 ViewModel, which persists it (debounced) as JSON plus a fraction, and drives the progress slider,
 bookmarks and highlight decorations.
+
+### Around the reading
+
+```
+selection ──▶ Highlight / Note ──▶ highlights (Room, ordered by progression)
+                                        │
+                                        ├─▶ Contents sheet ▸ Notes tab ──▶ jump back
+                                        ├─▶ Library ▸ book details ──▶ read them without opening the book
+                                        └─▶ notesMarkdown() ──▶ cacheDir/exports ──▶ FileProvider ──▶ ACTION_SEND
+
+selection ──▶ Define ──▶ WiktionaryDictionary ──▶ definition sheet
+                              │ no entry (or a phrase, not a word)
+                              └──▶ "Ask the assistant instead" ──▶ the existing Explain thread
+
+debounced progress save ──▶ reading_sessions (row extended as you read, new row after a 3 min gap)
+                                   ▼
+                          ReadingSpeed: positions per minute, newest sessions weighted highest
+                                   │ per-book once it has been read 3 times, else the reader's own pace
+                                   ├──▶ reader bottom bar: "About 8 min left in this chapter"
+                                   └──▶ library shortcut: "42% read · about 3 h 20 m left"
+
+Listen ──▶ ReaderSession.createTts ──▶ TtsNavigator ──▶ utterance Locator
+                                                           ├──▶ navigator.go() — the page follows the voice
+                                                           └──▶ Decoration group "tts" — and marks it
+```
+
+Positions rather than pages or percentages throughout: a Readium position is about a kilobyte of
+content whatever the book, so a pace learned from one book is worth something in the next.
 
 ## Cross-cutting decisions
 

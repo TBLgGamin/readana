@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,12 +23,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedListItem
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -48,6 +52,7 @@ import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.LoadingState
 import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.HeadingSensitivity
+import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.SourceSettings
 
 private const val PERSISTABLE_FLAGS =
@@ -92,13 +97,18 @@ internal fun SettingsRoute(
         onRemoveHeadersChange = viewModel::setRemoveHeadersAndFooters,
         onHeadingSensitivityChange = viewModel::setHeadingSensitivity,
         onExtractImagesChange = viewModel::setExtractImages,
+        onReadingChange = viewModel::updateReadingDefaults,
         modifier = modifier
     )
 }
 
 /**
- * Every setting on one scrolling page, grouped under headings. Nothing is hidden behind a tap:
- * what the app is set to can be read by scrolling, which is what a settings screen is for.
+ * Two pages rather than one long scroll.
+ *
+ * Basic holds what a reader touches while they are actually reading: how a book looks, how pages
+ * turn, and which model answers questions. Advanced holds the rest, which is set up once and then
+ * left alone. Splitting them keeps the first screen short enough to read at a glance without
+ * hiding anything behind a chevron.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,9 +124,11 @@ internal fun SettingsScreen(
     onRemoveHeadersChange: (Boolean) -> Unit,
     onHeadingSensitivityChange: (HeadingSensitivity) -> Unit,
     onExtractImagesChange: (Boolean) -> Unit,
+    onReadingChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    var tab by rememberSaveable { mutableStateOf(SettingsTab.Basic) }
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
@@ -126,45 +138,93 @@ internal fun SettingsScreen(
             )
         }
     ) { padding ->
-        when (uiState) {
-            SettingsUiState.Loading -> LoadingState(Modifier.padding(padding))
-
-            is SettingsUiState.Loaded -> Column(
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Column(
-                    modifier = Modifier
-                        .widthIn(max = ContentMaxWidth)
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(SectionSpacing)
-                ) {
-                    SourcesSection(
-                        settings = uiState.sources,
-                        toggles = uiState.sourceToggles,
-                        onSourceEnabledChange = onSourceEnabledChange,
-                        onAnnasMirrorsChange = onAnnasMirrorsChange,
-                        onAnnasSecretKeyChange = onAnnasSecretKeyChange
+        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+            PrimaryTabRow(selectedTabIndex = tab.ordinal) {
+                SettingsTab.entries.forEach { entry ->
+                    Tab(
+                        selected = entry == tab,
+                        onClick = { tab = entry },
+                        text = { Text(stringResource(entry.labelRes())) }
                     )
-                    ConversionSection(
-                        settings = uiState.conversion,
-                        onAutoConvertChange = onAutoConvertChange,
-                        onRemoveHeadersChange = onRemoveHeadersChange,
-                        onHeadingSensitivityChange = onHeadingSensitivityChange,
-                        onExtractImagesChange = onExtractImagesChange
-                    )
-                    AiSettingsSection(state = aiState, actions = aiActions)
-                    StorageSection(
-                        libraryFolderUri = uiState.libraryFolderUri,
-                        onLibraryFolderChange = onLibraryFolderChange
-                    )
-                    Spacer(Modifier.height(SectionSpacing))
                 }
             }
+            when (uiState) {
+                SettingsUiState.Loading -> LoadingState()
+
+                is SettingsUiState.Loaded -> SettingsPage(tab) {
+                    when (tab) {
+                        SettingsTab.Basic -> {
+                            ReadingSettingsSection(
+                                settings = uiState.reading,
+                                onChange = onReadingChange
+                            )
+                            AiSettingsSection(state = aiState, actions = aiActions)
+                        }
+
+                        SettingsTab.Advanced -> {
+                            ReadingLayoutSection(
+                                settings = uiState.reading,
+                                onChange = onReadingChange
+                            )
+                            AiAdvancedSection(state = aiState, actions = aiActions)
+                            SourcesSection(
+                                settings = uiState.sources,
+                                toggles = uiState.sourceToggles,
+                                onSourceEnabledChange = onSourceEnabledChange,
+                                onAnnasMirrorsChange = onAnnasMirrorsChange,
+                                onAnnasSecretKeyChange = onAnnasSecretKeyChange
+                            )
+                            ConversionSection(
+                                settings = uiState.conversion,
+                                onAutoConvertChange = onAutoConvertChange,
+                                onRemoveHeadersChange = onRemoveHeadersChange,
+                                onHeadingSensitivityChange = onHeadingSensitivityChange,
+                                onExtractImagesChange = onExtractImagesChange
+                            )
+                            StorageSection(
+                                libraryFolderUri = uiState.libraryFolderUri,
+                                onLibraryFolderChange = onLibraryFolderChange
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Which half of the settings is on screen. */
+private enum class SettingsTab { Basic, Advanced }
+
+private fun SettingsTab.labelRes(): Int = when (this) {
+    SettingsTab.Basic -> R.string.feature_settings_tab_basic
+    SettingsTab.Advanced -> R.string.feature_settings_tab_advanced
+}
+
+/**
+ * The column both tabs are poured into.
+ *
+ * Keyed on the tab so switching starts at the top rather than at wherever the other tab had been
+ * scrolled to, which otherwise lands the reader in the middle of a section they did not choose.
+ */
+@Composable
+private fun SettingsPage(tab: SettingsTab, content: @Composable ColumnScope.() -> Unit) {
+    key(tab) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Column(
+                modifier = Modifier
+                    .widthIn(max = ContentMaxWidth)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(SectionSpacing),
+                content = content
+            )
+            Spacer(Modifier.height(SectionSpacing))
         }
     }
 }

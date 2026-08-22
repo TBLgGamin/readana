@@ -47,7 +47,8 @@ import dev.readana.core.model.AiProviderKind
 import dev.readana.core.model.AiSettings
 
 /**
- * Everything the assistant needs: which provider answers, with which key and which model.
+ * What the assistant needs to work at all: which provider answers, with which key and which model,
+ * plus the two things a reader turns on or off from one week to the next.
  *
  * The providers are a single-choice list, and the chosen one's own settings sit directly under it.
  * Only one provider is ever in use, so only one set of fields is ever worth showing.
@@ -90,14 +91,6 @@ internal fun AiSettingsSection(state: AiSettingsUiState, actions: AiSettingsActi
                 actions = actions
             )
         }
-        ChoiceRow(
-            label = stringResource(R.string.feature_settings_ai_context),
-            options = AiContextSize.entries,
-            selected = settings.contextSize,
-            optionLabel = { stringResource(it.labelRes()) },
-            onSelect = actions.onContextSizeChange,
-            help = stringResource(R.string.feature_settings_ai_context_help)
-        )
         SettingsGroup {
             item { shapes ->
                 SwitchItem(
@@ -122,15 +115,6 @@ internal fun AiSettingsSection(state: AiSettingsUiState, actions: AiSettingsActi
                 )
             }
         }
-        if (settings.recapEnabled) {
-            Slider(
-                value = settings.recapAfterDays.toFloat(),
-                onValueChange = { actions.onRecapAfterDaysChange(it.toInt()) },
-                valueRange = AiSettings.RECAP_DAYS_RANGE.first.toFloat()..AiSettings.RECAP_DAYS_RANGE.last.toFloat(),
-                steps = AiSettings.RECAP_DAYS_RANGE.last - AiSettings.RECAP_DAYS_RANGE.first - 1
-            )
-        }
-        SettingsNote(stringResource(R.string.feature_settings_ai_privacy))
     }
 
     if (addingCustom) {
@@ -141,6 +125,46 @@ internal fun AiSettingsSection(state: AiSettingsUiState, actions: AiSettingsActi
             },
             onDismiss = { addingCustom = false }
         )
+    }
+}
+
+/**
+ * What the assistant costs and how much of the book it is trusted with.
+ *
+ * Both are set once, when a reader decides how they want to use it, and then left alone.
+ */
+@Composable
+internal fun AiAdvancedSection(state: AiSettingsUiState, actions: AiSettingsActions, modifier: Modifier = Modifier) {
+    val settings = state.settings
+    SettingsSection(
+        title = stringResource(R.string.feature_settings_section_ai_advanced),
+        icon = ReadanaIcons.Assistant,
+        modifier = modifier
+    ) {
+        ChoiceRow(
+            label = stringResource(R.string.feature_settings_ai_context),
+            options = AiContextSize.entries,
+            selected = settings.contextSize,
+            optionLabel = { stringResource(it.labelRes()) },
+            onSelect = actions.onContextSizeChange,
+            help = stringResource(R.string.feature_settings_ai_context_help)
+        )
+        if (settings.recapEnabled) {
+            Column {
+                Text(
+                    text = stringResource(R.string.feature_settings_ai_recap_delay),
+                    style = MaterialTheme.typography.titleSmall
+                )
+                val days = AiSettings.RECAP_DAYS_RANGE
+                Slider(
+                    value = settings.recapAfterDays.toFloat(),
+                    onValueChange = { actions.onRecapAfterDaysChange(it.toInt()) },
+                    valueRange = days.first.toFloat()..days.last.toFloat(),
+                    steps = days.last - days.first - 1
+                )
+            }
+        }
+        SettingsNote(stringResource(R.string.feature_settings_ai_privacy))
     }
 }
 
@@ -235,7 +259,12 @@ private fun ProviderDetails(
                     }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Three labelled buttons do not fit side by side on a phone; wrapping beats clipping
+            // the last one off the edge of the card.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 OutlinedButton(
                     onClick = { actions.onFetchModels(provider.id) },
                     enabled = !probe.isBusy

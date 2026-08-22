@@ -43,7 +43,6 @@ import androidx.compose.ui.unit.dp
 import dev.readana.core.common.result.AppError
 import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.EmptyState
-import dev.readana.core.designsystem.component.WavyProgress
 import dev.readana.core.model.AiThreadKind
 import kotlin.math.roundToInt
 
@@ -149,10 +148,10 @@ private fun Conversation(state: AssistantUiState, modifier: Modifier = Modifier)
         state.messages.forEach { message -> Turn(message, pictures = state.pictures) }
         val streaming = state.streaming
         when {
-            state.phase == AssistantPhase.Gathering -> GatheringRow()
-
-            // An empty stream means the request is out but no word has come back yet.
-            streaming != null && streaming.isEmpty() -> ThinkingRow()
+            // Either gathering the read text, or waiting for the first word of the answer: an
+            // empty stream means the request is out but nothing has come back yet.
+            state.phase == AssistantPhase.Gathering ||
+                (streaming != null && streaming.isEmpty()) -> WaitingRow()
 
             streaming != null -> AssistantAnswer(text = streaming, pictures = state.pictures)
         }
@@ -180,20 +179,15 @@ private fun Turn(message: AssistantMessage, pictures: Map<String, AssistantPictu
     }
 }
 
+/**
+ * Whatever the assistant is doing before it starts writing.
+ *
+ * Gathering the read text and waiting for the first token are different jobs but the same thing to
+ * wait for, and the spinner says wait on its own — a bar and a caption alongside it only made the
+ * pause look longer than it was.
+ */
 @Composable
-private fun GatheringRow(modifier: Modifier = Modifier) {
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = stringResource(R.string.feature_reader_ai_gathering),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        WavyProgress()
-    }
-}
-
-@Composable
-private fun ThinkingRow(modifier: Modifier = Modifier) {
+private fun WaitingRow(modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
         LoadingIndicator()
     }
@@ -279,29 +273,61 @@ internal fun RecapOffer(daysAway: Int, onAccept: () -> Unit, onDismiss: () -> Un
 }
 
 /**
- * Every conversation held about this book, newest first. Its own sheet rather than a section of
- * the contents, so it is one tap from the reading chrome and scrolls on its own.
+ * The assistant's front door: the two ways to start a conversation, then every conversation the
+ * book has already had.
+ *
+ * Both entry points live here rather than as their own chrome buttons. Asking about a book and
+ * catching up on it are the same errand — talking to the assistant — and the reader already
+ * reaches for this button to find what they asked last time.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ReaderConversationsSheet(
     threads: List<ThreadItem>,
+    assistantEnabled: Boolean,
+    onAskBook: () -> Unit,
+    onRecap: () -> Unit,
     onOpen: (Long) -> Unit,
     onDelete: (Long) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, modifier = modifier) {
-        if (threads.isEmpty()) {
-            EmptyState(
-                icon = ReadanaIcons.Conversations,
-                title = stringResource(R.string.feature_reader_ai_conversations_empty),
-                description = stringResource(R.string.feature_reader_ai_conversations_empty_help)
-            )
-            return@ModalBottomSheet
-        }
         LazyColumn {
-            item { ConversationsHeader() }
+            if (assistantEnabled) {
+                item { ConversationsHeader() }
+                item {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.feature_reader_ai_ask_book)) },
+                        modifier = Modifier.clickable(onClick = onAskBook),
+                        supportingContent = {
+                            Text(stringResource(R.string.feature_reader_ai_ask_book_help))
+                        },
+                        leadingContent = { Icon(ReadanaIcons.Assistant, contentDescription = null) }
+                    )
+                }
+                item {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.feature_reader_ai_recap)) },
+                        modifier = Modifier.clickable(onClick = onRecap),
+                        supportingContent = {
+                            Text(stringResource(R.string.feature_reader_ai_recap_help))
+                        },
+                        leadingContent = { Icon(ReadanaIcons.Refresh, contentDescription = null) }
+                    )
+                }
+            }
+            if (threads.isEmpty()) {
+                item {
+                    EmptyState(
+                        icon = ReadanaIcons.Conversations,
+                        title = stringResource(R.string.feature_reader_ai_conversations_empty),
+                        description = stringResource(R.string.feature_reader_ai_conversations_empty_help)
+                    )
+                }
+                return@LazyColumn
+            }
+            item { SheetSubheading(stringResource(R.string.feature_reader_ai_conversations_past)) }
             items(threads, key = { it.id }) { thread ->
                 ListItem(
                     headlineContent = {
@@ -322,6 +348,16 @@ internal fun ReaderConversationsSheet(
             }
         }
     }
+}
+
+@Composable
+private fun SheetSubheading(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        modifier = modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }
 
 @Composable
