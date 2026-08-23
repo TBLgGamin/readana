@@ -18,6 +18,13 @@ data class ReaderSettings(
     val tapToTurnPages: Boolean = true,
     val volumeKeysTurnPages: Boolean = false,
     val keepScreenOn: Boolean = true,
+    /**
+     * Ignore finger touches while the pen is in use, so a hand resting on the page does not turn
+     * it. Harmless with no pen around: nothing is ignored until one shows up.
+     */
+    val palmRejection: Boolean = true,
+    /** What a pen drag across the page does. */
+    val penMode: PenMode = PenMode.Highlight,
     /** How fast the reading voice speaks. A preference of the reader's, not of the book. */
     val ttsSpeed: Float = 1.0f
 ) {
@@ -58,4 +65,19 @@ enum class ReaderColumns {
     Auto,
     One,
     Two
+}
+
+/**
+ * What the pen does when it is dragged across the page. It only affects the pen: fingers keep
+ * turning pages and selecting text whatever this is set to.
+ */
+enum class PenMode {
+    /** The pen behaves like a finger, for anyone who would rather it did. */
+    Off,
+
+    /** A drag across text highlights it, without the long press a finger needs. */
+    Highlight,
+
+    /** A drag leaves a line on the page. */
+    Ink
 }

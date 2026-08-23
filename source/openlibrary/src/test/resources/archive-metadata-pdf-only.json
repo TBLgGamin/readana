@@ -1,0 +1,6 @@
+{
+  "files": [
+    { "name": "scan_meta.xml", "format": "Metadata", "size": "512" },
+    { "name": "scan_text.pdf", "format": "Text PDF", "size": "3300000" }
+  ]
+}

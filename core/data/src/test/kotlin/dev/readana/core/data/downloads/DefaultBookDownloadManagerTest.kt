@@ -13,8 +13,8 @@ import dev.readana.core.data.conversion.FakeConversionManager
 import dev.readana.core.data.database.ReadanaDatabase
 import dev.readana.core.data.importing.BookImporter
 import dev.readana.core.data.importing.ImportResult
-import dev.readana.core.data.repository.BookSourceRegistry
 import dev.readana.core.data.repository.RoomLibraryRepository
+import dev.readana.core.data.repository.testRegistry
 import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
 import dev.readana.core.model.BookOrigin
@@ -189,7 +189,7 @@ class DefaultBookDownloadManagerTest {
         assertEquals(RetryOutcome.Requeued, manager.retry("job-1"))
 
         assertEquals(DownloadStatus.Queued, downloads.getJob("job-1")?.status)
-        assertEquals(3, settings.sourceSettingsNow.annasDownloadsLeft)
+        assertEquals(3, settings.sourceSettingsNow.quotas["annas-archive"]?.remaining)
     }
 
     @Test
@@ -242,7 +242,7 @@ class DefaultBookDownloadManagerTest {
         source: FakeSource = FakeSource(fastDownload().asSuccess()),
         registerSource: Boolean = true
     ): DefaultBookDownloadManager {
-        val registry = BookSourceRegistry(if (registerSource) setOf(source) else emptySet())
+        val registry = testRegistry(if (registerSource) setOf(source) else emptySet(), settings)
         val downloader = BookDownloader(
             client = HttpClient(MockEngine { respond("", HttpStatusCode.OK) }),
             downloadsRepository = downloads,

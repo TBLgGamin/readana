@@ -15,9 +15,10 @@ import androidx.room.RoomDatabase
         BookSettingsEntity::class,
         ReadingSessionEntity::class,
         CollectionEntity::class,
-        CollectionBookEntity::class
+        CollectionBookEntity::class,
+        InkStrokeEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
     // Every version only adds tables or nullable columns, so Room can write the migrations itself.
     autoMigrations = [
@@ -30,7 +31,8 @@ import androidx.room.RoomDatabase
         AutoMigration(from = 7, to = 8),
         AutoMigration(from = 8, to = 9),
         AutoMigration(from = 9, to = 10),
-        AutoMigration(from = 10, to = 11)
+        AutoMigration(from = 10, to = 11),
+        AutoMigration(from = 11, to = 12)
     ]
 )
 abstract class ReadanaDatabase : RoomDatabase() {
@@ -39,6 +41,8 @@ abstract class ReadanaDatabase : RoomDatabase() {
     abstract fun bookmarkDao(): BookmarkDao
 
     abstract fun highlightDao(): HighlightDao
+
+    abstract fun inkStrokeDao(): InkStrokeDao
 
     abstract fun downloadDao(): DownloadDao
 

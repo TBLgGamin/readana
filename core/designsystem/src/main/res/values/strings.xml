@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="core_designsystem_note_progress">%1$d%%</string>
+    <string name="core_designsystem_snackbar_dismiss">Dismiss</string>
 </resources>

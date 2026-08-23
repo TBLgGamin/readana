@@ -32,6 +32,14 @@ Given a source name `<name>` (lowercase, e.g. `openlibrary`):
    `implementation(projects.source.<name>)` in `core/data/build.gradle.kts`.
    Discover and Settings pick it up automatically via `BookSourceRegistry`.
 
-5. Pure-JVM rule: no `android.*`/`androidx.*` imports anywhere in the module (Konsist + hook enforce this).
+5. **Anything the user must fill in** (an API key, a host list, a filter) goes in
+   `BookSource.configFields`, not in a settings screen — the Sources page renders whatever a source
+   declares, and the values arrive back through `SourceSettings.configFor(id)` (ADR 0017). Add a
+   `summary` too: it is the line under the name. A source that browses shelves as well as searching
+   implements `CatalogSource`.
 
-6. Finish with `/ship` (gates, CHANGELOG entry under Added, ARCHITECTURE.md + README source lists).
+6. Pure-JVM rule: no `android.*`/`androidx.*` imports anywhere in the module (Konsist + hook enforce
+   this). **Add the module path to `JVM_MODULES` in `app/src/test/.../ArchitectureTest.kt`** — the
+   rule only checks modules listed there, so leaving it out silently skips the check.
+
+7. Finish with `/ship` (gates, CHANGELOG entry under Added, ARCHITECTURE.md + README source lists).

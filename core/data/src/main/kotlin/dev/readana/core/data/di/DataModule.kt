@@ -24,6 +24,7 @@ import dev.readana.core.data.repository.CollectionsRepository
 import dev.readana.core.data.repository.DataStoreSettingsRepository
 import dev.readana.core.data.repository.DownloadsRepository
 import dev.readana.core.data.repository.HighlightsRepository
+import dev.readana.core.data.repository.InkRepository
 import dev.readana.core.data.repository.LibraryRepository
 import dev.readana.core.data.repository.ReadingSessionsRepository
 import dev.readana.core.data.repository.RoomBookSettingsRepository
@@ -31,10 +32,18 @@ import dev.readana.core.data.repository.RoomBookmarksRepository
 import dev.readana.core.data.repository.RoomCollectionsRepository
 import dev.readana.core.data.repository.RoomDownloadsRepository
 import dev.readana.core.data.repository.RoomHighlightsRepository
+import dev.readana.core.data.repository.RoomInkRepository
 import dev.readana.core.data.repository.RoomLibraryRepository
 import dev.readana.core.data.repository.RoomReadingSessionsRepository
 import dev.readana.core.data.repository.SettingsRepository
 
+/**
+ * Which implementation stands behind each repository interface.
+ *
+ * The function count is a list of bindings, not behaviour: splitting it would mean grouping
+ * repositories by nothing more than how many there are.
+ */
+@Suppress("TooManyFunctions")
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class DataModule {
@@ -49,6 +58,9 @@ abstract class DataModule {
 
     @Binds
     abstract fun bindsHighlightsRepository(impl: RoomHighlightsRepository): HighlightsRepository
+
+    @Binds
+    abstract fun bindsInkRepository(impl: RoomInkRepository): InkRepository
 
     @Binds
     abstract fun bindsBookSettingsRepository(impl: RoomBookSettingsRepository): BookSettingsRepository

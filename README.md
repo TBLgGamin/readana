@@ -16,7 +16,7 @@ dedicated e-reader app.
 
 | Area | Plan |
 |------|------|
-| **Discover** | One search box fanned out to every configured `BookSource` (Project Gutenberg today; Anna's Archive with member API + browser fallback; OPDS catalogs later). |
+| **Discover** | One search box fanned out to every enabled source: Open Library (Internet Archive scans), arXiv preprints, Anna's Archive with member API + browser fallback, and any OPDS catalog you add — Standard Ebooks, DOAB and Feedbooks are one tap, or paste a feed address, including your own Calibre-Web. Catalogs can be browsed shelf by shelf as well as searched. |
 | **Download** | WorkManager-driven background downloads that survive HyperOS's aggressive process killing, with progress in the library. |
 | **Convert** | On-device PDF → EPUB: PDFBox text extraction → layout heuristics (headers/footers, paragraphs, hyphenation, headings) → valid EPUB 3. Validated with epubcheck in tests. |
 | **Library** | Room database + files in app storage (or a user-chosen SAF folder), covers extracted on import, reading progress, sort and search. |
@@ -60,7 +60,9 @@ restrictions): [docs/DEVICE.md](docs/DEVICE.md).
 | `./gradlew spotlessApply` | Format Kotlin, Gradle scripts, Markdown/YAML/XML (ktlint 1.8, Android Studio style) |
 | `./gradlew spotlessCheck detekt` | Formatting + static analysis, same as CI |
 | `./gradlew :app:lintDebug` | Android Lint over every module (`checkDependencies`) |
-| `./gradlew testDebugUnitTest test` | JVM unit tests (Android modules + pure Kotlin modules) |
+| `./gradlew testDebugUnitTest test` | JVM unit tests, screenshot tests included (no emulator needed) |
+| `./gradlew testDebugUnitTest -PrecordScreenshots=true` | Accept the current look as the new screenshot goldens |
+| `./gradlew :app:generateBaselineProfile` | Regenerate the startup profile (needs the tablet attached) |
 | `./gradlew check` | Everything above |
 
 Optional local hooks: `pre-commit install --hook-type pre-commit --hook-type pre-push`

@@ -54,13 +54,27 @@ Milestones are sized so each one ships something usable on the tablet.
 - [x] Settings: per-provider key/model/base URL, model fetch, connection test, context budget,
       recap threshold
 
-## M5 — More sources
+## M5 — More sources ✅ (2026-08-23)
 
-- [ ] OPDS 1.2/2.0 catalogs via `readium-opds` (Standard Ebooks, Calibre-Web, DOAB)
-- [ ] Open Library / Internet Archive, arXiv
-- [ ] Per-source enable/disable, language and format filters in Discover
+- [x] OPDS 1.2/2.0 catalogs, browsable as well as searchable, with presets (Standard Ebooks, DOAB,
+      Feedbooks) and any pasted feed including Calibre-Web. Parsed in a pure-Kotlin module rather
+      than with `readium-opds`, which is an Android artifact — see
+      [ADR 0017](adr/0017-uniform-source-configuration.md)
+- [x] Open Library search with Internet Archive downloads, limited to publicly downloadable scans
+      (lending-only items are DRM-locked and are not listed); arXiv preprints, converted from PDF
+- [x] Sources declare their own configuration, so a new source needs no settings UI; catalogs are
+      data rather than modules, and Settings is split into five tabs
 
-## M6 — Polish
+## M6 — Polish ✅ (2026-08-23)
 
-- [ ] Roborazzi screenshot tests, baseline profiles, release signing + GitHub Releases
-- [ ] Stylus: highlight with pen, palm rejection in reader
+- [x] Roborazzi screenshot tests, run inside the ordinary unit-test task through Robolectric so CI
+      needs no emulator (`-PrecordScreenshots=true` to accept new goldens). Roborazzi's own Gradle
+      plugin is not applied: it still uses AGP's removed `TestedExtension`
+- [x] Baseline profile generated from a macrobenchmark on the tablet and committed, with a
+      `benchmark` build type and a startup benchmark that measures with and without it
+- [x] Release signing and GitHub Releases: a `vX.Y.Z` tag sets the version, runs the gates, builds
+      a signed APK and publishes it with notes taken from the changelog — see
+      [docs/RELEASING.md](RELEASING.md)
+- [x] Stylus: palm rejection, pen-drag highlighting and freehand ink, all handled below Readium
+      because its input events carry no tool type — see
+      [ADR 0018](adr/0018-pen-input-below-readium.md)

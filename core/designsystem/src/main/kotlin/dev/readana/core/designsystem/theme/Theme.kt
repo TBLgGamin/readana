@@ -2,52 +2,42 @@ package dev.readana.core.designsystem.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.expressiveLightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF7A4E2D),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFFFDCC6),
-    onPrimaryContainer = Color(0xFF2D1600),
-    secondary = Color(0xFF705B4C),
-    secondaryContainer = Color(0xFFFBDECB),
-    tertiary = Color(0xFF4F6D4A),
-    background = Color(0xFFFFF8F4),
-    surface = Color(0xFFFFF8F4)
-)
+/**
+ * The Material 3 Expressive baseline, unaltered.
+ *
+ * [expressiveLightColorScheme] is what `MaterialExpressiveTheme` itself defaults to: the baseline
+ * violet palette with the on-container roles pulled down to tone 30, which is what gives expressive
+ * containers their contrast. Material ships no expressive dark counterpart, so dark is the baseline
+ * [darkColorScheme] it is meant to pair with.
+ */
+private val LightColorScheme: ColorScheme = expressiveLightColorScheme()
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFFF0B58E),
-    onPrimary = Color(0xFF482506),
-    primaryContainer = Color(0xFF613B1A),
-    onPrimaryContainer = Color(0xFFFFDCC6),
-    secondary = Color(0xFFDEC2AF),
-    secondaryContainer = Color(0xFF574336),
-    tertiary = Color(0xFFB5CCAD),
-    background = Color(0xFF1A120D),
-    surface = Color(0xFF1A120D)
-)
+private val DarkColorScheme: ColorScheme = darkColorScheme()
 
 val ReadanaTypography = Typography()
 
 /**
- * App-wide Material 3 Expressive theme: expressive motion for every transition, Material You
- * dynamic colour on Android 12+ (the Pad 8 runs Android 16) and a warm paper-like palette
- * elsewhere. Every screen in the app themes through this and uses stock Material 3 components.
+ * App-wide Material 3 Expressive theme: the baseline expressive palette, expressive motion for
+ * every transition, and stock Material 3 components on every screen.
+ *
+ * [dynamicColor] is off by default so the app looks like itself rather than like the wallpaper.
+ * Turn it on to take Material You colours from the system on Android 12+.
  */
 @Composable
 fun ReadanaTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {

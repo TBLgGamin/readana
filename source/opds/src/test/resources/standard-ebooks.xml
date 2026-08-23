@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"
+      xmlns:dc="http://purl.org/dc/elements/1.1/"
+      xmlns:dcterms="http://purl.org/dc/terms/"
+      xmlns:opds="http://opds-spec.org/2010/catalog">
+  <id>https://standardebooks.test/feeds/opds/all</id>
+  <title>Standard Ebooks</title>
+  <updated>2026-08-01T00:00:00Z</updated>
+  <link rel="search" type="application/opensearchdescription+xml" href="/feeds/opds/search?query={searchTerms}&amp;start={startIndex?}"/>
+  <link rel="next" type="application/atom+xml;profile=opds-catalog;kind=acquisition" href="/feeds/opds/all?page=2"/>
+  <entry>
+    <id>https://standardebooks.test/ebooks/jane-austen/pride-and-prejudice</id>
+    <title>Pride and Prejudice</title>
+    <author><name>Jane Austen</name></author>
+    <summary>A novel of manners.</summary>
+    <dcterms:language>en-GB</dcterms:language>
+    <dcterms:issued>1813-01-28T00:00:00Z</dcterms:issued>
+    <dcterms:publisher>Standard Ebooks</dcterms:publisher>
+    <link rel="alternate" type="text/html" href="/ebooks/jane-austen/pride-and-prejudice"/>
+    <link rel="http://opds-spec.org/image/thumbnail" type="image/jpeg" href="/images/pride-thumb.jpg"/>
+    <link rel="http://opds-spec.org/acquisition/open-access" type="application/epub+zip" length="483920"
+          href="/ebooks/jane-austen/pride-and-prejudice/downloads/pride.epub"/>
+  </entry>
+  <entry>
+    <id>https://standardebooks.test/ebooks/herman-melville/moby-dick</id>
+    <title>Moby Dick</title>
+    <author><name>Herman Melville</name></author>
+    <link rel="http://opds-spec.org/acquisition" type="application/x-mobipocket-ebook"
+          href="/ebooks/herman-melville/moby-dick/downloads/moby.azw3"/>
+  </entry>
+  <entry>
+    <id>https://standardebooks.test/ebooks/borrowed</id>
+    <title>A Borrowed Book</title>
+    <link rel="http://opds-spec.org/acquisition/borrow" type="application/epub+zip" href="/borrow/1"/>
+  </entry>
+</feed>

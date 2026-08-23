@@ -19,6 +19,8 @@ internal data class ReaderActions(
     val onLocatorChange: (Locator) -> Unit,
     /** The live navigator, which is the only thing that can actually move the page. */
     val onNavigator: (Navigator?) -> Unit,
+    /** The surface the pen draws on; null once the reading surface is gone. */
+    val onSurface: (ReaderSurfaceView?) -> Unit,
     val onSeek: (Float) -> Unit,
     val onShowSheet: (ReaderSheet) -> Unit,
     val onDismissSheet: () -> Unit,

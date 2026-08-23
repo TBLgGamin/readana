@@ -25,7 +25,11 @@ class SettingsViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val settings = FakeSettingsRepository()
-    private val registry = BookSourceRegistry(setOf(FakeBookSource()))
+    private val registry = BookSourceRegistry(
+        builtIn = setOf(FakeBookSource()),
+        catalogFactory = { catalog -> error("unexpected catalog ${'$'}{catalog.id}") },
+        settings = settings
+    )
 
     private fun viewModel() = SettingsViewModel(settings, registry)
 
@@ -37,7 +41,7 @@ class SettingsViewModelTest {
         viewModel.uiState.test {
             val loaded = assertIs<SettingsUiState.Loaded>(awaitItem())
             assertEquals("content://tree/primary%3ABooks", loaded.libraryFolderUri)
-            assertEquals(listOf("Fake Source"), loaded.sourceToggles.map { it.name })
+            assertEquals(listOf("Fake Source"), loaded.sourceRows.map { row -> row.name })
         }
     }
 

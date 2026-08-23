@@ -1,5 +1,6 @@
 package dev.readana.feature.reader
 
+import android.graphics.PointF
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -12,6 +13,7 @@ import dev.readana.core.data.notes.NotesExporter
 import dev.readana.core.data.repository.BookSettingsRepository
 import dev.readana.core.data.repository.BookmarksRepository
 import dev.readana.core.data.repository.HighlightsRepository
+import dev.readana.core.data.repository.InkRepository
 import dev.readana.core.data.repository.LibraryRepository
 import dev.readana.core.data.repository.ReadingSessionsRepository
 import dev.readana.core.data.repository.SettingsRepository
@@ -21,6 +23,8 @@ import dev.readana.core.model.DictionaryEntry
 import dev.readana.core.model.Highlight
 import dev.readana.core.model.HighlightStyle
 import dev.readana.core.model.HighlightTint
+import dev.readana.core.model.InkPoint
+import dev.readana.core.model.InkStroke
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.ReadingProgress
 import java.time.Instant
@@ -120,7 +124,9 @@ internal sealed interface ReaderUiState {
         /** Positions per minute, once enough reading has been done to know. Null until then. */
         val readingRate: Double? = null,
         /** The word the reader asked about, while the definition sheet is up. */
-        val definition: DefinitionState? = null
+        val definition: DefinitionState? = null,
+        /** Ink drawn on this book, with whether the page has moved under each stroke. */
+        val ink: List<ReaderInk> = emptyList()
     ) : ReaderUiState
 }
 
@@ -150,6 +156,7 @@ internal class ReaderViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
     private val bookmarksRepository: BookmarksRepository,
     private val highlightsRepository: HighlightsRepository,
+    private val inkRepository: InkRepository,
     private val settingsRepository: SettingsRepository,
     private val bookSettingsRepository: BookSettingsRepository,
     private val readingSessionsRepository: ReadingSessionsRepository,
@@ -171,6 +178,7 @@ internal class ReaderViewModel @Inject constructor(
     private var lastLocator: Locator? = null
     private var progressJob: Job? = null
     private var bookmarksJob: Job? = null
+    private var inkJob: Job? = null
     private var bookmarks: List<Bookmark> = emptyList()
     private var searchJob: Job? = null
     private var searchIterator: SearchIterator? = null
@@ -282,6 +290,45 @@ internal class ReaderViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    /**
+     * Stores a line drawn on the page.
+     *
+     * The points are normalised to the surface they were drawn on, so the stroke survives a change
+     * of window size, and stamped with the reading settings in force. On a reflowable book those
+     * settings are what decides whether the ink is still over the right words later — the stroke is
+     * anchored to the current locator, but text moves when the type does (see [InkStroke]).
+     */
+    fun addInkStroke(points: List<PointF>, surfaceWidth: Int, surfaceHeight: Int) {
+        val bookId = openedBookId ?: return
+        val locator = lastLocator ?: return
+        if (points.isEmpty() || surfaceWidth <= 0 || surfaceHeight <= 0) return
+        val settings = (_uiState.value as? ReaderUiState.Ready)?.settings ?: return
+        viewModelScope.launch {
+            inkRepository.add(
+                InkStroke(
+                    id = InkStroke.UNSAVED_ID,
+                    bookId = bookId,
+                    resourceHref = locator.href.toString(),
+                    anchorLocatorJson = locator.toJSON().toString(),
+                    points = points.map { point ->
+                        InkPoint(point.x / surfaceWidth, point.y / surfaceHeight)
+                    },
+                    tint = HighlightTint.Yellow,
+                    layoutFingerprint = InkStroke.fingerprintOf(settings),
+                    progression = locator.locations.totalProgression,
+                    createdAt = Instant.now()
+                )
+            )
+        }
+    }
+
+    /** Wipes the ink on the page being read, which is what an eraser sweep amounts to. */
+    fun clearInkOnPage() {
+        val bookId = openedBookId ?: return
+        val href = lastLocator?.href?.toString() ?: return
+        viewModelScope.launch { inkRepository.clearResource(bookId, href) }
     }
 
     /**
@@ -505,6 +552,21 @@ internal class ReaderViewModel @Inject constructor(
             highlightsRepository.observeForBook(book.id).collect { saved ->
                 highlights = saved
                 updateReady { state -> state.copy(highlights = saved.map { it.toItem() }) }
+            }
+        }
+        inkJob?.cancel()
+        inkJob = viewModelScope.launch {
+            inkRepository.observeForBook(book.id).collect { saved ->
+                updateReady { state ->
+                    val fingerprint = InkStroke.fingerprintOf(state.settings)
+                    state.copy(
+                        ink = saved.map { stroke ->
+                            // A stroke drawn under different settings sits over text that has
+                            // since moved; it is still shown, but not as if it were still right.
+                            ReaderInk(stroke, isMisplaced = stroke.layoutFingerprint != fingerprint)
+                        }
+                    )
+                }
             }
         }
         _uiState.value = ReaderUiState.Ready(

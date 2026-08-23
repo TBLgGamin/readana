@@ -11,6 +11,8 @@ Readana is a Kotlin/Jetpack Compose Android e-reader targeting a Xiaomi Pad 8 (A
 ./gradlew detekt                        # static analysis, config in config/detekt/detekt.yml
 ./gradlew :app:lintDebug                # Android Lint for all modules; warnings fail the build
 ./gradlew testDebugUnitTest test        # unit tests (Android modules + pure-JVM modules)
+./gradlew testDebugUnitTest -PrecordScreenshots=true   # re-record Roborazzi goldens after a UI change
+./gradlew :app:generateBaselineProfile  # startup profile; needs the tablet attached
 ./gradlew :engine:reflow:test           # single module
 ./gradlew check                         # all of the above
 adb install -r app/build/outputs/apk/debug/app-debug.apk
@@ -43,6 +45,12 @@ JDK 24 runs Gradle fine (bytecode target is 17).
   reason or fix; don't grow the baseline.
 - **Kotlin comments**: a `/*` inside KDoc (e.g. `core/*`) opens a nested comment and breaks compilation.
 - **Dependencies** only via `gradle/libs.versions.toml`; Dependabot groups updates weekly.
+- **Sources declare their own settings** (`BookSource.configFields`); the Sources settings page
+  renders them generically, so a new source needs no UI. Catalogs are data, not modules (ADR 0017).
+- **Releases are a `vX.Y.Z` tag** — see `docs/RELEASING.md`. `versionName`/`versionCode` come from
+  the tag; never edit them by hand.
+- **Screenshot goldens** live in `<module>/src/test/screenshots`. Roborazzi's Gradle plugin is
+  deliberately not applied (it needs AGP's removed `TestedExtension`); record/verify is a `-P` flag.
 
 ## Automation in this repo
 

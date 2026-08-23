@@ -76,7 +76,12 @@ internal fun SettingsGroup(modifier: Modifier = Modifier, content: SettingsGroup
     }
 }
 
-/** A setting that is on or off. The whole row is the target, not just the switch. */
+/**
+ * A setting that is on or off. The whole row is the target, not just the switch.
+ *
+ * [trailing] sits before the switch, for a row that has somewhere else to go as well as something
+ * to turn on — a source with its own settings, say.
+ */
 @Composable
 internal fun SwitchItem(
     shapes: ListItemShapes,
@@ -84,7 +89,8 @@ internal fun SwitchItem(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    help: String? = null
+    help: String? = null,
+    trailing: (@Composable () -> Unit)? = null
 ) {
     SegmentedListItem(
         checked = checked,
@@ -96,7 +102,36 @@ internal fun SwitchItem(
         } else {
             null
         },
-        trailingContent = { Switch(checked = checked, onCheckedChange = null) },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                trailing?.invoke()
+                Switch(checked = checked, onCheckedChange = null)
+            }
+        },
+        colors = ListItemDefaults.segmentedColors()
+    ) {
+        Text(label)
+    }
+}
+
+/** A row that does something when tapped rather than holding a value. */
+@Composable
+internal fun ActionItem(
+    shapes: ListItemShapes,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    supporting: String? = null
+) {
+    SegmentedListItem(
+        onClick = onClick,
+        shapes = shapes,
+        modifier = modifier,
+        supportingContent = if (supporting != null) {
+            { Text(supporting) }
+        } else {
+            null
+        },
         colors = ListItemDefaults.segmentedColors()
     ) {
         Text(label)

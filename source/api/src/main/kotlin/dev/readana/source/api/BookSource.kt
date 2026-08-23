@@ -20,6 +20,17 @@ interface BookSource {
     val enabledByDefault: Boolean
         get() = true
 
+    /**
+     * What the user has to fill in before this source works. Rendered generically by the Sources
+     * settings page; an empty list means the source needs no configuration.
+     */
+    val configFields: List<SourceConfigField>
+        get() = emptyList()
+
+    /** A line under the name in Settings saying what the source is. */
+    val summary: String?
+        get() = null
+
     suspend fun search(query: SearchQuery): AppResult<SearchPage>
 
     /**

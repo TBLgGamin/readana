@@ -14,6 +14,7 @@ import dev.readana.core.model.BrowserDownload
 import dev.readana.core.model.DownloadErrorKind
 import dev.readana.core.model.DownloadJob
 import dev.readana.core.model.DownloadStatus
+import dev.readana.core.model.StoredQuota
 import dev.readana.source.api.BrowserLogin
 import dev.readana.source.api.DownloadRequest
 import dev.readana.source.api.SearchResult
@@ -187,7 +188,7 @@ class DefaultBookDownloadManager @Inject constructor(
             is AppResult.Failure -> return RetryOutcome.Failed(resolved.error)
             is AppResult.Success -> resolved.value
         }
-        request.quota?.let { rememberQuota(it.remaining, it.perDay) }
+        request.quota?.let { rememberQuota(entity.sourceId, it.remaining, it.perDay) }
 
         if (!request.requiresBrowser) {
             downloadsRepository.updateResolution(entity.id, request.url, total = request.expectedSizeBytes)
@@ -250,9 +251,9 @@ class DefaultBookDownloadManager @Inject constructor(
         downloadsRepository.removeFinished().forEach { downloader.discardPart(it) }
     }
 
-    private suspend fun rememberQuota(remaining: Int?, perDay: Int?) {
+    private suspend fun rememberQuota(sourceId: String, remaining: Int?, perDay: Int?) {
         settingsRepository.updateSourceSettings {
-            it.copy(annasDownloadsLeft = remaining, annasDownloadsPerDay = perDay)
+            it.withQuota(sourceId, StoredQuota(remaining, perDay))
         }
     }
 

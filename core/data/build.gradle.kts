@@ -15,6 +15,9 @@ dependencies {
     api(projects.core.model)
     api(projects.source.api)
     implementation(projects.source.annas)
+    implementation(projects.source.arxiv)
+    implementation(projects.source.openlibrary)
+    implementation(projects.source.opds)
     api(projects.source.trending)
     // PDF → EPUB conversion; the dependency runs data → engine, never the other way.
     api(projects.engine.pdf2epub)

@@ -37,4 +37,8 @@
     <string name="feature_discover_details_publisher">Publisher</string>
     <string name="feature_discover_details_source">Source</string>
     <string name="feature_discover_details_action">Show details</string>
+    <string name="feature_discover_catalogs_title">Catalogs</string>
+    <string name="feature_discover_catalog_back">Back</string>
+    <string name="feature_discover_catalog_failed">Could not open this catalog</string>
+    <string name="feature_discover_catalog_empty">Nothing on this shelf</string>
 </resources>

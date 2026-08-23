@@ -32,9 +32,15 @@ graph TD
     core_data --> core_common[core:common]
     core_data --> source_api[source:api]
     core_data --> source_annas[source:annas]
+    core_data --> source_opds[source:opds]
+    core_data --> source_openlibrary[source:openlibrary]
+    core_data --> source_arxiv[source:arxiv]
     core_data --> source_trending[source:trending]
 
     source_annas --> source_api
+    source_opds --> source_api
+    source_openlibrary --> source_api
+    source_arxiv --> source_opds
     source_trending --> core_common
     source_api --> core_model
     source_api --> core_common
@@ -44,7 +50,7 @@ graph TD
     engine_reflow --> engine_epub[engine:epub]
 
     classDef jvm fill:#e8f4e8,stroke:#4f6d4a;
-    class core_model,core_common,source_api,source_annas,source_trending,engine_reflow,engine_epub jvm;
+    class core_model,core_common,source_api,source_annas,source_opds,source_openlibrary,source_arxiv,source_trending,engine_reflow,engine_epub jvm;
 ```
 
 Green nodes are pure Kotlin/JVM modules: no Android dependency, millisecond unit tests, no Robolectric.
@@ -55,12 +61,15 @@ Green nodes are pure Kotlin/JVM modules: no Android dependency, millisecond unit
 | `feature/*` | One screen family each: `XxxKey` (NavKey), `xxxEntry()` (entry provider), `XxxRoute` (wires ViewModel), `XxxScreen` (stateless UI), `XxxViewModel` | yes |
 | `core/data` | Room (`books`, `bookmarks`, `highlights`, `downloads`, `ai_threads`, `ai_messages`, `book_reader_settings`, `reading_sessions`, `collections`, `collection_books`), DataStore (`SettingsKeys`), repositories, `BookSourceRegistry`, `ReadiumPublicationOpener`, the import pipeline (`BookStorage`, `BookImporter`, `BookImportManager`), the download pipeline (`BookDownloadManager`, `BookDownloader`, `DownloadWorker`), the shared browser identity (`WebViewCookieJar`, `BrowserIdentity`, `WebViewBrowserVerifier`), the conversion pipeline (`BookConverter`, `ConversionManager`), the reading assistant (`AiAssistant`, `AiPrompts`, `AiProviderProbe`), the reading aids (`WiktionaryDictionary`, `NotesExporter`, `ReadingSpeed`), all Hilt modules | yes |
 | `core/designsystem` | `ReadanaTheme` (Material 3 Expressive), `ReadanaIcons`, `EmptyState`, `LoadingState`, `BookCover` (Coil), `NoteRow`, `HighlightTint.color()` | yes |
-| `core/model` | `Book`, `BookFormat`, `ReadingProgress`, `Bookmark`, `Highlight`, `ReaderSettings`, `SourceSettings`, `ConversionSettings`, `ConversionInfo`, `DownloadJob`, `BrowserDownload`, `AiSettings`, `AiProviderConfig`, `AiThread`, `AiMessage`, `BookSeries`, `ReadingStatus`, `BookCollection`, `DictionaryEntry` | no |
+| `core/model` | `Book`, `BookFormat`, `ReadingProgress`, `Bookmark`, `Highlight`, `ReaderSettings`, `SourceSettings`, `CatalogRef`, `CatalogPreset`, `StoredQuota`, `ConversionSettings`, `ConversionInfo`, `DownloadJob`, `BrowserDownload`, `AiSettings`, `AiProviderConfig`, `AiThread`, `AiMessage`, `BookSeries`, `ReadingStatus`, `BookCollection`, `DictionaryEntry` | no |
 | `core/common` | `AppResult`/`AppError`, `@Dispatcher`/`@ApplicationScope`, `suspendRunCatching`, `VolumeKeyRelay` | no |
 | `core/testing` | `MainDispatcherRule`, `FakeBookSource` | no |
-| `source/api` | `BookSource`, `SearchQuery/Page/Result`, `DownloadRequest`, `DownloadQuota`, `BrowserLogin`, `BrowserVerifier`, `FileNames` | no |
+| `source/api` | `BookSource`, `CatalogSource`, `SourceConfigField`, `SearchQuery/Page/Result`, `DownloadRequest`, `DownloadQuota`, `BrowserLogin`, `BrowserVerifier`, `FileNames` | no |
 | `source/gutenberg` | Gutendex JSON client — built, but not registered in `SourcesModule` | no |
 | `source/annas` | search-page parser, the browser-check gate (`DdosGuard`, `AnnasSession`), member fast-download API, the free download ladder (`LibgenDirectLinks`, `SlowDownloadParser`), `MirrorResolver` | no |
+| `source/opds` | OPDS 1.2 (Atom, via jsoup in XML mode) and 2.0 (JSON) parsers, `OpdsSource`, `PresetCatalogs`, the shared `AtomXml` helper | no |
+| `source/openlibrary` | Open Library search, Internet Archive file listing; public-domain scans only | no |
+| `source/arxiv` | arXiv Atom API; every result is a PDF for the conversion pipeline | no |
 | `source/trending` | Open Library trending feed for the Discover shelf; not a `BookSource` | no |
 | `ai/client` | `LlmClient` (Anthropic + OpenAI-compatible dialects), `SseReader`, `LlmClientFactory`, `ReadingContextBuilder`/`TextWalker` (the spoiler-safe context cut) | no |
 | `engine/epub` | `EpubBook` model, `NavEntry`, `EpubWriter` (EPUB 3.3, epubcheck-validated) | no |
@@ -179,7 +188,12 @@ content whatever the book, so a pace learned from one book is worth something in
 
 - **State**: ViewModels expose a single `StateFlow<UiState>` (sealed interfaces); screens are
   stateless and previewable. Events flow up as lambdas.
-- **DI**: Hilt. Sources are a `Set<BookSource>` multibinding; add a source with one `@IntoSet` provider.
+- **DI**: Hilt. Compiled-in sources are a `Set<BookSource>` multibinding; add one with a single
+  `@IntoSet` provider. Catalogs the user added are data, not modules: `BookSourceRegistry` builds a
+  source per stored `CatalogRef` and exposes `Flow<List<BookSource>>` (ADR 0017).
+- **Source configuration**: a source declares `configFields`; the Sources settings page renders
+  them and stores the answers in `SourceSettings.config`, keyed by source id. Nothing in the
+  settings screen names a source (ADR 0017).
 - **Navigation**: Navigation 3 with a `NavBackStack<NavKey>` owned by `ReadanaApp`; the library is
   always the root so system back returns there; the reader hides the navigation suite.
 - **Errors**: `AppResult`/`AppError` at every module boundary; UI maps errors to strings.
@@ -206,7 +220,8 @@ content whatever the book, so a pace learned from one book is worth something in
 | ViewModels | `MainDispatcherRule` + fakes + Turbine | `LibraryViewModelTest`, `DiscoverViewModelTest`, `ReaderViewModelTest` |
 | Readium mappers | Robolectric (Readium's preference types need Android) | `ReadiumPreferencesTest` |
 | Architecture | Konsist | `ArchitectureTest` |
-| UI | Compose previews now; Roborazzi screenshot tests planned | — |
+| UI | Roborazzi + Robolectric, goldens committed under `src/test/screenshots` | `DesignSystemScreenshotTest`, `SettingsScreenshotTest` |
+| Startup | Macrobenchmark on the device, profile committed | `BaselineProfileGenerator`, `StartupBenchmark` |
 
 ## Build logic
 
@@ -222,5 +237,6 @@ content whatever the book, so a pace learned from one book is worth something in
 | `readana.android.room` | Room Gradle plugin, KSP, exported schemas |
 | `readana.jvm.library` | `org.jetbrains.kotlin.jvm`, Java 17, Android Lint for JVM, test deps |
 | `readana.hilt` | KSP + Hilt (Android) or Dagger core (JVM) |
+| `readana.android.screenshot` | Roborazzi + Compose UI test deps, and the record/verify switch |
 
 Spotless and detekt are configured once in the root `build.gradle.kts`.

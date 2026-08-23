@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">
+  <title>ArXiv Query: search_query=all:attention</title>
+  <opensearch:totalResults>137</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <opensearch:itemsPerPage>20</opensearch:itemsPerPage>
+  <entry>
+    <id>http://arxiv.org/abs/1706.03762v7</id>
+    <published>2017-06-12T17:57:34Z</published>
+    <title>Attention Is All You
+      Need</title>
+    <summary>  The dominant sequence transduction models are based on complex
+recurrent or convolutional neural networks.
+</summary>
+    <author><name>Ashish Vaswani</name></author>
+    <author><name>Noam Shazeer</name></author>
+    <link href="http://arxiv.org/abs/1706.03762v7" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/1706.03762v7" rel="related" type="application/pdf"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2001.00001v1</id>
+    <published>2020-01-01T00:00:00Z</published>
+    <title>A Paper With No PDF Link</title>
+    <summary>Nothing much.</summary>
+    <author><name>Someone Else</name></author>
+    <link href="http://arxiv.org/abs/2001.00001v1" rel="alternate" type="text/html"/>
+  </entry>
+</feed>

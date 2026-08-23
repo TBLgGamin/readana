@@ -11,6 +11,7 @@ import dev.readana.core.data.notes.NotesExporter
 import dev.readana.core.data.repository.BookSettingsRepository
 import dev.readana.core.data.repository.BookmarksRepository
 import dev.readana.core.data.repository.HighlightsRepository
+import dev.readana.core.data.repository.InkRepository
 import dev.readana.core.data.repository.LibraryRepository
 import dev.readana.core.data.repository.ReadingSessionsRepository
 import dev.readana.core.data.repository.SettingsRepository
@@ -22,6 +23,7 @@ import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.DictionaryEntry
 import dev.readana.core.model.Highlight
 import dev.readana.core.model.HighlightTint
+import dev.readana.core.model.InkStroke
 import dev.readana.core.model.PageTurnMode
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.ReaderTheme
@@ -62,6 +64,7 @@ class ReaderViewModelTest {
     private val library = FakeLibraryRepository()
     private val bookmarks = FakeBookmarksRepository()
     private val highlights = FakeHighlightsRepository()
+    private val ink = FakeInkRepository()
     private val settings = FakeSettingsRepository()
     private val bookSettings = FakeBookSettingsRepository()
     private val sessionStore = ReaderSessionStore()
@@ -71,6 +74,7 @@ class ReaderViewModelTest {
         libraryRepository = library,
         bookmarksRepository = bookmarks,
         highlightsRepository = highlights,
+        inkRepository = ink,
         settingsRepository = settings,
         bookSettingsRepository = bookSettings,
         readingSessionsRepository = FakeReadingSessionsRepository(),
@@ -492,6 +496,26 @@ private class FakeHighlightsRepository : HighlightsRepository {
     }
 
     override suspend fun remove(id: Long) = state.update { saved -> saved.filterNot { it.id == id } }
+}
+
+private class FakeInkRepository : InkRepository {
+    private val state = MutableStateFlow<List<InkStroke>>(emptyList())
+    private var nextId = 1L
+
+    override fun observeForBook(bookId: String): Flow<List<InkStroke>> =
+        state.map { saved -> saved.filter { it.bookId == bookId } }
+
+    override suspend fun add(stroke: InkStroke): InkStroke {
+        val stored = stroke.copy(id = nextId++)
+        state.update { it + stored }
+        return stored
+    }
+
+    override suspend fun remove(id: Long) = state.update { saved -> saved.filterNot { it.id == id } }
+
+    override suspend fun clearResource(bookId: String, resourceHref: String) = state.update { saved ->
+        saved.filterNot { it.bookId == bookId && it.resourceHref == resourceHref }
+    }
 }
 
 private class FakeSettingsRepository : SettingsRepository {

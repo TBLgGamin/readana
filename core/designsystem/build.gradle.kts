@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.readana.android.library.compose)
+    alias(libs.plugins.readana.android.screenshot)
 }
 
 android {

@@ -6,12 +6,79 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The pen does something now. Drag it across a line and the passage is highlighted — no long press,
+  no handles to drag — or switch it to draw and it leaves ink on the page. While the pen is
+  touching or hovering over the screen, fingers are ignored, so a hand resting on the page no
+  longer turns it or starts a stray selection; put the pen down and everything works as before.
+  None of this could be done through Readium, whose input events carry no tool type and, for EPUB,
+  are raised by JavaScript inside the WebView: touches are sorted below it now, where a nib can
+  still be told from a palm. A pen highlight goes through exactly the path a long press does, so
+  notes, colours, the contents sheet and the Markdown export all work on it unchanged.
+
+  Ink on a fixed-layout book — a PDF or a comic — is exact and stays exact. On a reflowing book it
+  cannot be: change the font size and the text moves out from under the line. Rather than draw a
+  confident stroke through the wrong sentence, each stroke remembers the type it was drawn under
+  and is shown faintly when that no longer matches.
+
+- Screenshot tests, so a change to how something looks is noticed in review rather than on a device
+  weeks later. They run in the ordinary test task through Robolectric — no emulator, nothing new
+  for CI to install — and the reference images sit next to the tests that make them.
+  `./gradlew testDebugUnitTest -PrecordScreenshots=true` accepts a change as intended.
+
+- A baseline profile, so a cold start compiles the path it actually takes instead of interpreting
+  it. Generated from a macrobenchmark on the tablet and committed, with a benchmark that measures
+  startup with and without it, since a profile nobody measures is a profile nobody can trust.
+
+- Releases are a tag. Pushing `vX.Y.Z` runs the same gates CI runs, builds a signed APK, and
+  publishes it with the changelog's own words as the release notes; the version in the tag becomes
+  the version in the APK, and the ProGuard mapping is attached so a crash report stays readable.
+  `docs/RELEASING.md` covers the keystore and the dry run.
+
+
+- Four more places to find books, and a Sources page that treats them all alike. **OPDS catalogs**
+  (1.2 and 2.0) can be added from a built-in list — Standard Ebooks, the Directory of Open Access
+  Books, Feedbooks' public domain shelf — or by pasting any feed address, including your own
+  Calibre-Web, which takes a username and password like any other setting. A catalog is browsed as
+  well as searched: Discover offers the catalogs you added as shelves, and opening one walks its
+  feeds, each shelf its own screen so system back comes out one level at a time. Deduplication is
+  deliberately off inside a catalog, where every entry is there on purpose. **Open Library** search
+  brings in Internet Archive scans, listing only what can actually be downloaded — a borrowable
+  scan ends in an Adobe licence this app cannot open, so it is not offered at all — and picks the
+  EPUB derivative over the scanned PDF when the item holds both. **arXiv** searches preprints,
+  narrowed to the categories you name, and its PDFs go through the existing conversion so a paper
+  reflows like anything else. Search results now page: scrolling to the end of the grid fetches
+  more from whichever sources said they had more.
+
+### Changed
+
+- A source now carries its own settings, so adding one no longer means adding a settings page for
+  it. Anna's mirrors and membership key used to be fields on the shared source settings, spelled
+  out again in the settings screen and written back by the download queue; a second source that
+  needed a key had nowhere to put it. Sources now declare what they need — a line of text, a
+  secret, a list of URLs — and the Sources page renders whatever they declared. Anna's is one row
+  among the others, and what you already configured moves across on first run.
+
+- Settings is five short tabs instead of two long ones: Reading, Sources, Assistant, Files and
+  About. Every tab fits on a screen, so nothing is found by scrolling past something unrelated,
+  and the version number finally has somewhere to live.
+
 ### Fixed
 
-- Passing messages look the way Material 3 draws them, and turn up wherever you are. Material 3
-  still ships its old snackbar layout by default and keeps the corrected one behind a flag, which
-  is now on, so every message in the app has the same expressive shape. They are also raised
-  centrally rather than by each screen: a screen used to own its own host, so a message only
+- The release workflow could never have signed anything. Its "restore signing key" step was guarded
+  by `if: ${{ secrets.KEYSTORE_BASE64 != '' }}`, and the `secrets` context is not available in a
+  step-level `if` — so the guard never held and the key was never written. It also built from a
+  hardcoded `versionName` regardless of the tag, and generated release notes from commit subjects
+  while the changelog sat unused. No release had ever been cut, so this was found rather than
+  suffered.
+
+
+- Passing messages are drawn by Readana now, and turn up wherever you are. Material 3's snackbar is
+  deliberately foreign to whatever is behind it — a dark inverted slab that fades in flat — so the
+  app draws its own: a warm, fully rounded pill in the same palette as every other surface, with
+  emphasized text and an expressive spring that rises and settles as it arrives. Messages are also
+  raised centrally rather than by each screen: a screen used to own its own host, so a message only
   appeared if you happened to still be on the screen that raised it. A download queued from the
   in-app browser was announced to a browser that was already closing itself and so was rarely seen
   at all, and an import finishing while you were in Settings said nothing. One host now sits in the
@@ -179,6 +246,15 @@ All notable changes to this project are documented here. The format follows
   queued so a wrong edition is obvious.
 
 ### Changed
+
+- The app wears Material 3 Expressive's own colours. The hand-mixed warm-brown palette is gone in
+  favour of `expressiveLightColorScheme()` — the scheme `MaterialExpressiveTheme` itself defaults
+  to, the baseline violet with its on-container roles pulled down to tone 30 for the contrast
+  expressive containers are drawn with — paired with the baseline `darkColorScheme()`, since
+  Material ships no expressive dark counterpart. Material You dynamic colour is off by default now
+  rather than on: it was quietly replacing the whole palette with the wallpaper's on every device
+  since Android 12, so nothing chosen here was ever what you saw. Pass `dynamicColor = true` to
+  `ReadanaTheme` to have it back.
 
 - A PDF converting after a download no longer gets a card of its own beside the download that
   started it. It is the same book one step later, so it appears as the converting step inside that

@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.model.PageTurnMode
+import dev.readana.core.model.PenMode
 import dev.readana.core.model.ReaderColumns
 import dev.readana.core.model.ReaderFont
 import dev.readana.core.model.ReaderSettings
@@ -86,8 +87,31 @@ internal fun ReadingSettingsSection(
                     onCheckedChange = { enabled -> onChange { it.copy(keepScreenOn = enabled) } }
                 )
             }
+            item { shapes ->
+                SwitchItem(
+                    shapes = shapes,
+                    label = stringResource(R.string.feature_settings_reading_palm_rejection),
+                    help = stringResource(R.string.feature_settings_reading_palm_rejection_help),
+                    checked = settings.palmRejection,
+                    onCheckedChange = { enabled -> onChange { it.copy(palmRejection = enabled) } }
+                )
+            }
         }
+        ChoiceRow(
+            label = stringResource(R.string.feature_settings_reading_pen_mode),
+            options = PenMode.entries,
+            selected = settings.penMode,
+            optionLabel = { stringResource(it.labelRes()) },
+            onSelect = { mode -> onChange { it.copy(penMode = mode) } },
+            help = stringResource(R.string.feature_settings_reading_pen_mode_help)
+        )
     }
+}
+
+private fun PenMode.labelRes(): Int = when (this) {
+    PenMode.Off -> R.string.feature_settings_reading_pen_off
+    PenMode.Highlight -> R.string.feature_settings_reading_pen_highlight
+    PenMode.Ink -> R.string.feature_settings_reading_pen_ink
 }
 
 /**

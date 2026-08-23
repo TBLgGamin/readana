@@ -1,5 +1,6 @@
 package dev.readana.feature.reader
 
+import android.graphics.PointF
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -31,6 +32,9 @@ import dev.readana.core.common.input.VolumeKeyRelay
 import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.EmptyState
 import dev.readana.core.designsystem.component.LoadingState
+import dev.readana.core.designsystem.component.color
+import dev.readana.core.model.HighlightTint
+import dev.readana.core.model.PenMode
 import org.readium.r2.navigator.Navigator
 import org.readium.r2.navigator.OverflowableNavigator
 import org.readium.r2.navigator.VisualNavigator
@@ -57,6 +61,9 @@ internal fun ReaderRoute(
     val systemInDarkTheme = isSystemInDarkTheme()
     LaunchedEffect(bookId) { viewModel.open(bookId, systemInDarkTheme) }
     var navigator by remember { mutableStateOf<Navigator?>(null) }
+    var surface by remember { mutableStateOf<ReaderSurfaceView?>(null) }
+    // The stroke as it is being drawn, so the line appears under the nib rather than on lift.
+    var inkInProgress by remember { mutableStateOf<List<PointF>>(emptyList()) }
     // Kept because the navigator clears the selection the moment an action runs, and the
     // definition sheet's way out needs the passage it was opened for.
     var definedSelection by remember { mutableStateOf<ReaderSelection?>(null) }
@@ -75,6 +82,7 @@ internal fun ReaderRoute(
         onToggleChrome = viewModel::toggleChrome,
         onLocatorChange = viewModel::onLocatorChanged,
         onNavigator = { navigator = it },
+        onSurface = { surface = it },
         onSeek = { fraction -> goTo(ReaderTarget.Progress(fraction), closeSheet = false) },
         onShowSheet = viewModel::showSheet,
         onDismissSheet = { viewModel.showSheet(ReaderSheet.None) },
@@ -141,7 +149,18 @@ internal fun ReaderRoute(
         actions = actions,
         assistantActions = assistantActions,
         ttsActions = ttsActions,
-        modifier = modifier
+        modifier = modifier,
+        inkInProgress = inkInProgress
+    )
+
+    PenGestures(
+        surface = surface,
+        navigator = navigator,
+        penMode = ready?.settings?.penMode ?: PenMode.Off,
+        palmRejection = ready?.settings?.palmRejection ?: true,
+        onHighlight = { locator, text -> viewModel.addHighlight(locator, text) },
+        onInkStroke = viewModel::addInkStroke,
+        onInkInProgress = { inkInProgress = it }
     )
 
     SpokenUtteranceEffect(navigator = navigator, utterance = tts.utterance)
@@ -185,7 +204,9 @@ internal fun ReaderScreen(
     actions: ReaderActions,
     assistantActions: AssistantActions,
     ttsActions: TtsActions,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** The pen stroke being drawn right now, so the line follows the nib. */
+    inkInProgress: List<PointF> = emptyList()
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         when (uiState) {
@@ -207,7 +228,8 @@ internal fun ReaderScreen(
                 tts = tts,
                 actions = actions,
                 assistantActions = assistantActions,
-                ttsActions = ttsActions
+                ttsActions = ttsActions,
+                inkInProgress = inkInProgress
             )
         }
     }
@@ -221,6 +243,7 @@ private fun ReadingSurface(
     actions: ReaderActions,
     assistantActions: AssistantActions,
     ttsActions: TtsActions,
+    inkInProgress: List<PointF>,
     modifier: Modifier = Modifier
 ) {
     KeepScreenOnEffect(state.settings.keepScreenOn)
@@ -239,6 +262,15 @@ private fun ReadingSurface(
             onLocatorChange = actions.onLocatorChange,
             onCenterTap = actions.onToggleChrome,
             onNavigator = actions.onNavigator,
+            onSurface = actions.onSurface,
+            modifier = Modifier.fillMaxSize()
+        )
+        // Above the page, but never in the way: strokes are captured below, in the surface view,
+        // where a pen can still be told from a finger.
+        ReaderInkOverlay(
+            strokes = state.ink,
+            inProgress = inkInProgress,
+            inProgressTint = HighlightTint.Yellow.color(),
             modifier = Modifier.fillMaxSize()
         )
         ReaderTopBar(

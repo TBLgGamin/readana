@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>https://catalog.test/root</id>
+  <title>A Library</title>
+  <link rel="search" type="application/opensearchdescription+xml" href="/search?q={searchTerms}"/>
+  <entry>
+    <id>https://catalog.test/fiction</id>
+    <title>Fiction</title>
+    <content type="text">Novels and short stories</content>
+    <link rel="subsection" type="application/atom+xml;profile=opds-catalog;kind=acquisition" href="/fiction"/>
+  </entry>
+  <entry>
+    <id>https://catalog.test/recent</id>
+    <title>Recently added</title>
+    <link type="application/atom+xml;profile=opds-catalog;kind=navigation" href="/recent"/>
+  </entry>
+</feed>

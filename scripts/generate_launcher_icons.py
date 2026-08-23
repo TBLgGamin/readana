@@ -1,6 +1,7 @@
-"""Generate Android launcher icons from the checked-in Readana masters.
+"""Generate Android launcher icons from the checked-in Readana colour master.
 
-Run from the repository root after replacing either artwork master.
+Run from the repository root after replacing the colour master. The monochrome master is derived
+from its alpha channel so both versions always use the same silhouette.
 """
 
 from pathlib import Path
@@ -21,6 +22,8 @@ DENSITIES = {
     "xxhdpi": (144, 324),
     "xxxhdpi": (192, 432),
 }
+
+ICON_BACKGROUND = "#FEF7FF"
 
 
 def trimmed(path: Path) -> Image.Image:
@@ -52,37 +55,49 @@ def save(image: Image.Image, path: Path) -> None:
     image.save(path, "PNG", optimize=True)
 
 
-def opaque_white_icon(source: Image.Image, size: int, content_fraction: float) -> Image.Image:
+def solid_monochrome(source: Image.Image) -> Image.Image:
+    """Keep the selected mark's exact alpha while removing all colour information."""
+    result = Image.new("RGBA", source.size, "black")
+    result.putalpha(source.getchannel("A"))
+    return result
+
+
+def opaque_background_icon(source: Image.Image, size: int, content_fraction: float) -> Image.Image:
     transparent = contain(source, size, round(size * content_fraction))
-    background = Image.new("RGBA", (size, size), "white")
+    background = Image.new("RGBA", (size, size), ICON_BACKGROUND)
     background.alpha_composite(transparent)
     return background.convert("RGB")
 
 
-def legacy_white_icon(source: Image.Image, size: int) -> Image.Image:
+def legacy_icon(source: Image.Image, size: int) -> Image.Image:
     canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     radius = round(size * 0.18)
     ImageDraw.Draw(canvas).rounded_rectangle(
-        (0, 0, size - 1, size - 1), radius=radius, fill="white"
+        (0, 0, size - 1, size - 1), radius=radius, fill=ICON_BACKGROUND
     )
     canvas.alpha_composite(contain(source, size, round(size * 0.72)))
     return canvas
 
 
-def round_white_icon(source: Image.Image, size: int) -> Image.Image:
+def round_icon(source: Image.Image, size: int) -> Image.Image:
     canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    ImageDraw.Draw(canvas).ellipse((0, 0, size - 1, size - 1), fill="white")
+    ImageDraw.Draw(canvas).ellipse((0, 0, size - 1, size - 1), fill=ICON_BACKGROUND)
     canvas.alpha_composite(contain(source, size, round(size * 0.68)))
     return canvas
 
 
 def main() -> None:
+    # The themed icon is generated from the chosen colour master instead of redrawn. This preserves
+    # the exact book-and-star silhouette and keeps the two deliverables in sync.
+    color_master = Image.open(COLOR_MASTER).convert("RGBA")
+    save(solid_monochrome(color_master), MONO_MASTER)
+
     color = trimmed(COLOR_MASTER)
     monochrome = trimmed(MONO_MASTER)
 
     for density, (legacy_size, adaptive_size) in DENSITIES.items():
-        # Android's adaptive safe zone is 66/108 dp. A little extra breathing room
-        # keeps the original soft shadow intact under all OEM masks.
+        # Android's adaptive safe zone is 66/108 dp. A little extra breathing room keeps the
+        # open-book silhouette and its detached star inside all OEM masks.
         safe_content = round(adaptive_size * 64 / 108)
         save(
             contain(color, adaptive_size, safe_content),
@@ -93,15 +108,15 @@ def main() -> None:
             RES / f"drawable-{density}" / "ic_launcher_monochrome.png",
         )
         save(
-            legacy_white_icon(color, legacy_size),
+            legacy_icon(color, legacy_size),
             ARTWORK / "android" / "legacy" / density / "ic_launcher.png",
         )
         save(
-            round_white_icon(color, legacy_size),
+            round_icon(color, legacy_size),
             ARTWORK / "android" / "legacy" / density / "ic_launcher_round.png",
         )
 
-    save(opaque_white_icon(color, 512, 0.76), ARTWORK / "readana-play-store-icon.png")
+    save(opaque_background_icon(color, 512, 0.76), ARTWORK / "readana-play-store-icon.png")
 
 
 if __name__ == "__main__":

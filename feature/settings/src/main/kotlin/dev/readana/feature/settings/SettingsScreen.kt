@@ -22,17 +22,20 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -43,17 +46,24 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.readana.core.data.repository.SourceDefaults
 import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.LoadingState
+import dev.readana.core.model.CatalogPreset
 import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.HeadingSensitivity
 import dev.readana.core.model.ReaderSettings
-import dev.readana.core.model.SourceSettings
+import dev.readana.source.api.SourceConfigField
+
+/** Lines an editable URL list shows before it scrolls. */
+private const val URL_LIST_LINES = 2
+
+/** Air between the fields of one source's settings. */
+private val FieldSpacing = 12.dp
 
 private const val PERSISTABLE_FLAGS =
     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
@@ -89,18 +99,37 @@ internal fun SettingsRoute(
             onIllustrateChange = aiViewModel::setIllustrateFromWeb,
             onRecapAfterDaysChange = aiViewModel::setRecapAfterDays
         ),
-        onLibraryFolderChange = viewModel::setLibraryFolder,
-        onSourceEnabledChange = viewModel::setSourceEnabled,
-        onAnnasMirrorsChange = viewModel::setAnnasMirrors,
-        onAnnasSecretKeyChange = viewModel::setAnnasSecretKey,
-        onAutoConvertChange = viewModel::setAutoConvertPdf,
-        onRemoveHeadersChange = viewModel::setRemoveHeadersAndFooters,
-        onHeadingSensitivityChange = viewModel::setHeadingSensitivity,
-        onExtractImagesChange = viewModel::setExtractImages,
-        onReadingChange = viewModel::updateReadingDefaults,
+        actions = SettingsActions(
+            onLibraryFolderChange = viewModel::setLibraryFolder,
+            onSourceEnabledChange = viewModel::setSourceEnabled,
+            onSourceConfigChange = viewModel::setSourceConfig,
+            onAddPresetCatalog = viewModel::addPresetCatalog,
+            onAddCatalog = viewModel::addCatalog,
+            onRemoveCatalog = viewModel::removeCatalog,
+            onAutoConvertChange = viewModel::setAutoConvertPdf,
+            onRemoveHeadersChange = viewModel::setRemoveHeadersAndFooters,
+            onHeadingSensitivityChange = viewModel::setHeadingSensitivity,
+            onExtractImagesChange = viewModel::setExtractImages,
+            onReadingChange = viewModel::updateReadingDefaults
+        ),
         modifier = modifier
     )
 }
+
+/** Everything the settings page can do, gathered so the screen takes one parameter for it. */
+internal data class SettingsActions(
+    val onLibraryFolderChange: (String?) -> Unit,
+    val onSourceEnabledChange: (sourceId: String, enabled: Boolean) -> Unit,
+    val onSourceConfigChange: (sourceId: String, field: SourceConfigField, value: String) -> Unit,
+    val onAddPresetCatalog: (CatalogPreset) -> Unit,
+    val onAddCatalog: (name: String, feedUrl: String) -> Boolean,
+    val onRemoveCatalog: (catalogId: String) -> Unit,
+    val onAutoConvertChange: (Boolean) -> Unit,
+    val onRemoveHeadersChange: (Boolean) -> Unit,
+    val onHeadingSensitivityChange: (HeadingSensitivity) -> Unit,
+    val onExtractImagesChange: (Boolean) -> Unit,
+    val onReadingChange: ((ReaderSettings) -> ReaderSettings) -> Unit
+)
 
 /**
  * Two pages rather than one long scroll.
@@ -116,19 +145,11 @@ internal fun SettingsScreen(
     uiState: SettingsUiState,
     aiState: AiSettingsUiState,
     aiActions: AiSettingsActions,
-    onLibraryFolderChange: (String?) -> Unit,
-    onSourceEnabledChange: (sourceId: String, enabled: Boolean) -> Unit,
-    onAnnasMirrorsChange: (String) -> Unit,
-    onAnnasSecretKeyChange: (String) -> Unit,
-    onAutoConvertChange: (Boolean) -> Unit,
-    onRemoveHeadersChange: (Boolean) -> Unit,
-    onHeadingSensitivityChange: (HeadingSensitivity) -> Unit,
-    onExtractImagesChange: (Boolean) -> Unit,
-    onReadingChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
+    actions: SettingsActions,
     modifier: Modifier = Modifier
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    var tab by rememberSaveable { mutableStateOf(SettingsTab.Basic) }
+    var tab by rememberSaveable { mutableStateOf(SettingsTab.Reading) }
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
@@ -139,7 +160,7 @@ internal fun SettingsScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            PrimaryTabRow(selectedTabIndex = tab.ordinal) {
+            PrimaryScrollableTabRow(selectedTabIndex = tab.ordinal, edgePadding = 0.dp) {
                 SettingsTab.entries.forEach { entry ->
                     Tab(
                         selected = entry == tab,
@@ -153,39 +174,43 @@ internal fun SettingsScreen(
 
                 is SettingsUiState.Loaded -> SettingsPage(tab) {
                     when (tab) {
-                        SettingsTab.Basic -> {
+                        SettingsTab.Reading -> {
                             ReadingSettingsSection(
                                 settings = uiState.reading,
-                                onChange = onReadingChange
+                                onChange = actions.onReadingChange
                             )
-                            AiSettingsSection(state = aiState, actions = aiActions)
-                        }
-
-                        SettingsTab.Advanced -> {
                             ReadingLayoutSection(
                                 settings = uiState.reading,
-                                onChange = onReadingChange
+                                onChange = actions.onReadingChange
                             )
+                        }
+
+                        SettingsTab.Sources -> SourcesSection(
+                            rows = uiState.sourceRows,
+                            presets = uiState.availablePresets,
+                            actions = actions
+                        )
+
+                        SettingsTab.Assistant -> {
+                            AiSettingsSection(state = aiState, actions = aiActions)
                             AiAdvancedSection(state = aiState, actions = aiActions)
-                            SourcesSection(
-                                settings = uiState.sources,
-                                toggles = uiState.sourceToggles,
-                                onSourceEnabledChange = onSourceEnabledChange,
-                                onAnnasMirrorsChange = onAnnasMirrorsChange,
-                                onAnnasSecretKeyChange = onAnnasSecretKeyChange
-                            )
+                        }
+
+                        SettingsTab.Files -> {
                             ConversionSection(
                                 settings = uiState.conversion,
-                                onAutoConvertChange = onAutoConvertChange,
-                                onRemoveHeadersChange = onRemoveHeadersChange,
-                                onHeadingSensitivityChange = onHeadingSensitivityChange,
-                                onExtractImagesChange = onExtractImagesChange
+                                onAutoConvertChange = actions.onAutoConvertChange,
+                                onRemoveHeadersChange = actions.onRemoveHeadersChange,
+                                onHeadingSensitivityChange = actions.onHeadingSensitivityChange,
+                                onExtractImagesChange = actions.onExtractImagesChange
                             )
                             StorageSection(
                                 libraryFolderUri = uiState.libraryFolderUri,
-                                onLibraryFolderChange = onLibraryFolderChange
+                                onLibraryFolderChange = actions.onLibraryFolderChange
                             )
                         }
+
+                        SettingsTab.About -> AboutSection()
                     }
                 }
             }
@@ -193,12 +218,18 @@ internal fun SettingsScreen(
     }
 }
 
-/** Which half of the settings is on screen. */
-private enum class SettingsTab { Basic, Advanced }
+/**
+ * One tab per thing a reader might have come here to change. Five short pages beat two long ones:
+ * every tab now fits on a screen, so nothing is found by scrolling past something unrelated.
+ */
+private enum class SettingsTab { Reading, Sources, Assistant, Files, About }
 
 private fun SettingsTab.labelRes(): Int = when (this) {
-    SettingsTab.Basic -> R.string.feature_settings_tab_basic
-    SettingsTab.Advanced -> R.string.feature_settings_tab_advanced
+    SettingsTab.Reading -> R.string.feature_settings_tab_reading
+    SettingsTab.Sources -> R.string.feature_settings_tab_sources
+    SettingsTab.Assistant -> R.string.feature_settings_tab_assistant
+    SettingsTab.Files -> R.string.feature_settings_tab_files
+    SettingsTab.About -> R.string.feature_settings_tab_about
 }
 
 /**
@@ -231,77 +262,227 @@ private fun SettingsPage(tab: SettingsTab, content: @Composable ColumnScope.() -
 
 @Composable
 private fun SourcesSection(
-    settings: SourceSettings,
-    toggles: List<SourceToggle>,
-    onSourceEnabledChange: (sourceId: String, enabled: Boolean) -> Unit,
-    onAnnasMirrorsChange: (String) -> Unit,
-    onAnnasSecretKeyChange: (String) -> Unit,
+    rows: List<SourceRow>,
+    presets: List<CatalogPreset>,
+    actions: SettingsActions,
     modifier: Modifier = Modifier
 ) {
-    // Text fields keep local drafts so typing doesn't round-trip through DataStore per keystroke.
-    var mirrorsDraft by rememberSaveable(settings.annasMirrors) {
-        mutableStateOf(settings.annasMirrors.joinToString("\n"))
-    }
-    var keyDraft by rememberSaveable(settings.annasSecretKey) {
-        mutableStateOf(settings.annasSecretKey.orEmpty())
-    }
+    // Which source's settings are open. Only one at a time: the rows are the index, and two
+    // expanded sources would push the rest of the list off the screen.
+    var expanded by rememberSaveable { mutableStateOf<String?>(null) }
 
-    SettingsSection(
-        title = stringResource(R.string.feature_settings_section_sources),
-        icon = ReadanaIcons.Discover,
-        modifier = modifier
-    ) {
-        SettingsGroup {
-            toggles.forEach { toggle ->
-                item { shapes ->
-                    SwitchItem(
-                        shapes = shapes,
-                        label = toggle.name,
-                        checked = toggle.enabled,
-                        onCheckedChange = { enabled -> onSourceEnabledChange(toggle.id, enabled) }
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(SectionSpacing)) {
+        SettingsSection(
+            title = stringResource(R.string.feature_settings_section_sources),
+            icon = ReadanaIcons.Discover
+        ) {
+            SettingsGroup {
+                rows.forEach { row ->
+                    item { shapes ->
+                        SourceHeaderRow(
+                            row = row,
+                            shapes = shapes,
+                            isExpanded = expanded == row.id,
+                            onToggleExpand = {
+                                expanded = if (expanded == row.id) null else row.id
+                            },
+                            onEnabledChange = { actions.onSourceEnabledChange(row.id, it) }
+                        )
+                    }
+                }
+            }
+            rows.firstOrNull { it.id == expanded }?.let { row ->
+                SourceConfigFields(row = row, actions = actions)
+            }
+            SettingsNote(stringResource(R.string.feature_settings_sources_notice))
+        }
+
+        AddCatalogSection(presets = presets, actions = actions)
+    }
+}
+
+/**
+ * One source in the list: name, what it is, and a switch. The chevron only appears when the source
+ * has something to configure, so a source that needs nothing looks like it needs nothing.
+ */
+@Composable
+private fun SourceHeaderRow(
+    row: SourceRow,
+    shapes: ListItemShapes,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit,
+    onEnabledChange: (Boolean) -> Unit
+) {
+    SwitchItem(
+        shapes = shapes,
+        label = row.name,
+        help = row.summary,
+        checked = row.enabled,
+        onCheckedChange = onEnabledChange,
+        trailing = if (!row.isConfigurable) {
+            null
+        } else {
+            {
+                IconButton(onClick = onToggleExpand) {
+                    Icon(
+                        imageVector = if (isExpanded) ReadanaIcons.ExpandLess else ReadanaIcons.ExpandMore,
+                        contentDescription = stringResource(
+                            if (isExpanded) {
+                                R.string.feature_settings_source_collapse
+                            } else {
+                                R.string.feature_settings_source_expand
+                            }
+                        )
                     )
                 }
             }
         }
-        SettingsNote(stringResource(R.string.feature_settings_annas_notice))
-        OutlinedTextField(
-            value = mirrorsDraft,
-            onValueChange = { mirrorsDraft = it },
-            // Saving per keystroke rewrites the mirror list on every letter typed, and every
-            // search reads it; committing once the field is done is enough.
-            modifier = Modifier.fillMaxWidth().onFocusChanged { focus ->
-                if (!focus.isFocused) onAnnasMirrorsChange(mirrorsDraft)
-            },
-            label = { Text(stringResource(R.string.feature_settings_annas_mirrors)) },
-            // An empty box does not mean "no mirrors": it means the built-in list is in use, so
-            // show that list as the placeholder rather than leaving it a mystery.
-            placeholder = { Text(SourceDefaults.ANNAS_MIRRORS.joinToString("\n")) },
-            supportingText = { Text(stringResource(R.string.feature_settings_annas_mirrors_help)) },
-            minLines = 2
-        )
-        OutlinedTextField(
-            value = keyDraft,
-            onValueChange = { keyDraft = it },
-            modifier = Modifier.fillMaxWidth().onFocusChanged { focus ->
-                if (!focus.isFocused) onAnnasSecretKeyChange(keyDraft)
-            },
-            label = { Text(stringResource(R.string.feature_settings_annas_secret_key)) },
-            supportingText = {
-                Text(stringResource(R.string.feature_settings_annas_secret_key_help))
-            },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { onAnnasSecretKeyChange(keyDraft) }),
-            visualTransformation = PasswordVisualTransformation()
-        )
-        val downloadsLeft = settings.annasDownloadsLeft
-        if (settings.annasSecretKey != null && downloadsLeft != null) {
-            SettingsNote(
-                text = settings.annasDownloadsPerDay?.let { perDay ->
-                    stringResource(R.string.feature_settings_annas_quota, downloadsLeft, perDay)
-                } ?: stringResource(R.string.feature_settings_annas_quota_left, downloadsLeft)
+    )
+}
+
+/**
+ * A source's own settings, rendered from what the source declared. Nothing here knows which source
+ * it is looking at, which is what keeps a new source from needing new UI.
+ */
+@Composable
+private fun SourceConfigFields(row: SourceRow, actions: SettingsActions, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(FieldSpacing)) {
+        row.fields.forEach { field ->
+            // A local draft, so typing does not round-trip through DataStore per keystroke.
+            var draft by rememberSaveable(row.id, field.key, row.values[field.key]) {
+                mutableStateOf(row.values[field.key].orEmpty())
+            }
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                // Saving on every keystroke rewrites the value each letter, and every search
+                // reads it; committing once the field is done is enough.
+                modifier = Modifier.fillMaxWidth().onFocusChanged { focus ->
+                    if (!focus.isFocused) actions.onSourceConfigChange(row.id, field, draft)
+                },
+                label = { Text(field.label) },
+                placeholder = field.placeholder?.let { { Text(it) } },
+                supportingText = field.help?.let { { Text(it) } },
+                singleLine = field.kind != SourceConfigField.Kind.UrlList,
+                minLines = if (field.kind == SourceConfigField.Kind.UrlList) URL_LIST_LINES else 1,
+                visualTransformation = if (field.kind == SourceConfigField.Kind.Secret) {
+                    PasswordVisualTransformation()
+                } else {
+                    VisualTransformation.None
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(
+                    onDone = { actions.onSourceConfigChange(row.id, field, draft) }
+                )
             )
         }
+        row.quota?.remaining?.let { remaining ->
+            SettingsNote(
+                text = row.quota.perDay?.let { perDay ->
+                    stringResource(R.string.feature_settings_source_quota, remaining, perDay)
+                } ?: stringResource(R.string.feature_settings_source_quota_left, remaining)
+            )
+        }
+        if (row.isRemovable) {
+            TextButton(onClick = { actions.onRemoveCatalog(row.id) }) {
+                Text(stringResource(R.string.feature_settings_catalog_remove))
+            }
+        }
+    }
+}
+
+/** Catalogs to add: the ready-made ones first, then anywhere else the user knows of. */
+@Composable
+private fun AddCatalogSection(presets: List<CatalogPreset>, actions: SettingsActions, modifier: Modifier = Modifier) {
+    var name by rememberSaveable { mutableStateOf("") }
+    var url by rememberSaveable { mutableStateOf("") }
+    var rejected by rememberSaveable { mutableStateOf(false) }
+
+    SettingsSection(
+        title = stringResource(R.string.feature_settings_section_catalogs),
+        icon = ReadanaIcons.Add,
+        modifier = modifier
+    ) {
+        if (presets.isNotEmpty()) {
+            SettingsGroup {
+                presets.forEach { preset ->
+                    item { shapes ->
+                        ActionItem(
+                            shapes = shapes,
+                            label = preset.name,
+                            supporting = preset.description,
+                            onClick = { actions.onAddPresetCatalog(preset) }
+                        )
+                    }
+                }
+            }
+        }
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(R.string.feature_settings_catalog_name)) },
+            singleLine = true
+        )
+        OutlinedTextField(
+            value = url,
+            onValueChange = {
+                url = it
+                rejected = false
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(R.string.feature_settings_catalog_url)) },
+            supportingText = {
+                Text(
+                    stringResource(
+                        if (rejected) {
+                            R.string.feature_settings_catalog_url_invalid
+                        } else {
+                            R.string.feature_settings_catalog_url_help
+                        }
+                    )
+                )
+            },
+            isError = rejected,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
+        )
+        TextButton(
+            onClick = {
+                if (actions.onAddCatalog(name, url)) {
+                    name = ""
+                    url = ""
+                    rejected = false
+                } else {
+                    rejected = true
+                }
+            },
+            enabled = url.isNotBlank()
+        ) {
+            Text(stringResource(R.string.feature_settings_catalog_add))
+        }
+    }
+}
+
+/**
+ * What this build is, for when something needs reporting. The version is read from the installed
+ * package rather than a `BuildConfig` constant, which library modules do not get.
+ */
+@Composable
+private fun AboutSection(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val version = remember(context) {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull().orEmpty()
+    }
+    SettingsSection(
+        title = stringResource(R.string.feature_settings_section_about),
+        icon = ReadanaIcons.Library,
+        modifier = modifier
+    ) {
+        SettingsNote(stringResource(R.string.feature_settings_about_version, version))
+        SettingsNote(stringResource(R.string.feature_settings_about_blurb))
     }
 }
 

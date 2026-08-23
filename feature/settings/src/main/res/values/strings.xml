@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="feature_settings_title">Settings</string>
-    <string name="feature_settings_tab_basic">Basic</string>
-    <string name="feature_settings_tab_advanced">Advanced</string>
+    <string name="feature_settings_tab_reading">Reading</string>
+    <string name="feature_settings_tab_sources">Sources</string>
+    <string name="feature_settings_tab_assistant">Assistant</string>
+    <string name="feature_settings_tab_files">Files</string>
+    <string name="feature_settings_tab_about">About</string>
 
     <string name="feature_settings_section_reading">Reading</string>
     <string name="feature_settings_reading_help">Defaults for new books. What you change while reading stays with that book.</string>
@@ -71,13 +74,28 @@
     <string name="feature_settings_ai_privacy">Questions send the part of the book you have read to your provider. Nothing past your place is sent.</string>
 
     <string name="feature_settings_section_sources">Book sources</string>
-    <string name="feature_settings_annas_notice">Anna\'s Archive indexes shadow libraries. Downloading copyrighted work without permission is illegal in most countries. You are responsible for what you download.</string>
-    <string name="feature_settings_annas_mirrors">Anna\'s Archive mirrors</string>
-    <string name="feature_settings_annas_mirrors_help">One URL per line, tried in order. Leave empty for the built-in list.</string>
-    <string name="feature_settings_annas_secret_key">Member secret key (optional)</string>
-    <string name="feature_settings_annas_secret_key_help">A member key gives fast downloads and skips the browser check.</string>
-    <string name="feature_settings_annas_quota">Fast downloads left today: %1$d of %2$d</string>
-    <string name="feature_settings_annas_quota_left">Fast downloads left today: %1$d</string>
+    <string name="feature_settings_sources_notice">Some sources index shadow libraries. Downloading copyrighted work without permission is illegal in most countries. You are responsible for what you download.</string>
+    <string name="feature_settings_source_expand">Settings for this source</string>
+    <string name="feature_settings_source_collapse">Hide these settings</string>
+    <string name="feature_settings_source_quota">Fast downloads left today: %1$d of %2$d</string>
+    <string name="feature_settings_source_quota_left">Fast downloads left today: %1$d</string>
+    <string name="feature_settings_reading_palm_rejection">Ignore my palm while using the pen</string>
+    <string name="feature_settings_reading_palm_rejection_help">Fingers are ignored while the pen is touching or hovering over the page, so a resting hand does not turn it.</string>
+    <string name="feature_settings_reading_pen_mode">What the pen does</string>
+    <string name="feature_settings_reading_pen_mode_help">Only the pen. Fingers keep turning pages and selecting text whatever this is set to.</string>
+    <string name="feature_settings_reading_pen_off">Like a finger</string>
+    <string name="feature_settings_reading_pen_highlight">Highlight</string>
+    <string name="feature_settings_reading_pen_ink">Draw</string>
+    <string name="feature_settings_section_catalogs">Add a catalog</string>
+    <string name="feature_settings_catalog_name">Name (optional)</string>
+    <string name="feature_settings_catalog_url">OPDS feed address</string>
+    <string name="feature_settings_catalog_url_help">Any OPDS 1.2 or 2.0 catalog, including your own Calibre-Web.</string>
+    <string name="feature_settings_catalog_url_invalid">That does not look like a web address. It should start with https://.</string>
+    <string name="feature_settings_catalog_add">Add catalog</string>
+    <string name="feature_settings_catalog_remove">Forget this catalog</string>
+    <string name="feature_settings_section_about">About Readana</string>
+    <string name="feature_settings_about_version">Version %1$s</string>
+    <string name="feature_settings_about_blurb">An offline-first e-reader. Books you add stay on this device.</string>
 
     <string name="feature_settings_section_conversion">PDF conversion</string>
     <string name="feature_settings_conversion_auto">Convert PDFs to EPUB</string>

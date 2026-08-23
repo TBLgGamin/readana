@@ -1,0 +1,10 @@
+{
+  "server": "ia800100.us.archive.org",
+  "dir": "/12/items/fantasticmrfox0000dahl",
+  "files": [
+    { "name": "fantasticmrfox0000dahl_meta.xml", "format": "Metadata", "size": "1024" },
+    { "name": "fantasticmrfox0000dahl_djvu.txt", "format": "DjVuTXT", "size": "90210" },
+    { "name": "fantasticmrfox0000dahl.pdf", "format": "Text PDF", "size": "8471234" },
+    { "name": "fantasticmrfox0000dahl.epub", "format": "EPUB", "size": "412000" }
+  ]
+}

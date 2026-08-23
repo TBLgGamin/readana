@@ -33,6 +33,7 @@ internal class ReaderNavigatorHostFragment : Fragment() {
 
     private var onNavigatorChanged: ((Navigator?) -> Unit)? = null
     private var restoredWithoutSession = false
+    private var surface: ReaderSurfaceView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val session = sessionStore.session
@@ -45,15 +46,22 @@ internal class ReaderNavigatorHostFragment : Fragment() {
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        val view = FragmentContainerView(requireContext()).apply { id = CONTAINER_ID }
+        // The navigator sits inside a surface that sees touches first, which is the only place a
+        // pen can still be told from a palm — see ReaderSurfaceView.
+        val surface = ReaderSurfaceView(requireContext())
+        surface.addView(FragmentContainerView(requireContext()).apply { id = CONTAINER_ID })
+        this.surface = surface
         val session = sessionStore.session
         if (session != null && childFragmentManager.findFragmentByTag(NAVIGATOR_TAG) == null) {
             childFragmentManager.commitNow {
                 add(CONTAINER_ID, session.navigatorClass, Bundle(), NAVIGATOR_TAG)
             }
         }
-        return view
+        return surface
     }
+
+    /** The surface the pen draws on, for the reader to configure once it is composed. */
+    fun surface(): ReaderSurfaceView? = surface
 
     override fun onStart() {
         super.onStart()
@@ -62,6 +70,7 @@ internal class ReaderNavigatorHostFragment : Fragment() {
 
     override fun onDestroyView() {
         onNavigatorChanged?.invoke(null)
+        surface = null
         super.onDestroyView()
     }
 

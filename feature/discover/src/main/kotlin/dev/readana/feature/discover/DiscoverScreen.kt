@@ -17,12 +17,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -42,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -65,10 +70,13 @@ import dev.readana.core.model.BrowserDownload
 import dev.readana.source.api.SearchResult
 import dev.readana.source.api.SourceId
 import dev.readana.source.trending.TrendingBook
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 
 @Composable
 internal fun DiscoverRoute(
     onVerifyInBrowser: (url: String, title: String) -> Unit,
+    onOpenCatalog: (CatalogKey) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DiscoverViewModel = hiltViewModel()
 ) {
@@ -109,6 +117,8 @@ internal fun DiscoverRoute(
             askForNotifications()
             viewModel.download(book)
         },
+        onOpenCatalog = { catalog -> onOpenCatalog(CatalogKey(catalog.sourceId, title = catalog.name)) },
+        onLoadMore = viewModel::loadMore,
         modifier = modifier
     )
 }
@@ -164,6 +174,8 @@ internal fun DiscoverScreen(
     onSelectTrending: (TrendingBook) -> Unit,
     onVerify: (SourceError) -> Unit,
     onDownloadTrending: (TrendingBook) -> Unit,
+    onOpenCatalog: (BrowsableCatalog) -> Unit,
+    onLoadMore: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Long-pressing a cover opens what the source knows about it, the way the library does.
@@ -222,13 +234,19 @@ internal fun DiscoverScreen(
             uiState.sourceErrors.forEach { sourceError ->
                 SourceErrorRow(sourceError = sourceError, onVerify = onVerify)
             }
+            // Before a search, the catalogs on offer are the most useful thing on the screen;
+            // afterwards they would only get in the way of the results.
+            if (!uiState.hasSearched && uiState.catalogs.isNotEmpty()) {
+                CatalogShelfRow(catalogs = uiState.catalogs, onOpenCatalog = onOpenCatalog)
+            }
             DiscoverContent(
                 uiState = uiState,
                 onDownload = onDownload,
                 onSelectTrending = onSelectTrending,
                 onDownloadTrending = onDownloadTrending,
                 onShowDetails = { details = it },
-                onShowEditions = { editions = it }
+                onShowEditions = { editions = it },
+                onLoadMore = onLoadMore
             )
         }
     }
@@ -253,6 +271,7 @@ private fun DiscoverContent(
     onDownloadTrending: (TrendingBook) -> Unit,
     onShowDetails: (SearchResult) -> Unit,
     onShowEditions: (ResultGroup) -> Unit,
+    onLoadMore: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val waitingForFirstResults = uiState.isSearching && uiState.results.isEmpty()
@@ -290,8 +309,35 @@ private fun DiscoverContent(
             onDownload = onDownload,
             onShowDetails = onShowDetails,
             onShowEditions = onShowEditions,
+            canLoadMore = uiState.canLoadMore,
+            isLoadingMore = uiState.isLoadingMore,
+            onLoadMore = onLoadMore,
             modifier = modifier
         )
+    }
+}
+
+/** The catalogs on offer, as chips to walk into rather than more boxes to search. */
+@Composable
+private fun CatalogShelfRow(
+    catalogs: List<BrowsableCatalog>,
+    onOpenCatalog: (BrowsableCatalog) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+        Text(
+            text = stringResource(R.string.feature_discover_catalogs_title),
+            style = MaterialTheme.typography.titleSmall
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(catalogs, key = { it.sourceId }) { catalog ->
+                AssistChip(
+                    onClick = { onOpenCatalog(catalog) },
+                    label = { Text(catalog.name) },
+                    leadingIcon = { Icon(ReadanaIcons.Library, contentDescription = null) }
+                )
+            }
+        }
     }
 }
 
@@ -336,9 +382,22 @@ private fun ResultGrid(
     onDownload: (SearchResult) -> Unit,
     onShowDetails: (SearchResult) -> Unit,
     onShowEditions: (ResultGroup) -> Unit,
+    canLoadMore: Boolean,
+    isLoadingMore: Boolean,
+    onLoadMore: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val gridState = rememberLazyGridState()
+    val currentOnLoadMore by rememberUpdatedState(onLoadMore)
+    // Ask for the next page a little before the end, so scrolling does not visibly stall.
+    LaunchedEffect(gridState, canLoadMore, results.size) {
+        snapshotFlow { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
+            .distinctUntilChanged()
+            .filter { canLoadMore && it >= results.size - LOAD_AHEAD }
+            .collect { currentOnLoadMore() }
+    }
     LazyVerticalGrid(
+        state = gridState,
         columns = GridCells.Fixed(GRID_COLUMNS),
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(GridSpacing),
@@ -356,11 +415,16 @@ private fun ResultGrid(
                 onShowEditions = { onShowEditions(group) }
             )
         }
+        if (isLoadingMore) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                LoadingState(modifier = Modifier.fillMaxWidth().height(LoadingRowHeight))
+            }
+        }
     }
 }
 
 @Composable
-private fun ResultCard(
+internal fun ResultCard(
     group: ResultGroup,
     onDownload: () -> Unit,
     onShowDetails: () -> Unit,
@@ -478,7 +542,11 @@ private const val BYTES_PER_KIB = 1024.0
 
 /** Two across, as covers are the point of this screen. */
 private const val GRID_COLUMNS = 2
+
+/** How close to the end of the grid a scroll gets before the next page is asked for. */
+private const val LOAD_AHEAD = 4
 private val GridSpacing = 16.dp
+private val LoadingRowHeight = 72.dp
 
 private fun SearchResult.metaLine(): String = listOfNotNull(
     authors.takeIf { it.isNotEmpty() }?.joinToString(", "),
@@ -516,7 +584,9 @@ private fun DiscoverScreenPreview() {
             onDownload = {},
             onSelectTrending = {},
             onVerify = {},
-            onDownloadTrending = {}
+            onDownloadTrending = {},
+            onOpenCatalog = {},
+            onLoadMore = {}
         )
     }
 }
@@ -538,7 +608,9 @@ private fun DiscoverTrendingPreview() {
             onDownload = {},
             onSelectTrending = {},
             onVerify = {},
-            onDownloadTrending = {}
+            onDownloadTrending = {},
+            onOpenCatalog = {},
+            onLoadMore = {}
         )
     }
 }

@@ -1,0 +1,34 @@
+{
+  "metadata": { "title": "An OPDS 2 Catalog" },
+  "links": [
+    { "rel": "self", "href": "/feed", "type": "application/opds+json" },
+    { "rel": ["next"], "href": "/feed?page=2", "type": "application/opds+json" },
+    { "rel": "search", "href": "/search{?query}", "type": "application/opds+json" }
+  ],
+  "navigation": [
+    { "href": "/new", "title": "New titles", "type": "application/opds+json" }
+  ],
+  "publications": [
+    {
+      "metadata": {
+        "identifier": "urn:isbn:9780000000001",
+        "title": "The Time Machine",
+        "author": { "name": "H. G. Wells" },
+        "language": ["en"],
+        "publisher": "Heinemann",
+        "published": "1895-05-07",
+        "description": "A scientific romance."
+      },
+      "images": [{ "href": "/covers/time.jpg", "type": "image/jpeg" }],
+      "links": [
+        { "rel": "http://opds-spec.org/acquisition/open-access", "href": "/files/time.epub", "type": "application/epub+zip" }
+      ]
+    },
+    {
+      "metadata": { "title": "An Audiobook", "author": "Someone" },
+      "links": [
+        { "rel": "http://opds-spec.org/acquisition", "href": "/files/audio.json", "type": "application/audiobook+json" }
+      ]
+    }
+  ]
+}

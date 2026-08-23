@@ -1,0 +1,36 @@
+{
+  "numFound": 42,
+  "start": 0,
+  "docs": [
+    {
+      "key": "/works/OL45804W",
+      "title": "Fantastic Mr Fox",
+      "author_name": ["Roald Dahl"],
+      "first_publish_year": 1970,
+      "cover_i": 6498519,
+      "language": ["eng"],
+      "publisher": ["Puffin"],
+      "ia": ["fantasticmrfox0000dahl"],
+      "ebook_access": "public"
+    },
+    {
+      "key": "/works/OL27448W",
+      "title": "The Lord of the Rings",
+      "author_name": ["J. R. R. Tolkien"],
+      "first_publish_year": 1954,
+      "ia": ["lordofrings0000tolk"],
+      "ebook_access": "borrowable"
+    },
+    {
+      "key": "/works/OL99999W",
+      "title": "A Print-Disabled Scan",
+      "ia": ["printdisabled0000"],
+      "ebook_access": "printdisabled"
+    },
+    {
+      "key": "/works/OL88888W",
+      "title": "No Ebook At All",
+      "ebook_access": "no_ebook"
+    }
+  ]
+}

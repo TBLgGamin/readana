@@ -110,8 +110,15 @@ connection. See ADR 0013 for what the app does about it.
   `cover_i`; art at `https://covers.openlibrary.org/b/id/<cover_i>-M.jpg`) — no key, no throttling,
   ships cover art. Used for the Discover "Popular right now" shelf, deliberately *not* Anna's
   Archive, whose scraping budget belongs to real searches.
-- Planned: **OPDS** catalogs (Standard Ebooks, Feedbooks, DOAB/OAPEN, Calibre-Web) through
-  `readium-opds`; **Internet Archive**; **arXiv** (PDF → converted).
+- **OPDS** catalogs (Standard Ebooks, Feedbooks, DOAB/OAPEN, Calibre-Web) — shipped, but parsed in
+  a pure-Kotlin module rather than through `readium-opds`, which is an Android artifact and would
+  have made the source module depend on Android (ADR 0017). Atom via jsoup in XML mode, OPDS 2.0
+  via kotlinx.serialization.
+- **Open Library / Internet Archive** — shipped. `search.json` with `ebook_access` requested; only
+  `public` items are listed, because borrowable scans hand back an ACSM licence needing Adobe DRM.
+  The file to fetch comes from `archive.org/metadata/<id>`, since derivative names vary.
+- **arXiv** — shipped. `export.arxiv.org/api/query` answers Atom; every result is a PDF and goes
+  through the conversion pipeline.
 
 ## 5. Toolchain versions (verified against Maven Central / Google Maven on 2026-08-20)
 

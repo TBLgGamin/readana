@@ -44,12 +44,15 @@ internal fun ReaderNavigatorHost(
     onLocatorChange: (Locator) -> Unit,
     onCenterTap: () -> Unit,
     onNavigator: (Navigator?) -> Unit,
+    /** Hands out the surface the pen draws on, once the fragment has built it. */
+    onSurface: (ReaderSurfaceView?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var navigator by remember(sessionId) { mutableStateOf<Navigator?>(null) }
     val currentOnLocatorChanged by rememberUpdatedState(onLocatorChange)
     val currentOnCenterTap by rememberUpdatedState(onCenterTap)
     val currentOnNavigator by rememberUpdatedState(onNavigator)
+    val currentOnSurface by rememberUpdatedState(onSurface)
     val systemInDarkTheme = isSystemInDarkTheme()
 
     key(sessionId) {
@@ -58,6 +61,7 @@ internal fun ReaderNavigatorHost(
                 navigator = attached
                 currentOnNavigator(attached)
             }
+            currentOnSurface(host.surface())
         }
     }
 

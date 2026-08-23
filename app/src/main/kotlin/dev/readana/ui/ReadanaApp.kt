@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
@@ -32,10 +31,12 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import dev.readana.core.data.messages.UiMessage
+import dev.readana.core.designsystem.component.ReadanaSnackbarHost
 import dev.readana.feature.browser.BrowserKey
 import dev.readana.feature.browser.BrowserVerifyKey
 import dev.readana.feature.browser.browserEntry
 import dev.readana.feature.browser.browserVerifyEntry
+import dev.readana.feature.discover.catalogEntry
 import dev.readana.feature.discover.discoverEntry
 import dev.readana.feature.downloads.downloadsEntry
 import dev.readana.feature.library.LibraryKey
@@ -103,7 +104,14 @@ fun ReadanaApp(modifier: Modifier = Modifier, viewModel: AppShellViewModel = hil
                         onOpenBrowser = { backStack.add(BrowserKey.of(it)) }
                     )
                     discoverEntry(
-                        onVerifyInBrowser = { url, title -> backStack.add(BrowserVerifyKey(url, title)) }
+                        onVerifyInBrowser = { url, title -> backStack.add(BrowserVerifyKey(url, title)) },
+                        onOpenCatalog = { backStack.add(it) }
+                    )
+                    // Each shelf is its own entry, so system back walks out of a catalog one
+                    // level at a time rather than leaving it altogether.
+                    catalogEntry(
+                        onBack = { backStack.removeLastOrNull() },
+                        onOpenSection = { backStack.add(it) }
                     )
                     settingsEntry()
                     readerEntry(onBack = { backStack.removeLastOrNull() })
@@ -113,7 +121,7 @@ fun ReadanaApp(modifier: Modifier = Modifier, viewModel: AppShellViewModel = hil
             )
             // Inside the scaffold's content, so it floats above the page but never under the
             // navigation bar or behind the rail.
-            SnackbarHost(
+            ReadanaSnackbarHost(
                 hostState = snackbarHostState,
                 modifier = Modifier.align(Alignment.BottomCenter).windowInsetsPadding(WindowInsets.ime)
             )

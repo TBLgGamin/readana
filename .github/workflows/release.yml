@@ -1,17 +1,30 @@
 name: Release
 
-# Tag a commit `vX.Y.Z` to build a release APK and attach it to a GitHub Release.
-# Signing: set the repository secrets below to sign with your own key. Without them the
-# APK is debug-signed, which is enough for side-loading onto your own tablet.
+# Tag a commit `vX.Y.Z` to build a signed release APK and attach it to a GitHub Release.
+# The version in the tag becomes the APK's versionName, and versionCode is derived from it.
+#
+# Signing: set these repository secrets to sign with your own key. Without them the APK is
+# debug-signed, which is enough for side-loading onto your own tablet but not for anything else —
+# the job says which of the two it produced.
 #   KEYSTORE_BASE64  - `base64 -w0 release.jks`
 #   KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build, e.g. v0.1.0 (dry run: nothing is published)"
+        required: true
 
 permissions:
   contents: write
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.daemon=false
+  # Read at job level, because the `secrets` context is not available in a step-level `if`.
+  KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
 jobs:
   release:
@@ -27,12 +40,27 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
         with:
+          # A release must not write to the cache the branch builds share.
+          cache-read-only: true
           validate-wrappers: true
 
+      - name: Work out the version
+        id: version
+        run: |
+          version="${{ github.event.inputs.version || github.ref_name }}"
+          echo "name=$version" >> "$GITHUB_OUTPUT"
+          echo "Building $version"
+
+      # A broken build must not become a release, so the same gates CI runs come first.
+      - name: Formatting, static analysis and lint
+        run: ./gradlew spotlessCheck detekt :app:lintDebug
+
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest test --continue
+
       - name: Restore signing key
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: env.KEYSTORE_BASE64 != ''
         env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -46,11 +74,40 @@ jobs:
           EOF
 
       - name: Build release APK
-        run: ./gradlew :app:assembleRelease
+        run: ./gradlew :app:assembleRelease -PreadanaVersion=${{ steps.version.outputs.name }}
+
+      - name: Report how it was signed
+        run: |
+          apk=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs "$apk" | head -20
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::No signing secrets are set, so this APK is debug-signed."
+          fi
+
+      - name: Release notes from the changelog
+        run: python3 scripts/release_notes.py "${{ steps.version.outputs.name }}" > release-notes.md
+
+      # A manual run is a dry run: it proves the build and the notes without publishing anything.
+      - name: Upload the artifacts of a dry run
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v7
+        with:
+          name: readana-release-dry-run
+          path: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/mapping/release/mapping.txt
+            release-notes.md
+          retention-days: 7
 
       - name: Create GitHub Release
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" app/build/outputs/apk/release/*.apk \
-            --title "Readana $GITHUB_REF_NAME" --generate-notes
+          # mapping.txt goes with the release: without it a crash report from this APK is
+          # unreadable, and R8 is on for release builds.
+          gh release create "${{ steps.version.outputs.name }}" \
+            app/build/outputs/apk/release/*.apk \
+            app/build/outputs/mapping/release/mapping.txt \
+            --title "Readana ${{ steps.version.outputs.name }}" \
+            --notes-file release-notes.md

@@ -11,7 +11,8 @@ import dev.readana.core.data.downloads.EnqueueOutcome
 import dev.readana.core.data.messages.MessageBus
 import dev.readana.core.data.messages.UiMessage
 import dev.readana.core.data.repository.BookSourceRegistry
-import dev.readana.core.data.repository.SettingsRepository
+import dev.readana.source.api.BookSource
+import dev.readana.source.api.CatalogSource
 import dev.readana.source.api.SearchQuery
 import dev.readana.source.api.SearchResult
 import dev.readana.source.trending.TrendingBook
@@ -24,14 +25,12 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @HiltViewModel
 class DiscoverViewModel @Inject constructor(
     private val sources: BookSourceRegistry,
-    private val settingsRepository: SettingsRepository,
     private val downloadManager: BookDownloadManager,
     private val trendingBooks: TrendingBooks,
     private val messages: MessageBus,
@@ -41,15 +40,28 @@ class DiscoverViewModel @Inject constructor(
     val uiState: StateFlow<DiscoverUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
+    private var moreJob: Job? = null
     private var awaitingVerification = false
+
+    /**
+     * Every result seen for the query on screen, ungrouped. Grouping collapses editions, so
+     * appending a page has to start from the raw list or the collapsed ones never come back.
+     */
+    private var collected: List<SearchResult> = emptyList()
+
+    /** Where each source got to, for the sources that said they had more. */
+    private var cursors: List<PageCursor> = emptyList()
 
     init {
         viewModelScope.launch {
-            settingsRepository.sourceSettings.collect { settings ->
-                _uiState.update {
-                    it.copy(
-                        sourceNames = sources.enabled(settings).map { source ->
-                            source.displayName
+            sources.enabledSources.collect { enabled ->
+                _uiState.update { state ->
+                    state.copy(
+                        sourceNames = enabled.map { it.displayName },
+                        // Catalogs are worth browsing as well as searching, so the screen offers
+                        // them as shelves rather than only as another set of search results.
+                        catalogs = enabled.filterIsInstance<CatalogSource>().map { catalog ->
+                            BrowsableCatalog(catalog.id.value, catalog.displayName)
                         }
                     )
                 }
@@ -92,31 +104,40 @@ class DiscoverViewModel @Inject constructor(
         val text = _uiState.value.query.trim()
         if (text.isEmpty()) return
         searchJob?.cancel()
+        moreJob?.cancel()
+        collected = emptyList()
+        cursors = emptyList()
         searchJob = viewModelScope.launch {
             _uiState.update {
                 it.copy(
                     isSearching = true,
                     results = emptyList(),
                     sourceErrors = emptyList(),
-                    hasSearched = true
+                    hasSearched = true,
+                    canLoadMore = false
                 )
             }
-            val enabledSources = sources.enabled(settingsRepository.sourceSettings.first())
+            val enabledSources = sources.enabled()
             val outcomes = coroutineScope {
                 enabledSources.map { source ->
                     async { source to source.search(SearchQuery(text)) }
                 }.awaitAll()
+            }
+            collected = outcomes.flatMap { (_, outcome) ->
+                (outcome as? AppResult.Success)?.value?.results.orEmpty()
+            }
+            cursors = outcomes.mapNotNull { (source, outcome) ->
+                (outcome as? AppResult.Success)?.value?.takeIf { it.hasMore }?.let { page ->
+                    PageCursor(source, page.page, page.nextHref)
+                }
             }
             _uiState.update { state ->
                 state.copy(
                     isSearching = false,
                     // Shadow libraries list the same work many times over, so a page of hits is
                     // mostly repeats; the grid shows one entry per book with the rest behind it.
-                    results = ResultGrouping.group(
-                        outcomes.flatMap { (_, outcome) ->
-                            (outcome as? AppResult.Success)?.value?.results.orEmpty()
-                        }
-                    ),
+                    results = ResultGrouping.group(collected),
+                    canLoadMore = cursors.isNotEmpty(),
                     sourceErrors = outcomes.mapNotNull { (source, outcome) ->
                         (outcome as? AppResult.Failure)?.let {
                             SourceError(
@@ -149,8 +170,43 @@ class DiscoverViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Fetches the next page from every source that has one and appends it. Sources that fail are
+     * simply dropped from the rotation: the results already on screen are still good, and a
+     * second error row for a page the user did not ask for would be noise.
+     */
+    fun loadMore() {
+        if (cursors.isEmpty() || _uiState.value.isLoadingMore || _uiState.value.isSearching) return
+        val text = _uiState.value.query.trim()
+        if (text.isEmpty()) return
+        moreJob?.cancel()
+        moreJob = viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingMore = true) }
+            val outcomes = coroutineScope {
+                cursors.map { cursor ->
+                    async { cursor to cursor.source.search(SearchQuery(text, page = cursor.page + 1)) }
+                }.awaitAll()
+            }
+            collected = collected + outcomes.flatMap { (_, outcome) ->
+                (outcome as? AppResult.Success)?.value?.results.orEmpty()
+            }
+            cursors = outcomes.mapNotNull { (cursor, outcome) ->
+                (outcome as? AppResult.Success)?.value?.takeIf { it.hasMore }?.let { page ->
+                    cursor.copy(page = page.page, nextHref = page.nextHref)
+                }
+            }
+            _uiState.update {
+                it.copy(
+                    isLoadingMore = false,
+                    results = ResultGrouping.group(collected),
+                    canLoadMore = cursors.isNotEmpty()
+                )
+            }
+        }
+    }
+
     private suspend fun firstMatch(query: String): SearchResult? {
-        val enabledSources = sources.enabled(settingsRepository.sourceSettings.first())
+        val enabledSources = sources.enabled()
         val outcomes = coroutineScope {
             enabledSources.map { source -> async { source.search(SearchQuery(query)) } }.awaitAll()
         }
@@ -225,8 +281,20 @@ data class DiscoverUiState(
     /** Starts true so the shelf opens on skeletons rather than flashing the empty state. */
     val isLoadingTrending: Boolean = true,
     val sourceErrors: List<SourceError> = emptyList(),
+    /** Catalogs among the enabled sources, which can be walked as well as searched. */
+    val catalogs: List<BrowsableCatalog> = emptyList(),
+    /** True while another page of results is being fetched onto the end of the list. */
+    val isLoadingMore: Boolean = false,
+    /** Whether any source said it had more results for the query on screen. */
+    val canLoadMore: Boolean = false,
     val effect: DiscoverEffect? = null
 )
+
+/** A catalog the user can open and walk through. */
+data class BrowsableCatalog(val sourceId: String, val name: String)
+
+/** How far one source got through its results, so the next page can be asked for. */
+private data class PageCursor(val source: BookSource, val page: Int, val nextHref: String?)
 
 /** [verifyUrl] is set when the source could not get past a bot check on its own. */
 data class SourceError(val sourceName: String, val error: AppError, val verifyUrl: String? = null)

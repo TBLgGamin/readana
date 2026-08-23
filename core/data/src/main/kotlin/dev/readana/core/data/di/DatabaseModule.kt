@@ -14,6 +14,7 @@ import dev.readana.core.data.database.BookmarkDao
 import dev.readana.core.data.database.CollectionDao
 import dev.readana.core.data.database.DownloadDao
 import dev.readana.core.data.database.HighlightDao
+import dev.readana.core.data.database.InkStrokeDao
 import dev.readana.core.data.database.ReadanaDatabase
 import dev.readana.core.data.database.ReadingSessionDao
 import javax.inject.Singleton
@@ -34,6 +35,9 @@ object DatabaseModule {
 
     @Provides
     fun providesHighlightDao(database: ReadanaDatabase): HighlightDao = database.highlightDao()
+
+    @Provides
+    fun providesInkStrokeDao(database: ReadanaDatabase): InkStrokeDao = database.inkStrokeDao()
 
     @Provides
     fun providesDownloadDao(database: ReadanaDatabase): DownloadDao = database.downloadDao()

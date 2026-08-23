@@ -1,5 +1,6 @@
 package dev.readana.core.data.settings
 
+import dev.readana.core.model.PenMode
 import dev.readana.core.model.ReaderSettings
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -28,6 +29,8 @@ private data class ReaderSettingsDto(
     val tapToTurnPages: Boolean? = null,
     val volumeKeysTurnPages: Boolean? = null,
     val keepScreenOn: Boolean? = null,
+    val palmRejection: Boolean? = null,
+    val penMode: String? = null,
     val ttsSpeed: Float? = null
 )
 
@@ -46,6 +49,8 @@ internal fun ReaderSettings.encodeToJson(): String = json.encodeToString(
         tapToTurnPages = tapToTurnPages,
         volumeKeysTurnPages = volumeKeysTurnPages,
         keepScreenOn = keepScreenOn,
+        palmRejection = palmRejection,
+        penMode = penMode.name,
         ttsSpeed = ttsSpeed
     )
 )
@@ -77,6 +82,8 @@ internal fun String?.decodeReaderSettings(): ReaderSettings? {
         tapToTurnPages = dto.tapToTurnPages ?: defaults.tapToTurnPages,
         volumeKeysTurnPages = dto.volumeKeysTurnPages ?: defaults.volumeKeysTurnPages,
         keepScreenOn = dto.keepScreenOn ?: defaults.keepScreenOn,
+        palmRejection = dto.palmRejection ?: defaults.palmRejection,
+        penMode = PenMode.entries.firstOrNull { it.name == dto.penMode } ?: defaults.penMode,
         ttsSpeed = dto.ttsSpeed?.coerceIn(ReaderSettings.TTS_SPEED_RANGE) ?: defaults.ttsSpeed
     )
 }

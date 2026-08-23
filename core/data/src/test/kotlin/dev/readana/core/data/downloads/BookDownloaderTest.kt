@@ -12,7 +12,7 @@ import dev.readana.core.data.FakeSettingsRepository
 import dev.readana.core.data.conversion.FakeConversionManager
 import dev.readana.core.data.importing.BookImporter
 import dev.readana.core.data.importing.ImportResult
-import dev.readana.core.data.repository.BookSourceRegistry
+import dev.readana.core.data.repository.testRegistry
 import dev.readana.core.model.Book
 import dev.readana.core.model.BookFormat
 import dev.readana.core.model.BookOrigin
@@ -259,7 +259,7 @@ class BookDownloaderTest {
         return BookDownloader(
             client = client,
             downloadsRepository = downloads,
-            sources = BookSourceRegistry(setOf(source)),
+            sources = testRegistry(setOf(source), settings),
             importer = importer,
             conversionManager = conversions,
             settingsRepository = settings,

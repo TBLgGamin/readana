@@ -18,6 +18,7 @@ import dev.readana.core.model.BookFormat
 import dev.readana.core.model.BookOrigin
 import dev.readana.core.model.DownloadErrorKind
 import dev.readana.core.model.DownloadStatus
+import dev.readana.core.model.StoredQuota
 import dev.readana.source.api.DownloadRequest
 import dev.readana.source.api.SearchResult
 import dev.readana.source.api.SourceId
@@ -179,7 +180,7 @@ class BookDownloader @Inject constructor(
         // shows it, so record it wherever the resolution happens to land.
         request.quota?.let { quota ->
             settingsRepository.updateSourceSettings {
-                it.copy(annasDownloadsLeft = quota.remaining, annasDownloadsPerDay = quota.perDay)
+                it.withQuota(entity.sourceId, StoredQuota(quota.remaining, quota.perDay))
             }
         }
         // A spent allowance still carries a URL when the source found a free route to the file;

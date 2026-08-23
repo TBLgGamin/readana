@@ -72,8 +72,12 @@ class DiscoverViewModelTest {
     private val messageBus = DefaultMessageBus()
 
     private fun viewModel() = DiscoverViewModel(
-        BookSourceRegistry(setOf(gutenberg, broken)),
-        settings,
+        BookSourceRegistry(
+            builtIn = setOf(gutenberg, broken),
+            // No catalogs are configured in these tests, so nothing should ask for one.
+            catalogFactory = { catalog -> error("unexpected catalog ${'$'}{catalog.id}") },
+            settings = settings
+        ),
         downloads,
         trending,
         messageBus,

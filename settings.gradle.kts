@@ -49,9 +49,14 @@ include(":engine:epub")
 include(":engine:reflow")
 include(":engine:pdf2epub")
 
+include(":benchmark")
+
 include(":source:api")
 include(":source:gutenberg")
 include(":source:annas")
+include(":source:arxiv")
+include(":source:openlibrary")
+include(":source:opds")
 include(":source:trending")
 
 include(":feature:browser")

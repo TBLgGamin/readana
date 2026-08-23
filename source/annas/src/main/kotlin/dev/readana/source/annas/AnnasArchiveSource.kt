@@ -16,6 +16,7 @@ import dev.readana.source.api.NoBrowserVerifier
 import dev.readana.source.api.SearchPage
 import dev.readana.source.api.SearchQuery
 import dev.readana.source.api.SearchResult
+import dev.readana.source.api.SourceConfigField
 import dev.readana.source.api.SourceId
 import dev.readana.source.api.VerifyOutcome
 import io.ktor.client.HttpClient
@@ -59,6 +60,10 @@ class AnnasArchiveSource(
 
     /** Opt-in: the user must enable it in Settings after reading the legal notice. */
     override val enabledByDefault: Boolean = false
+
+    override val summary: String = "Shadow library. Needs a membership key for fast downloads."
+
+    override val configFields: List<SourceConfigField> = AnnasConfig.CONFIG_FIELDS
 
     private val json = Json { ignoreUnknownKeys = true }
     private val session = AnnasSession(client)

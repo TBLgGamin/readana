@@ -15,7 +15,16 @@ data class SearchQuery(
     }
 }
 
-data class SearchPage(val results: List<SearchResult>, val page: Int, val hasMore: Boolean)
+data class SearchPage(
+    val results: List<SearchResult>,
+    val page: Int,
+    val hasMore: Boolean,
+    /**
+     * Where the next page lives, for sources that link to it rather than counting pages (OPDS
+     * feeds carry `rel="next"`). Page-numbered sources leave it null and use [hasMore].
+     */
+    val nextHref: String? = null
+)
 
 data class SearchResult(
     val sourceId: SourceId,

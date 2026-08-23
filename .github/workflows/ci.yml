@@ -47,6 +47,8 @@ jobs:
       - name: Android Lint
         run: ./gradlew :app:lintDebug
 
+      # Screenshot tests run inside this task: Roborazzi renders through Robolectric, so no
+      # emulator is needed. A UI change that was not intended fails here.
       - name: Unit tests
         run: ./gradlew testDebugUnitTest test --continue
 
@@ -70,3 +72,15 @@ jobs:
             **/build/reports/**
             build/reports/detekt/**
           retention-days: 7
+
+      # What the screen looks like now next to what it looked like before, so a failed screenshot
+      # test can be judged from the diff rather than by rerunning it locally.
+      - name: Upload screenshot diffs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: screenshot-diffs
+          path: |
+            **/build/outputs/roborazzi/**
+          retention-days: 7
+          if-no-files-found: ignore

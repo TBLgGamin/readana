@@ -1,10 +1,14 @@
 import java.util.Properties
 
+/** Used when no `-PreadanaVersion` is passed, which is every build that is not a release. */
+val fallbackVersionName = "0.1.0"
+
 plugins {
     alias(libs.plugins.readana.android.application)
     alias(libs.plugins.readana.android.application.compose)
     alias(libs.plugins.readana.hilt)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 // Release signing is optional: drop a keystore.properties (git-ignored) next to settings.gradle.kts
@@ -15,13 +19,32 @@ val keystoreProperties = Properties().apply {
     if (file.exists()) file.inputStream().use(::load)
 }
 
+/**
+ * The version being built. A release is cut by tagging `vX.Y.Z`, and the workflow passes the tag
+ * in as `-PreadanaVersion`; a local build keeps the fallback so nothing depends on git state.
+ */
+val releaseVersionName: String =
+    (providers.gradleProperty("readanaVersion").orNull ?: fallbackVersionName).removePrefix("v")
+
+/**
+ * Derived from the version rather than kept by hand, so it can only ever go up: 1.2.3 → 10203.
+ * Anything that does not parse falls back to 1, which is what a local build wants.
+ */
+val releaseVersionCode: Int = releaseVersionName
+    .substringBefore('-')
+    .split('.')
+    .mapNotNull { it.toIntOrNull() }
+    .takeIf { it.size == 3 }
+    ?.let { (major, minor, patch) -> major * 10_000 + minor * 100 + patch }
+    ?: 1
+
 android {
     namespace = "dev.readana"
 
     defaultConfig {
         applicationId = "dev.readana"
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = releaseVersionCode
+        versionName = releaseVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -53,6 +76,15 @@ android {
             )
             signingConfig =
                 signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+        }
+        // What the macrobenchmarks run against: release code, so the measurements mean something,
+        // but signed with the debug key so it can be installed without the release keystore.
+        create("benchmark") {
+            initWith(buildTypes.getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+            proguardFiles("benchmark-rules.pro")
         }
     }
 
@@ -98,6 +130,11 @@ dependencies {
     // On-demand WorkManager init: the app supplies the Hilt worker factory (see ReadanaApplication).
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.hilt.work)
+
+    // Installs the committed baseline profile on devices that do not get it from Play.
+    implementation(libs.androidx.profileinstaller)
+    // Generated on a device and committed; see docs/RELEASING.md.
+    baselineProfile(projects.benchmark)
 
     testImplementation(libs.konsist)
     testImplementation(libs.kotlinx.coroutines.test)

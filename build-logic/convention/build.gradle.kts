@@ -25,6 +25,7 @@ dependencies {
     compileOnly(libs.ksp.gradlePlugin)
     compileOnly(libs.room.gradlePlugin)
     compileOnly(libs.hilt.gradlePlugin)
+    compileOnly(libs.androidx.benchmark.gradlePlugin)
 }
 
 tasks {
@@ -67,6 +68,10 @@ gradlePlugin {
         register("hilt") {
             id = libs.plugins.readana.hilt.get().pluginId
             implementationClass = "HiltConventionPlugin"
+        }
+        register("androidScreenshot") {
+            id = libs.plugins.readana.android.screenshot.get().pluginId
+            implementationClass = "AndroidScreenshotConventionPlugin"
         }
     }
 }

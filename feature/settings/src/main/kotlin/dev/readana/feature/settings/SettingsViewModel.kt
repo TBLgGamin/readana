@@ -5,10 +5,17 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.readana.core.data.repository.BookSourceRegistry
 import dev.readana.core.data.repository.SettingsRepository
+import dev.readana.core.data.repository.SourceDefaults
+import dev.readana.core.model.CatalogPreset
+import dev.readana.core.model.CatalogRef
 import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.HeadingSensitivity
 import dev.readana.core.model.ReaderSettings
 import dev.readana.core.model.SourceSettings
+import dev.readana.core.model.StoredQuota
+import dev.readana.source.api.CatalogSource
+import dev.readana.source.api.SourceConfigField
+import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -19,29 +26,39 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
-    private val sources: BookSourceRegistry
+    sources: BookSourceRegistry
 ) : ViewModel() {
     val uiState: StateFlow<SettingsUiState> =
         combine(
             settingsRepository.sourceSettings,
             settingsRepository.conversionSettings,
             settingsRepository.readerSettings,
-            settingsRepository.libraryFolderUri
-        ) { sourceSettings, conversionSettings, readerSettings, libraryFolderUri ->
+            settingsRepository.libraryFolderUri,
+            sources.sources
+        ) { sourceSettings, conversionSettings, readerSettings, libraryFolderUri, allSources ->
             SettingsUiState.Loaded(
                 sources = sourceSettings,
                 conversion = conversionSettings,
                 reading = readerSettings,
                 libraryFolderUri = libraryFolderUri,
-                sourceToggles = sources.all.map { source ->
-                    SourceToggle(
+                sourceRows = allSources.map { source ->
+                    SourceRow(
                         id = source.id.value,
                         name = source.displayName,
-                        enabled = sourceSettings.isEnabled(
-                            source.id.value,
-                            source.enabledByDefault
-                        )
+                        summary = source.summary,
+                        enabled = sourceSettings.isEnabled(source.id.value, source.enabledByDefault),
+                        fields = source.configFields,
+                        values = sourceSettings.configFor(source.id.value),
+                        quota = sourceSettings.quotas[source.id.value],
+                        // Only a catalog can be forgotten: a compiled-in source has no record to
+                        // remove, only a switch to turn off.
+                        isRemovable = source is CatalogSource &&
+                            sourceSettings.catalogs.any { it.id == source.id.value }
                     )
+                },
+                // Presets already added are not offered again.
+                availablePresets = SourceDefaults.CATALOG_PRESETS.filter { preset ->
+                    sourceSettings.catalogs.none { it.presetId == preset.id }
                 }
             )
         }.stateIn(
@@ -59,20 +76,45 @@ class SettingsViewModel @Inject constructor(
         it.withSourceEnabled(sourceId, enabled)
     }
 
-    /** One mirror per line; blank input restores the built-in defaults. */
-    fun setAnnasMirrors(text: String) = updateSources {
-        it.copy(annasMirrors = text.lines().map(String::trim).filter(String::isNotEmpty))
-    }
-
-    fun setAnnasSecretKey(key: String) = updateSources {
-        val trimmed = key.trim().ifEmpty { null }
-        if (trimmed == it.annasSecretKey) {
-            it
+    /**
+     * Stores one configuration value. Changing a credential clears whatever allowance the source
+     * last reported: that allowance belonged to the old account, and showing it against a new one
+     * would be a lie.
+     */
+    fun setSourceConfig(sourceId: String, field: SourceConfigField, value: String) = updateSources {
+        val updated = it.withConfigValue(sourceId, field.key, value)
+        if (field.kind == SourceConfigField.Kind.Secret && value.trim() != it.configFor(sourceId)[field.key]) {
+            updated.withQuota(sourceId, null)
         } else {
-            // The allowance belonged to the old key; showing it against a new one would be a lie.
-            it.copy(annasSecretKey = trimmed, annasDownloadsLeft = null, annasDownloadsPerDay = null)
+            updated
         }
     }
+
+    fun addPresetCatalog(preset: CatalogPreset) = updateSources {
+        it.withCatalog(
+            CatalogRef(
+                id = "catalog-${preset.id}",
+                name = preset.name,
+                feedUrl = preset.feedUrl,
+                presetId = preset.id
+            )
+        )
+    }
+
+    /** Adds a catalog from a pasted feed URL. Returns false when the address is unusable. */
+    fun addCatalog(name: String, feedUrl: String): Boolean {
+        val url = feedUrl.trim()
+        if (!url.startsWith("http://") && !url.startsWith("https://")) return false
+        val label = name.trim().ifEmpty { url.substringAfter("://").substringBefore('/') }
+        updateSources {
+            it.withCatalog(
+                CatalogRef(id = "catalog-${UUID.randomUUID()}", name = label, feedUrl = url)
+            )
+        }
+        return true
+    }
+
+    fun removeCatalog(catalogId: String) = updateSources { it.withoutCatalog(catalogId) }
 
     /** The defaults every book starts from; a book that has been adjusted keeps its own copy. */
     fun updateReadingDefaults(transform: (ReaderSettings) -> ReaderSettings) {
@@ -104,7 +146,22 @@ class SettingsViewModel @Inject constructor(
     }
 }
 
-data class SourceToggle(val id: String, val name: String, val enabled: Boolean)
+/**
+ * One source as the settings page sees it. Everything a source needs configured travels with it,
+ * so the screen renders any source — built in or added today — without knowing which it is.
+ */
+data class SourceRow(
+    val id: String,
+    val name: String,
+    val summary: String?,
+    val enabled: Boolean,
+    val fields: List<SourceConfigField>,
+    val values: Map<String, String>,
+    val quota: StoredQuota?,
+    val isRemovable: Boolean
+) {
+    val isConfigurable: Boolean get() = fields.isNotEmpty()
+}
 
 sealed interface SettingsUiState {
     data object Loading : SettingsUiState
@@ -113,7 +170,8 @@ sealed interface SettingsUiState {
         val sources: SourceSettings,
         val conversion: ConversionSettings,
         val reading: ReaderSettings,
-        val sourceToggles: List<SourceToggle>,
+        val sourceRows: List<SourceRow>,
+        val availablePresets: List<CatalogPreset>,
         val libraryFolderUri: String? = null
     ) : SettingsUiState
 }
