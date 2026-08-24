@@ -59,7 +59,7 @@ turbine = "1.2.1"
 robolectric = "4.16.1"
 konsist = "0.17.3"
 # Screenshot tests run on Robolectric, so they need no device and go in the normal test task.
-roborazzi = "1.43.1"
+roborazzi = "1.72.0"
 # Macrobenchmarks and the baseline profile they generate; the plugin moves with the library.
 androidxBenchmark = "1.5.0-rc01" # 1.4.x still uses AGP's removed TestedExtension and cannot apply.
 androidxProfileinstaller = "1.4.1"
