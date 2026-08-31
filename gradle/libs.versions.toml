@@ -43,7 +43,7 @@ kotlinxCoroutines = "1.11.0"
 kotlinxSerialization = "1.11.0"
 ktor = "3.5.2"
 coil = "3.5.0"
-jsoup = "1.23.1"
+jsoup = "1.23.2"
 timber = "5.0.1"
 javaxInject = "1"
 
