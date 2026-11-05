@@ -50,14 +50,14 @@ javaxInject = "1"
 # --- Domain libraries ---
 readium = "3.3.0"
 pdfboxAndroid = "2.0.27.0"
-epubcheck = "5.3.0"
+epubcheck = "5.4.0"
 
 # --- Testing ---
 junit4 = "4.13.2"
 mockk = "1.14.11"
 turbine = "1.2.1"
-robolectric = "4.16.1"
-konsist = "0.17.3"
+robolectric = "4.17"
+konsist = "0.18.1"
 # Screenshot tests run on Robolectric, so they need no device and go in the normal test task.
 roborazzi = "1.43.1"
 # Macrobenchmarks and the baseline profile they generate; the plugin moves with the library.
