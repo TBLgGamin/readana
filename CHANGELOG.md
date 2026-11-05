@@ -53,6 +53,22 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The app now wears the same colours as mtgfmax: shadcn/ui's neutral greys, near-black (in dark
+  mode near-white) primary actions, one violet accent and its destructive red, each converted from
+  that project's OKLCH tokens to sRGB. Material 3 Expressive's baseline violet scheme is gone;
+  shapes, motion and components are unchanged, and dynamic colour is still off by default.
+- A new logo: a lowercase r whose stem ends in a bookmark ribbon. The launcher icon is the white r
+  on violet, drawn as a vector so it is sharp at every density and works as a themed icon; the
+  splash screen and the window behind the first frame use the app's own background, so opening the
+  app no longer flashes a different colour; Settings › About shows the full logo, switching to its
+  dark version on a dark theme. The brand kit and its guidelines are in `artwork/` (`BRAND.md`);
+  the old open-book PNGs and their generator script are gone.
+- The README is rewritten around what the app does, how to build it and how it works.
+- The repository is ready to be public: an MIT `LICENSE` and a Code of Conduct are added,
+  `.github/repo-settings.sh` applies the standard GitHub settings, blank issues are off, the
+  security policy states supported versions and response times, and `.gitignore` also keeps
+  `.env` files, `*.p12`/`*.pem` keys and `google-services.json` out of commits.
+
 - A source now carries its own settings, so adding one no longer means adding a settings page for
   it. Anna's mirrors and membership key used to be fields on the shared source settings, spelled
   out again in the settings screen and written back by the download queue; a second source that

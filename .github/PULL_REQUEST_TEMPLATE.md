@@ -8,6 +8,7 @@
 
 ## Checklist
 
+- [ ] PR title is a Conventional Commit (it becomes the squash commit message)
 - [ ] `./gradlew spotlessApply detekt` is clean
 - [ ] `./gradlew testDebugUnitTest test` passes
 - [ ] `./gradlew :app:lintDebug` passes

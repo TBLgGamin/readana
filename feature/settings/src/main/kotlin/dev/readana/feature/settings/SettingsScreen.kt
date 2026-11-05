@@ -53,6 +53,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.readana.core.designsystem.ReadanaIcons
 import dev.readana.core.designsystem.component.LoadingState
+import dev.readana.core.designsystem.component.ReadanaLogo
 import dev.readana.core.model.CatalogPreset
 import dev.readana.core.model.ConversionSettings
 import dev.readana.core.model.HeadingSensitivity
@@ -481,6 +482,7 @@ private fun AboutSection(modifier: Modifier = Modifier) {
         icon = ReadanaIcons.Library,
         modifier = modifier
     ) {
+        ReadanaLogo(modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp).height(40.dp))
         SettingsNote(stringResource(R.string.feature_settings_about_version, version))
         SettingsNote(stringResource(R.string.feature_settings_about_blurb))
     }

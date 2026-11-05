@@ -1,3 +1,6 @@
+# Weekly version updates, one grouped pull request per group. Security
+# updates for every ecosystem are switched on in the repository settings
+# (.github/repo-settings.sh) and need no entry here.
 version: 2
 updates:
   # Gradle version catalog (gradle/libs.versions.toml) and wrapper.
@@ -9,6 +12,9 @@ updates:
       time: "07:00"
       timezone: Europe/Amsterdam
     open-pull-requests-limit: 10
+    commit-message:
+      prefix: chore
+      include: scope
     groups:
       androidx:
         patterns: ["androidx.*", "com.google.dagger*", "com.google.devtools.ksp*"]
@@ -30,6 +36,9 @@ updates:
       day: monday
       time: "07:00"
       timezone: Europe/Amsterdam
+    commit-message:
+      prefix: chore
+      include: scope
     groups:
       actions:
         patterns: ["*"]

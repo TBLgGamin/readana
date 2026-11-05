@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Brand kit svg/readana-symbol-small-white.svg, placed as in web/readana-symbol-app-icon.svg:
+     the 256-unit tile maps onto the 72dp visible part of the 108dp adaptive layer. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.28125"
+        android:scaleY="0.28125"
+        android:translateX="18"
+        android:translateY="18">
+        <group
+            android:scaleX="0.816"
+            android:scaleY="0.816"
+            android:translateX="23.55"
+            android:translateY="23.27">
+            <path
+                android:fillColor="#FFFFFF"
+                android:pathData="M61.89 31.89A3.33 3.33 0 0 1 65.22 28.56H115.22A3.33 3.33 0 0 1 118.56 31.89V61.73A103.89 103.89 0 0 1 191.33 28.61A3.33 3.33 0 0 1 194.67 31.89V84.11A3.33 3.33 0 0 1 191.33 87.57A45 45 0 0 0 149.79 129.11A3.33 3.33 0 0 1 146.33 132.44H118.56V218.93A3.33 3.33 0 0 1 112.68 221.09L90.22 194.67L67.76 221.09A3.33 3.33 0 0 1 61.89 218.93Z" />
+        </group>
+    </group>
+</vector>

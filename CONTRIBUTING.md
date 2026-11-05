@@ -10,8 +10,9 @@ tooling, AI assistants and future contributors all follow one path.
    (`feat:`, `fix:`, `refactor:`, `docs:`, `build:`, `test:`, `chore:`).
 3. Before pushing: `./gradlew spotlessApply detekt testDebugUnitTest test :app:lintDebug`
    (or install the pre-commit hooks).
-4. Open a PR; CI must be green. Update `CHANGELOG.md` under *Unreleased* for user-visible changes
-   and add/adjust an ADR when an architectural decision changes.
+4. Open a PR; CI must be green. PRs are squash-merged with the PR title as the commit message, so
+   the title must be a Conventional Commit too. Update `CHANGELOG.md` under *Unreleased* for
+   user-visible changes and add/adjust an ADR when an architectural decision changes.
 
 When working with Claude Code, the repo enforces this automatically: `.claude/settings.json` hooks
 format the repo at the end of each turn (`spotlessApply`), lint each edited Kotlin file against the
@@ -39,3 +40,6 @@ pure refactors). The `/ship` skill runs the whole finishing pass.
 ## Reporting problems
 
 Use the issue templates. Never attach copyrighted books; describe the file instead.
+
+Security vulnerabilities go through private reporting, not issues: see [SECURITY.md](SECURITY.md).
+Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).

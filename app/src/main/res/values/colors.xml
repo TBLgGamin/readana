@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FEF7FF</color>
+    <!-- Brand kit: violet tile behind the white symbol (artwork/BRAND.md). -->
+    <color name="ic_launcher_background">#6F49B1</color>
+    <!-- The theme's background, so the window behind the first Compose frame already matches it. -->
+    <color name="window_background">#FFFFFF</color>
 </resources>
