@@ -41,7 +41,7 @@ androidxUiautomator = "2.4.0"
 # --- Kotlin ecosystem ---
 kotlinxCoroutines = "1.11.0"
 kotlinxSerialization = "1.11.0"
-ktor = "3.5.2"
+ktor = "3.6.1"
 coil = "3.5.0"
 jsoup = "1.23.1"
 timber = "5.0.1"
