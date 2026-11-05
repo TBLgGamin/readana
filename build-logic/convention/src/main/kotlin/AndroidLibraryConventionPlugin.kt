@@ -5,9 +5,11 @@ import dev.readana.buildlogic.libs
 import dev.readana.buildlogic.versionInt
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.apply
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.dependencies
+import org.gradle.kotlin.dsl.withType
 
 /** `readana.android.library`: Android library modules (the core modules and engine:pdf2epub). */
 class AndroidLibraryConventionPlugin : Plugin<Project> {
@@ -27,6 +29,16 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
                 // Resources inside ":feature:library" must be prefixed "feature_library_" to avoid clashes.
                 resourcePrefix = path.split("""\W""".toRegex()).drop(1).distinct()
                     .joinToString(separator = "_").lowercase() + "_"
+            }
+
+            // Robolectric 4.17 sets up API 36's ApplicationSharedMemory by writing a raw
+            // FileDescriptor through jdk.internal.access.SharedSecrets, which the module system
+            // hides from it unless that package is exported.
+            tasks.withType<Test>().configureEach {
+                jvmArgs(
+                    "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED",
+                    "--add-opens=java.base/java.io=ALL-UNNAMED"
+                )
             }
 
             dependencies {

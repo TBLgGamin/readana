@@ -2,6 +2,7 @@ package dev.readana.feature.browser
 
 import android.annotation.SuppressLint
 import android.webkit.CookieManager
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -81,6 +82,10 @@ internal fun BrowserVerifyScreen(key: BrowserVerifyKey, onDone: () -> Unit, modi
                 url = key.url,
                 onProgress = { progress = it },
                 onAttachWebView = { webView = it },
+                onRendererCrash = {
+                    webView = null
+                    currentOnDone()
+                },
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -89,15 +94,19 @@ internal fun BrowserVerifyScreen(key: BrowserVerifyKey, onDone: () -> Unit, modi
     BackHandler(enabled = webView?.canGoBack() == true) { webView?.goBack() }
 }
 
-@SuppressLint("SetJavaScriptEnabled")
+// MissingOnRenderProcessGone: the client below does override it. androidx.webkit's detector also
+// flags every `WebViewClient()` constructor call, which in Kotlin includes a subclass's super call.
+@SuppressLint("SetJavaScriptEnabled", "MissingOnRenderProcessGone")
 @Composable
 private fun VerifyWebView(
     url: String,
     onProgress: (Int) -> Unit,
     onAttachWebView: (WebView) -> Unit,
+    onRendererCrash: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val currentOnProgress by rememberUpdatedState(onProgress)
+    val currentOnRendererCrash by rememberUpdatedState(onRendererCrash)
 
     AndroidView(
         modifier = modifier,
@@ -110,6 +119,13 @@ private fun VerifyWebView(
                     override fun onPageFinished(view: WebView, url: String?) {
                         // Whatever the page granted is in the shared store from here on.
                         CookieManager.getInstance().flush()
+                    }
+
+                    // A crashed or reclaimed renderer leaves this WebView unusable; leave the page
+                    // (disposal destroys the view) instead of letting the app crash with it.
+                    override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                        currentOnRendererCrash()
+                        return true
                     }
                 }
                 webChromeClient = object : WebChromeClient() {

@@ -82,6 +82,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- If Android reclaims or crashes a WebView's renderer, the in-app browser and the "checking your
+  browser" page now close instead of taking the app down with them, and the hidden browser check
+  reports a failure instead of crashing.
+- CI could not run at all: the Gradle wrapper was committed without its executable bit.
+- Dependencies are current: AndroidX (Compose BOM 2026.09, Work 2.12, DataStore 1.3, Room 2.8.5),
+  Kotlin 2.4.21, Ktor 3.6.1, Readium 3.4.0, Coil 3.6.2, Robolectric 4.17, Roborazzi 1.74 and the
+  rest of the open Dependabot updates. Robolectric 4.17 needs `jdk.internal.access` exported to
+  start an API 36 app, which the library convention plugin now does for unit tests.
+
 - The release workflow could never have signed anything. Its "restore signing key" step was guarded
   by `if: ${{ secrets.KEYSTORE_BASE64 != '' }}`, and the `secrets` context is not available in a
   step-level `if` — so the guard never held and the key was never written. It also built from a

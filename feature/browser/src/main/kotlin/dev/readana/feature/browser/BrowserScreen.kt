@@ -2,6 +2,7 @@ package dev.readana.feature.browser
 
 import android.annotation.SuppressLint
 import android.webkit.CookieManager
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -102,6 +103,10 @@ internal fun BrowserScreen(
                 onCapture = onCapture,
                 onProgress = onProgress,
                 onAttachWebView = { webView = it },
+                onRendererCrash = {
+                    webView = null
+                    currentOnClose()
+                },
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -115,17 +120,21 @@ internal fun BrowserScreen(
  * key is configured it is posted to the account page first, which sets the session cookie the slow
  * download needs.
  */
-@SuppressLint("SetJavaScriptEnabled")
+// MissingOnRenderProcessGone: the client below does override it. androidx.webkit's detector also
+// flags every `WebViewClient()` constructor call, which in Kotlin includes a subclass's super call.
+@SuppressLint("SetJavaScriptEnabled", "MissingOnRenderProcessGone")
 @Composable
 private fun BrowserWebView(
     key: BrowserKey,
     onCapture: (CapturedFile) -> Unit,
     onProgress: (Int) -> Unit,
     onAttachWebView: (WebView) -> Unit,
+    onRendererCrash: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val currentOnCapture by rememberUpdatedState(onCapture)
     val currentOnProgress by rememberUpdatedState(onProgress)
+    val currentOnRendererCrash by rememberUpdatedState(onRendererCrash)
 
     AndroidView(
         modifier = modifier,
@@ -142,6 +151,13 @@ private fun BrowserWebView(
                             signedIn = true
                             view.loadUrl(key.url)
                         }
+                    }
+
+                    // A crashed or reclaimed renderer leaves this WebView unusable; close the page
+                    // (disposal destroys the view) instead of letting the app crash with it.
+                    override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                        currentOnRendererCrash()
+                        return true
                     }
                 }
                 webChromeClient = object : WebChromeClient() {

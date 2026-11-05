@@ -2,6 +2,7 @@ package dev.readana.core.data.browser
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -103,6 +104,9 @@ class WebViewBrowserVerifier @Inject constructor(
      * without an HTTP error and no longer shows the challenge. The site sends its answer back to
      * the same URL, so the address cannot be the signal — the title and the status are.
      */
+    // MissingOnRenderProcessGone: overridden below. androidx.webkit's detector also flags every
+    // `WebViewClient()` constructor call, which in Kotlin includes this subclass's super call.
+    @SuppressLint("MissingOnRenderProcessGone")
     private class VerifyingClient(private val onSettled: (VerifyOutcome) -> Unit) : WebViewClient() {
         private var lastMainFrameError: Int? = null
 
@@ -123,6 +127,13 @@ class WebViewBrowserVerifier @Inject constructor(
                 failure != null -> Unit
                 else -> onSettled(VerifyOutcome.Verified)
             }
+        }
+
+        // The hidden check runs in its own renderer; if that dies, report it rather than crash.
+        // `load` destroys the view on the way out.
+        override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+            onSettled(VerifyOutcome.Failed("WebView renderer gone"))
+            return true
         }
 
         private companion object {
