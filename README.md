@@ -1,12 +1,7 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="artwork/svg/readana-horizontal-dark.svg">
-    <img src="artwork/svg/readana-horizontal.svg" alt="Readana" width="360">
-  </picture>
-</p>
+<p align="center"><img src="docs/media/readana-hero.jpg" alt="Readana: find it, read it, no spoilers ahead" width="100%"></p>
 
 <p align="center">
-  <strong>A personal e-reader for the Xiaomi Pad 8: find books, convert PDFs to EPUB, and read with an assistant that never spoils what comes next.</strong>
+  <strong>An Android e-reader that finds books, converts PDFs to EPUB, and reads with an assistant that never spoils what comes next.</strong>
 </p>
 
 <p align="center">
@@ -15,8 +10,6 @@
   <a href="#usage">Usage</a>
   &middot;
   <a href="docs/ARCHITECTURE.md">Documentation</a>
-  &middot;
-  <a href="docs/ROADMAP.md">Roadmap</a>
   &middot;
   <a href="CHANGELOG.md">Changelog</a>
 </p>
@@ -31,16 +24,16 @@
 ---
 
 Readana searches several book sources at once, downloads the file in the background, turns a PDF
-into a reflowable EPUB when you want that, keeps everything in a library on the tablet, and opens it
-in a reader with the controls a dedicated e-reader has. *You search "Circe", pick the copy you want
-and it lands in your library as an EPUB. A month later you open the book, ask "Where was I?", and
-the recap stops at the page you reached.*
+into a reflowable EPUB when you want that, keeps everything in a library on your device, and opens
+it in a reader with the controls a dedicated e-reader has. *You search "Circe", pick the copy you
+want and it lands in your library as an EPUB. A month later you open the book, ask "Where was I?",
+and the recap stops at the page you reached.*
 
-It is a native Android app (Kotlin, Jetpack Compose) built for the **Xiaomi Pad 8** (Android 16,
-HyperOS 3, 11.2" 3:2 screen) that runs on Android 10 and later. The library, your progress and your
-notes live in the app's own storage on the device. The reading assistant uses your own API key with
-the provider you choose. Milestones M0 to M6 of the [roadmap](docs/ROADMAP.md) are done; no release
-is tagged yet, so you build the APK yourself.
+It is a native Android app (Kotlin, Jetpack Compose) for phones and tablets on Android 10 and
+later, with adaptive layouts, two-page spreads in landscape and stylus support for larger screens.
+The library, your progress and your notes live in the app's own storage on the device. The reading
+assistant uses your own API key with the provider you choose. No release is tagged yet, so you
+build the APK yourself.
 
 <p align="center"><img src="docs/media/readana-library-dark.png" alt="The Readana library in dark mode: a Continue reading card above a grid of sixteen classics with progress bars" width="100%"></p>
 
@@ -66,9 +59,9 @@ is tagged yet, so you build the APK yourself.
 - **OPDS catalogs.** Standard Ebooks, the Directory of Open Access Books and Feedbooks are one tap,
   or paste a feed address, including your own Calibre-Web. Catalogs can be browsed shelf by shelf as
   well as searched.
-- **Background downloads.** WorkManager and a foreground service carry downloads through HyperOS's
-  aggressive process killing. Downloads can be paused and resumed from the byte they stopped on, and
-  each one shows its steps, speed and time left.
+- **Background downloads.** WorkManager and a foreground service carry downloads through Android's
+  background limits, including aggressive OEM battery savers. Downloads can be paused and resumed
+  from the byte they stopped on, and each one shows its steps, speed and time left.
 - **PDF to EPUB on the device.** PDFBox text extraction, layout heuristics (headers and footers,
   paragraphs, hyphenation, headings, two-column detection, figures) and a valid EPUB 3, validated
   with epubcheck in tests. The original PDF is always kept.
@@ -101,8 +94,7 @@ is tagged yet, so you build the APK yourself.
 - The **Android SDK** with *platform 37* (compileSdk) and *build-tools 36.0.0*. Android Studio
   installs these, or use `sdkmanager`. Point Gradle at the SDK with `local.properties`
   (`sdk.dir=...`) or `ANDROID_HOME`.
-- An Android 10 (API 29) or later device or emulator. The Xiaomi Pad 8 is the target; `targetSdk` is
-  36.
+- An Android 10 (API 29) or later phone, tablet or emulator. `targetSdk` is 36.
 
 ### Installation
 
@@ -115,10 +107,10 @@ git clone https://github.com/TBLgGamin/readana.git && cd readana
 adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Device setup for the Pad 8 (developer options, the "Install via USB" Mi-account gotcha, battery
-restrictions): [docs/DEVICE.md](docs/DEVICE.md).
+Device setup notes (developer options, USB install, battery restrictions on aggressive OEM skins
+such as Xiaomi's HyperOS) are in [docs/DEVICE.md](docs/DEVICE.md).
 
-The everyday loop, against the tablet or an emulator, is just adb:
+The everyday loop, against a device or an emulator, is just adb:
 
 ```bash
 ./gradlew :app:installDebug                                       # build + install in one step
@@ -136,28 +128,28 @@ replacing it.
 2. Open **Discover** and search. Open Library is on by default; arXiv and Anna's Archive are off
    until you turn them on in **Settings, Sources**, where you can also add OPDS catalogs.
 3. For the assistant, open **Settings, Assistant**, pick a provider and paste a key.
-4. On HyperOS, set Settings, Apps, Readana, Battery saver to **No restrictions** so downloads and
-   conversions are not killed in the background ([docs/DEVICE.md](docs/DEVICE.md)).
+4. If your phone or tablet's battery saver kills background apps (Xiaomi, Samsung, OnePlus and
+   others), set Readana's battery setting to **No restrictions** so downloads and conversions are
+   not stopped ([dontkillmyapp.com](https://dontkillmyapp.com)).
 
 ### Uninstall and data
 
 Uninstalling removes the app's database and files, including the library. Where the data lives is
 listed under [Configuration](#data-locations).
 
-### Running without a tablet
+### Running without a device
 
 The SDK's own emulator is enough and does not need Android Studio. Install `emulator` and
-`system-images;android-36;google_apis;x86_64` with `sdkmanager`, then build an AVD with the Pad 8's
-3:2 screen:
+`system-images;android-36;google_apis;x86_64` with `sdkmanager`, then build an AVD; this one has a
+3:2 tablet screen, the layout Readana was first tuned on:
 
 ```bash
-avdmanager create avd -n pad8 -k "system-images;android-36;google_apis;x86_64" -d medium_tablet
+avdmanager create avd -n tablet -k "system-images;android-36;google_apis;x86_64" -d medium_tablet
 # then in <avd>/config.ini: hw.lcd.width=3200, hw.lcd.height=2136, hw.lcd.density=400
-emulator -avd pad8 -gpu host
+emulator -avd tablet -gpu host
 ```
 
-That yields 1280 x 854 dp, the same window size classes as the real device. Handy while checking
-adaptive layouts:
+That yields 1280 x 854 dp, an expanded-width window. Handy while checking adaptive layouts:
 
 ```bash
 adb shell cmd window user-rotation lock 1   # portrait (854 dp); 0 = landscape, free = auto
@@ -168,8 +160,7 @@ adb shell cmd uimode night yes              # dark theme
 
 Set `ANDROID_AVD_HOME` before creating AVDs if you care where the multi-gigabyte disk images land;
 the emulator otherwise writes them under `~/.android/avd` no matter where the SDK lives. The
-emulator is AOSP, so it will not reproduce the HyperOS behaviour in
-[docs/DEVICE.md](docs/DEVICE.md): background killing, Workstation mode, the Focus Pen.
+emulator is AOSP, so it will not reproduce OEM background killing.
 
 ## Usage
 
@@ -327,16 +318,12 @@ flowchart LR
 The app is a thin shell over independent feature modules, shared core modules, and two groups of
 pure-Kotlin modules: `engine` for document processing and `source` for where books come from. The
 module graph, every data flow above in detail, navigation, error handling and the testing strategy
-are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the "why" behind the stack is in the
-[decision records](docs/adr/), and what was evaluated is in [docs/RESEARCH.md](docs/RESEARCH.md).
-Download behaviour is in [ADR 0010](docs/adr/0010-download-pipeline.md), conversion in
-[ADR 0003](docs/adr/0003-on-device-pdf-to-epub.md), and the assistant in
-[ADR 0014](docs/adr/0014-provider-agnostic-reading-assistant.md).
+are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Development
 
-You need the same prerequisites as the [quick start](#prerequisites). Device notes for the Pad 8 are
-in [docs/DEVICE.md](docs/DEVICE.md).
+You need the same prerequisites as the [quick start](#prerequisites); device notes are in
+[docs/DEVICE.md](docs/DEVICE.md).
 
 ```bash
 git clone https://github.com/TBLgGamin/readana.git && cd readana
@@ -353,7 +340,7 @@ pre-commit install --hook-type pre-commit --hook-type pre-push   # optional loca
 | Unit tests, screenshot tests included (no emulator needed) | `./gradlew testDebugUnitTest test` |
 | Accept the current look as the new screenshot goldens | `./gradlew testDebugUnitTest -PrecordScreenshots=true` |
 | One module | `./gradlew :engine:reflow:test` |
-| Regenerate the startup profile (needs the tablet attached) | `./gradlew :app:generateBaselineProfile` |
+| Regenerate the startup profile (needs a device attached) | `./gradlew :app:generateBaselineProfile` |
 | Everything above | `./gradlew check` |
 
 CI runs on every push to `main` and on pull requests, on JDK 21: `spotlessCheck`, `detekt`,
@@ -391,7 +378,7 @@ Ktor `MockEngine` test with fixtures, and an `@IntoSet` provider in
 | PDF text | [PDFBox-Android](https://github.com/TomRoush/PdfBox-Android) (Apache-2.0) plus the project's own reflow engine |
 | Persistence | Room 2.8, DataStore Preferences |
 | Networking | Ktor 3 (OkHttp engine), kotlinx.serialization, jsoup |
-| Quality | Spotless + ktlint (+ compose rules), detekt 2, Android Lint, Konsist, Dependabot, GitHub Actions; see [ADR 0005](docs/adr/0005-quality-tooling.md) |
+| Quality | Spotless + ktlint (+ compose rules), detekt 2, Android Lint, Konsist, Dependabot, GitHub Actions |
 
 Versions are pinned in [`gradle/libs.versions.toml`](gradle/libs.versions.toml) and kept current by
 Dependabot.
@@ -422,7 +409,7 @@ ai/client                 LLM clients (Anthropic + OpenAI-compatible), spoiler-s
 feature/library|downloads|discover|browser|reader|settings   Compose screens + ViewModels + nav keys
 artwork/                  Logo kit and launcher-icon masters
 scripts/                  Release-notes generator, Gradle wrapper helper, Claude Code hooks
-docs/                     Architecture, device notes, research, roadmap, releasing, ADRs
+docs/                     Architecture, device notes, research, releasing
 ```
 
 ## Contributing
