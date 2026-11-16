@@ -54,7 +54,7 @@ epubcheck = "5.4.0"
 
 # --- Testing ---
 junit4 = "4.13.2"
-mockk = "1.14.11"
+mockk = "1.14.12"
 turbine = "1.2.1"
 robolectric = "4.17"
 konsist = "0.18.1"
