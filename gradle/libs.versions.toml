@@ -56,7 +56,7 @@ epubcheck = "5.4.0"
 junit4 = "4.13.2"
 mockk = "1.14.12"
 turbine = "1.2.1"
-robolectric = "4.17"
+robolectric = "4.18.1"
 konsist = "0.18.1"
 # Screenshot tests run on Robolectric, so they need no device and go in the normal test task.
 roborazzi = "1.79.0"
