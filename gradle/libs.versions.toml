@@ -15,6 +15,7 @@ hilt = "2.60.1"
 
 # --- Android SDK ---
 compileSdk = "37" # Compose 1.12 / Hilt 1.4 AARs require API 37 at compile time.
+compileSdkMinor = "1" # Compose 1.13 AARs require API 37.1 at compile time.
 targetSdk = "36" # Xiaomi Pad 8 runs Android 16; bump deliberately when HyperOS 4 lands.
 minSdk = "29"
 
