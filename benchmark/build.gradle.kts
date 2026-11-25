@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "dev.readana.benchmark"
     compileSdk = libs.versions.compileSdk.get().toInt()
+    compileSdkMinor = libs.versions.compileSdkMinor.get().toInt()
 
     compileOptions.apply {
         sourceCompatibility = JavaVersion.VERSION_17
